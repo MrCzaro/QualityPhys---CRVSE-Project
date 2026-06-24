@@ -1,0 +1,53 @@
+models:
+  - name: crvse_physformer_multichannel_v1
+    task: heart_rate
+    display_name: CRVSE PhysFormer Multichannel HR
+    checkpoint_file: CRVSETransformer_Ensemble_physformer_multichannel_best.pt
+    architecture: CRVSEPhysFormer
+
+    input:
+      input_mode: multichannel
+      in_channels: 3
+      channel_names:
+        - pos
+        - chrom
+        - green
+      window_seconds: 8.0
+      target_frames: 240
+      normalization: per_window_zscore
+
+    preprocessing:
+      roi_set: forehead_left_cheek_right_cheek
+      rppg_methods:
+        - pos
+        - chrom
+        - green
+      bandpass_low_hz: 0.7
+      bandpass_high_hz: 3.5
+      max_no_face_pct: 20.0
+
+    architecture_params:
+      cnn_channels: 16
+      freq_channels: 64
+      d_model: 80
+      n_heads: 4
+      n_layers: 4
+      dim_feedforward: 256
+      dropout: 0.11331939348791525
+      hr_min: 40.0
+      hr_max: 180.0
+      max_positional_length: 300
+
+    output:
+      unit: bpm
+      clamp_min: 40.0
+      clamp_max: 180.0
+
+    training_reference:
+      best_n_epochs: 50
+      best_val_mae: 6.900240182876587
+      datasets:
+        - MCD-rPPG
+        - UBFC-rPPG
+        - UBFC-Phys
+        - ECG-Fitness
