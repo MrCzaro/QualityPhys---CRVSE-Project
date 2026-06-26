@@ -1,54 +1,40 @@
 """
-Live HR demo app shell.
+FastHTML app shell for the QualityPhys live HR demo.
 
-Current purpose:
-    Show a synthetic backend inference result in the browser.
-    Show synthetic rPPG waveform and power spectrum plots.
-    Expose the same synthetic inference result through a real JSON endpoint.
-    Demonstrate browser → backend → UI update with a refresh button.
+This module wires together the live camera-based rPPG demo page and its backend
+API routes. The main app displays browser camera controls, ROI sampling,
+live pulse-wave visualization, spectral HR estimation, and an experimental
+CRVSE model HR comparison.
 
-What this proves:
-    FastHTML page route works.
-    Backend JSON endpoint works.
-    Model bundle loads.
-    Synthetic rPPG window runs through the full backend inference core.
-    Serialized result can be displayed as HTML and returned as JSON.
-    Browser JavaScript can fetch backend inference data and update the page.
+The app does not store camera frames. Debug frame and face routes process
+submitted frames in memory, while live HR prediction routes operate on numeric
+ROI RGB summaries collected in the browser.
 
-What this does NOT do yet:
-    No webcam.
-    No real face video.
-    No POS/CHROM/GREEN extraction from frames.
-    No frame storage.
+Synthetic inference checks are kept outside the app in
+``scripts/check_synthetic_inference.py``.
 """
-
 from __future__ import annotations
 from pathlib import Path
 import sys
 from fasthtml.common import *
-from starlette.requests import Request
-from starlette.responses import JSONResponse
+
 
 APP_DIR = Path(__file__).resolve().parent
 
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
-
-from backend.face_debug import summarize_face_from_data_url_frame
-from backend.frame_debug import summarize_data_url_frame
-from backend.live_prediction import make_json_safe_for_api, make_live_roi_model_prediction_payload
+    
+from backend.api_routes import register_api_routes
 from models.loader import load_model_bundle
-from rppg.live_methods import analyze_roi_series_payload
 from ui.live_demo_script import live_demo_script
 from ui.live_demo_components import camera_preview_card
 
 app, rt = fast_app(title="QualityPhys Live HR Demo")
-
 MODEL_BUNDLE = load_model_bundle(device="cpu")
+register_api_routes(rt=rt, model_bundle=MODEL_BUNDLE)
 
 
-
-### Route handlers
+# Page route
 @rt("/")
 def index() -> FT:
     """
@@ -57,14 +43,13 @@ def index() -> FT:
     Returns
     -------
     FT
-        FastHTML document containing the live camera-based HR demo.
+        FastHTML document containing the camera-based HR demo UI.
 
     Notes
     -----
-    Synthetic demo components and endpoints remain available in code for
-    development checks, but they are not shown on the main page.
+    The page is a research demo, not a medical device. Camera access and
+    frontend interaction are handled by ``live_demo_script()``.
     """
-
     return Html(
         Head(
             Title("QualityPhys Live HR Demo"),
@@ -97,242 +82,5 @@ def index() -> FT:
             cls="bg-slate-100",
         ),
     )
-
-
-
-
-@rt("/api/debug-frame", methods=["POST"])
-async def debug_frame_api(request: Request):
-    """
-    Receive one browser-captured frame and return basic decode diagnostics.
-
-    Expected request JSON
-    ---------------------
-    {
-        "image_data_url": "data:image/jpeg;base64,..."
-    }
-
-    Returns
-    -------
-    JSONResponse
-        Image dimensions, channel count, dtype, RGB statistics, and decode metadata.
-
-    Privacy:
-        The frame is decoded in memory only.
-        The frame is not stored on disk.
-        No model inference is run here.
-
-    Physiology:
-        No physiology is estimated here.
-
-    Signal:
-        No rPPG signal is extracted here. This only confirms valid pixel transport.
-
-    Limitation:
-        This route processes one manually submitted frame, not a live stream.
-    """
-
-    try:
-        payload = await request.json()
-        image_data_url = payload.get("image_data_url")
-
-        if image_data_url is None:
-            return JSONResponse(
-                {
-                    "status": "error",
-                    "message": "Missing required field: image_data_url",
-                },
-                status_code=400,
-            )
-
-        result = summarize_data_url_frame(image_data_url)
-
-        return JSONResponse(result)
-
-    except Exception as exc:
-        return JSONResponse(
-            {
-                "status": "error",
-                "message": str(exc),
-            },
-            status_code=400,
-        )
-    
-@rt("/api/debug-face", methods=["POST"])
-async def debug_face_api(request: Request):
-    """
-    Receive one browser-captured frame and run backend face landmark diagnostics.
-
-    Expected request JSON
-    ---------------------
-    {
-        "image_data_url": "data:image/jpeg;base64,..."
-    }
-
-    Returns
-    -------
-    JSONResponse
-        Frame decode summary and face detection diagnostics.
-
-    Privacy:
-        The frame is decoded and processed in memory only.
-        The frame is not stored on disk.
-        No model inference is run here.
-
-    Physiology:
-        No physiology is estimated here.
-
-    Signal:
-        No rPPG signal is extracted here. This only confirms valid face geometry
-        detection from real camera pixels.
-
-    Limitation:
-        This route processes one manually submitted frame, not a live stream.
-
-    Debug behavior:
-        If an error occurs, return the exception type and message in JSON so the
-        browser can show the actual cause instead of only "HTTP 400".
-    """
-
-    try:
-        payload = await request.json()
-        image_data_url = payload.get("image_data_url")
-
-        if image_data_url is None:
-            return JSONResponse(
-                {
-                    "status": "error",
-                    "stage": "request_validation",
-                    "message": "Missing required field: image_data_url",
-                },
-                status_code=400,
-            )
-
-        result = summarize_face_from_data_url_frame(image_data_url)
-
-        return JSONResponse(result)
-
-    except Exception as exc:
-        return JSONResponse(
-            {
-                "status": "error",
-                "stage": "face_debug_api",
-                "exception_type": type(exc).__name__,
-                "message": str(exc),
-            },
-            status_code=400,
-        )
-
-@rt("/api/analyze-roi-series", methods=["POST"])
-async def analyze_roi_series_api(request: Request):
-    """
-    Analyze browser-collected ROI RGB samples into candidate rPPG signals.
-
-    Expected request JSON
-    ---------------------
-    {
-        "samples": [
-            {
-                "t_s": 0.0,
-                "rois": {
-                    "forehead": {"r": ..., "g": ..., "b": ...},
-                    "image_left_cheek": {"r": ..., "g": ..., "b": ...},
-                    "image_right_cheek": {"r": ..., "g": ..., "b": ...}
-                }
-            }
-        ]
-    }
-
-    Returns
-    -------
-    JSONResponse
-        GREEN / POS / CHROM candidate signals and spectral summaries.
-
-    Privacy:
-        This route receives numeric ROI RGB summaries only.
-        It does not receive or store image frames.
-
-    Physiology:
-        Candidate rPPG signals may contain pulse-related color variation.
-
-    Signal:
-        This route converts ROI RGB time series into GREEN, POS, and CHROM-style
-        candidate signals.
-
-    Limitation:
-        This is not model inference and not a medical measurement.
-    """
-
-    try:
-        payload = await request.json()
-        result = analyze_roi_series_payload(payload)
-
-        status_code = 200 if result.get("status") == "ok" else 400
-
-        return JSONResponse(
-            result,
-            status_code=status_code,
-        )
-
-    except Exception as exc:
-        return JSONResponse(
-            {
-                "status": "error",
-                "stage": "analyze_roi_series_api",
-                "exception_type": type(exc).__name__,
-                "message": str(exc),
-            },
-            status_code=400,
-        )   
-
-@rt("/api/predict-live-roi-series", methods=["POST"])
-async def predict_live_roi_series_api(request: Request):
-    """
-    Run experimental live model prediction from browser-collected ROI RGB samples.
-
-    Expected request JSON
-    ---------------------
-    {
-        "samples": [...]
-    }
-
-    Returns
-    -------
-    JSONResponse
-        Model HR prediction plus classical spectral summaries.
-
-    Notes
-    -----
-    This route receives numeric ROI RGB summaries only. Raw image frames are not
-    sent to this endpoint.
-    """
-
-    try:
-        payload = await request.json()
-
-        result = make_live_roi_model_prediction_payload(
-            payload=payload,
-            model_bundle=MODEL_BUNDLE,
-        )
-
-        result = make_json_safe_for_api(result)
-
-        status_code = 200 if result.get("status") == "ok" else 400
-
-        return JSONResponse(
-            result,
-            status_code=status_code,
-        )
-
-    except Exception as exc:
-        return JSONResponse(
-            {
-                "status": "error",
-                "stage": "predict_live_roi_series_api",
-                "exception_type": type(exc).__name__,
-                "message": str(exc),
-            },
-            status_code=400,
-        )
 
 serve()
