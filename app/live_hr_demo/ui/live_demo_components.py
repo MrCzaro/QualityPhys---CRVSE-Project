@@ -1,6 +1,5 @@
 from fasthtml.common import *
 
-
 def camera_preview_card() -> FT:
     """
     Render the live camera-based HR estimation interface.
@@ -46,6 +45,28 @@ def camera_preview_card() -> FT:
         "rounded-lg border border-slate-300 bg-white px-4 py-2 "
         "text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
     )
+
+    metric_card_cls = (
+        "min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+    )
+
+    metric_card_rose_cls = (
+        "min-w-0 rounded-xl border border-rose-100 bg-white p-4 shadow-sm"
+    )
+
+    metric_label_cls = (
+        "text-[11px] font-semibold uppercase leading-tight tracking-wide "
+        "text-slate-500"
+    )
+
+    metric_value_cls = (
+        "mt-2 break-words text-2xl font-bold leading-tight text-slate-900 "
+        "sm:text-3xl"
+    )
+
+    metric_detail_cls = "mt-2 break-words text-xs leading-snug text-slate-500"
+
+    metric_detail_rose_cls = "mt-2 break-words text-xs leading-snug text-rose-700"
 
     return Div(
         Div(
@@ -169,69 +190,69 @@ def camera_preview_card() -> FT:
                     Div(
                         Div(
                             "Estimated HR",
-                            cls="text-xs font-semibold uppercase tracking-wide text-slate-500",
+                            cls=metric_label_cls,
                         ),
                         Div(
                             "Not analyzed yet",
                             id="spectral-consensus-summary",
-                            cls="mt-1 text-3xl font-bold text-slate-900",
+                            cls=metric_value_cls,
                         ),
                         Div(
                             "Primary estimate: spectral consensus",
-                            cls="mt-1 text-xs text-slate-500",
+                            cls=metric_detail_cls,
                         ),
-                        cls="rounded-xl border border-slate-200 bg-white p-4 shadow-sm",
+                        cls=metric_card_cls,
                     ),
                     Div(
                         Div(
                             "Model Estimated HR",
-                            cls="text-xs font-semibold uppercase tracking-wide text-slate-500",
+                            cls=metric_label_cls,
                         ),
                         Div(
                             "Not predicted yet",
                             id="live-model-hr-summary",
-                            cls="mt-1 text-3xl font-bold text-slate-900",
+                            cls=metric_value_cls,
                         ),
                         Div(
                             "Experimental CRVSE PhysFormer output",
-                            cls="mt-1 text-xs text-rose-700",
+                            cls=metric_detail_rose_cls,
                         ),
-                        cls="rounded-xl border border-rose-100 bg-white p-4 shadow-sm",
+                        cls=metric_card_rose_cls,
                     ),
                     Div(
                         Div(
                             "Model - spectral",
-                            cls="text-xs font-semibold uppercase tracking-wide text-slate-500",
+                            cls=metric_label_cls,
                         ),
                         Div(
                             "Not predicted yet",
                             id="model-spectral-difference-summary",
-                            cls="mt-1 text-3xl font-bold text-slate-900",
+                            cls=metric_value_cls,
                         ),
                         Div(
                             "Agreement diagnostic",
-                            cls="mt-1 text-xs text-slate-500",
+                            cls=metric_detail_cls,
                         ),
-                        cls="rounded-xl border border-slate-200 bg-white p-4 shadow-sm",
+                        cls=metric_card_cls,
                     ),
                     Div(
                         Div(
                             "Measurement Quality",
-                            cls="text-xs font-semibold uppercase tracking-wide text-slate-500",
+                            cls=metric_label_cls,
                         ),
                         Div(
                             "Not analyzed yet",
                             id="measurement-quality-summary",
-                            cls="mt-1 text-2xl font-bold text-slate-900",
+                            cls=metric_value_cls,
                         ),
                         Div(
                             "Signal quality gate",
                             id="measurement-quality-detail",
-                            cls="mt-1 text-xs text-slate-500",
+                            cls=metric_detail_cls,
                         ),
-                        cls="rounded-xl border border-slate-200 bg-white p-4 shadow-sm",
+                        cls=metric_card_cls,
                     ),
-                    cls="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4",
+                    cls="mt-4 grid gap-3 sm:grid-cols-2",
                 ),
                 cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
             ),

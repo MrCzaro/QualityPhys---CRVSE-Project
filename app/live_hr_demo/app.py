@@ -13,28 +13,39 @@ ROI RGB summaries collected in the browser.
 Synthetic inference checks are kept outside the app in
 ``scripts/check_synthetic_inference.py``.
 """
+
 from __future__ import annotations
+
 from pathlib import Path
 import sys
+
 from fasthtml.common import *
+from monsterui.all import *
 
 
 APP_DIR = Path(__file__).resolve().parent
 
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
-    
+
 from backend.api_routes import register_api_routes
 from models.loader import load_model_bundle
 from ui.live_demo_script import live_demo_script
 from ui.live_demo_components import camera_preview_card
 
-app, rt = fast_app(title="QualityPhys Live HR Demo")
+
+app, rt = fast_app(
+    title="QualityPhys Live HR Demo",
+    hdrs=Theme.blue.headers(),
+    bodykw={
+        "class": "bg-slate-100 text-slate-950",
+    },
+)
+
 MODEL_BUNDLE = load_model_bundle(device="cpu")
 register_api_routes(rt=rt, model_bundle=MODEL_BUNDLE)
 
 
-# Page route
 @rt("/")
 def index() -> FT:
     """
@@ -50,37 +61,33 @@ def index() -> FT:
     The page is a research demo, not a medical device. Camera access and
     frontend interaction are handled by ``live_demo_script()``.
     """
-    return Html(
-        Head(
-            Title("QualityPhys Live HR Demo"),
-            Script(src="https://cdn.tailwindcss.com"),
-        ),
-        Body(
-            Main(
-                Div(
-                    H1(
-                        "QualityPhys Live HR Demo",
-                        cls="text-3xl font-bold text-slate-950",
-                    ),
-                    P(
-                        "Research demo for camera-based heart-rate estimation from rPPG. "
-                        "The primary HR estimate is based on spectral consensus from live "
-                        "ROI color signals. The CRVSE model estimate is shown as an "
-                        "experimental comparison.",
-                        cls="mt-2 max-w-4xl text-slate-600",
-                    ),
-                    P(
-                        "Not a medical device. Not for diagnosis or treatment decisions.",
-                        cls="mt-2 font-medium text-red-700",
-                    ),
-                    cls="mb-8",
+
+    return (
+        Title("QualityPhys Live HR Demo"),
+        Main(
+            Div(
+                H1(
+                    "QualityPhys Live HR Demo",
+                    cls="text-3xl font-bold text-slate-950",
                 ),
-                camera_preview_card(),
-                cls="mx-auto max-w-6xl px-6 py-10",
+                P(
+                    "Research demo for camera-based heart-rate estimation from rPPG. "
+                    "The primary HR estimate is based on spectral consensus from live "
+                    "ROI color signals. The CRVSE model estimate is shown as an "
+                    "experimental comparison.",
+                    cls="mt-2 max-w-4xl text-slate-600",
+                ),
+                P(
+                    "Not a medical device. Not for diagnosis or treatment decisions.",
+                    cls="mt-2 font-medium text-red-700",
+                ),
+                cls="mb-8",
             ),
-            live_demo_script(),
-            cls="bg-slate-100",
+            camera_preview_card(),
+            cls="mx-auto max-w-6xl px-6 py-10",
         ),
+        live_demo_script(),
     )
+
 
 serve()
