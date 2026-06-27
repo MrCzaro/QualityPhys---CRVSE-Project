@@ -1,6 +1,5 @@
 from fasthtml.common import FT, NotStr, Script
 
-
 def live_demo_script() -> FT:
     """
     Return browser-side JavaScript for the live HR demo.
@@ -28,6 +27,12 @@ def live_demo_script() -> FT:
     let roiSamples = [];
     let roiSamplingStartMs = null;
     let roiSamplingInFlight = false;
+    let mainMeasurementTimer = null;
+    let mainMeasurementProgressTimer = null;
+    let mainMeasurementInProgress = false;
+    let measurementRevision = 0;
+
+    const MAIN_MEASUREMENT_DURATION_MS = 15000;
 
     const ROI_NAMES = ["forehead", "image_left_cheek", "image_right_cheek"];
 
@@ -49,6 +54,148 @@ def live_demo_script() -> FT:
       }
 
       return numberValue;
+    }
+
+    function setElementText(id, text) {
+      const element = document.getElementById(id);
+
+      if (!element) {
+        return;
+      }
+
+      element.textContent = text;
+      element.innerText = text;
+    }
+
+    function clearCanvasById(id) {
+      const canvasEl = document.getElementById(id);
+
+      if (!canvasEl) {
+        return;
+      }
+
+      const context = canvasEl.getContext("2d");
+
+      if (!context) {
+        return;
+      }
+
+      context.clearRect(0, 0, canvasEl.width, canvasEl.height);
+    }
+
+    function removeRepeatabilityTable() {
+      const repeatabilityContainer = document.getElementById("live-model-repeatability-container");
+
+      if (repeatabilityContainer) {
+        repeatabilityContainer.remove();
+      }
+    }
+
+    function resetMeasurementOutputs() {
+      setElementText("spectral-consensus-summary", "Not analyzed yet");
+      setElementText("live-model-hr-summary", "Not predicted yet");
+      setElementText("model-spectral-difference-summary", "Not predicted yet");
+      setElementText("measurement-quality-summary", "Not analyzed yet");
+      setElementText("measurement-quality-detail", "Signal quality gate");
+
+      setElementText("green-signal-summary", "Not analyzed yet");
+      setElementText("pos-signal-summary", "Not analyzed yet");
+      setElementText("chrom-signal-summary", "Not analyzed yet");
+
+      setElementText("roi-sampling-summary", "No ROI samples collected yet.");
+      setElementText("roi-series-analysis-output", "No ROI series analyzed yet.");
+      setElementText("live-model-prediction-output", "No live model prediction run yet.");
+      setElementText("backend-frame-debug", "No frame sent to backend yet.");
+      setElementText("backend-face-debug", "No face detection request sent yet.");
+
+      clearCanvasById("main-pulse-wave-canvas");
+      clearCanvasById("roi-green-trace-canvas");
+      clearCanvasById("roi-green-normalized-trace-canvas");
+      resetMeasurementProgress();
+      removeRepeatabilityTable();
+    }
+
+    function setMeasurementProgress(progressFraction, progressText) {
+      const progressBar = document.getElementById("measurement-progress-bar");
+      const progressTextEl = document.getElementById("measurement-progress-text");
+
+      const safeProgress = Math.max(0, Math.min(1, Number(progressFraction) || 0));
+      const percentText = `${Math.round(safeProgress * 100)}%`;
+
+      if (progressBar) {
+        progressBar.style.width = percentText;
+      }
+
+      if (progressTextEl) {
+        progressTextEl.innerText = progressText ?? percentText;
+      }
+    }
+
+    function setMeasurementStatus(summary, detail = "") {
+      setElementText("measurement-status-summary", summary);
+      setElementText("measurement-status-detail", detail);
+    }
+
+    function resetMeasurementProgress() {
+      setMeasurementStatus(
+        "Ready.",
+        "Start the camera, then start a measurement while holding still."
+      );
+      setMeasurementProgress(0.0, "0%");
+    }
+
+    function stopMeasurementProgressTimer() {
+      if (mainMeasurementProgressTimer !== null) {
+        clearInterval(mainMeasurementProgressTimer);
+        mainMeasurementProgressTimer = null;
+      }
+    }
+
+    function startMeasurementProgressTimer(activeRevision, startedAtMs) {
+      stopMeasurementProgressTimer();
+
+      mainMeasurementProgressTimer = setInterval(() => {
+        if (activeRevision !== measurementRevision || !mainMeasurementInProgress) {
+          stopMeasurementProgressTimer();
+          return;
+        }
+
+        const elapsedMs = performance.now() - startedAtMs;
+        const progress = elapsedMs / MAIN_MEASUREMENT_DURATION_MS;
+        const elapsedSeconds = Math.min(
+          MAIN_MEASUREMENT_DURATION_MS / 1000.0,
+          Math.max(0.0, elapsedMs / 1000.0)
+        );
+        const totalSeconds = MAIN_MEASUREMENT_DURATION_MS / 1000.0;
+
+        const phaseText = elapsedSeconds < 3.0
+          ? "Stabilizing signal. Hold still."
+          : "Collecting rPPG signal. Keep your face steady.";
+
+        setMeasurementStatus(
+          "Measuring...",
+          `${phaseText} ${elapsedSeconds.toFixed(1)} / ${totalSeconds.toFixed(1)} s`
+        );
+        setMeasurementProgress(
+          progress,
+          `${elapsedSeconds.toFixed(1)} / ${totalSeconds.toFixed(1)} s`
+        );
+      }, 250);
+    }
+
+
+    function setMainMeasurementButtonsState(isRunning) {
+      const startMeasurementButton = document.getElementById("start-measurement-button");
+      const stopMeasurementButton = document.getElementById("stop-measurement-button");
+
+      if (startMeasurementButton) {
+        startMeasurementButton.disabled = isRunning;
+        startMeasurementButton.innerText = isRunning ? "Measuring..." : "Start measurement";
+      }
+
+      if (stopMeasurementButton) {
+        stopMeasurementButton.disabled = !isRunning;
+      }
     }
 
     function mean(values) {
@@ -194,6 +341,17 @@ def live_demo_script() -> FT:
       const videoEl = document.getElementById("camera-video");
       const statusEl = document.getElementById("camera-status");
       const startSamplingButton = document.getElementById("start-roi-sampling-button");
+
+      if (mainMeasurementTimer !== null) {
+        clearTimeout(mainMeasurementTimer);
+        mainMeasurementTimer = null;
+      }
+
+      mainMeasurementInProgress = false;
+      measurementRevision += 1;
+      stopMeasurementProgressTimer();
+      setMainMeasurementButtonsState(false);
+      setMeasurementStatus("Camera stopped.", "Start the camera again before running a new measurement.");
 
       if (roiSamplingTimer !== null) {
         clearInterval(roiSamplingTimer);
@@ -1213,8 +1371,12 @@ function drawMainPulseWaveformFromAnalysis(data) {
       roiSamples = [];
       roiSamplingStartMs = performance.now();
 
-      startButton.disabled = true;
-      startButton.innerText = "Sampling...";
+      resetMeasurementOutputs();
+
+      if (startButton) {
+        startButton.disabled = true;
+        startButton.innerText = "Sampling...";
+      }
 
       statusEl.innerText =
         `ROI sampling started at ${samplingIntervalMs} ms interval. Hold still for about 8-10 seconds.`;
@@ -1237,8 +1399,10 @@ function drawMainPulseWaveformFromAnalysis(data) {
         roiSamplingTimer = null;
       }
 
-      startButton.disabled = false;
-      startButton.innerText = "Start ROI sampling";
+      if (startButton) {
+        startButton.disabled = false;
+        startButton.innerText = "Start ROI sampling";
+      }
 
       summarizeCollectedRoiSamples();
 
@@ -1250,6 +1414,17 @@ function drawMainPulseWaveformFromAnalysis(data) {
       const statusEl = document.getElementById("camera-status");
       const startButton = document.getElementById("start-roi-sampling-button");
 
+      if (mainMeasurementTimer !== null) {
+        clearTimeout(mainMeasurementTimer);
+        mainMeasurementTimer = null;
+      }
+
+      mainMeasurementInProgress = false;
+      measurementRevision += 1;
+      stopMeasurementProgressTimer();
+      setMainMeasurementButtonsState(false);
+      setMeasurementStatus("Camera stopped.", "Start the camera again before running a new measurement.");
+
       if (roiSamplingTimer !== null) {
         clearInterval(roiSamplingTimer);
         roiSamplingTimer = null;
@@ -1259,14 +1434,253 @@ function drawMainPulseWaveformFromAnalysis(data) {
       roiSamplingStartMs = null;
       roiSamplingInFlight = false;
 
+      window.livePredictionRuns = [];
+
       if (startButton) {
         startButton.disabled = false;
         startButton.innerText = "Start ROI sampling";
       }
 
-      summarizeCollectedRoiSamples();
+      resetMeasurementOutputs();
+      drawMainPulseWaveformPlaceholder();
 
-      statusEl.innerText = "ROI samples cleared.";
+      if (statusEl) {
+        statusEl.innerText = "ROI samples and measurement results cleared.";
+      }
+    }
+
+    async function startMainMeasurement() {
+      const statusEl = document.getElementById("camera-status");
+
+      if (!cameraStream) {
+        statusEl.innerText = "Cannot start measurement: camera is not started.";
+        return;
+      }
+
+      if (mainMeasurementInProgress) {
+        statusEl.innerText = "Measurement is already running.";
+        return;
+      }
+
+      clearRoiSamples();
+
+      measurementRevision += 1;
+      const activeRevision = measurementRevision;
+
+      mainMeasurementInProgress = true;
+      setMainMeasurementButtonsState(true);
+
+      const measurementStartedAtMs = performance.now();
+      setMeasurementStatus(
+        "Measuring...",
+        `Stabilizing signal. 0.0 / ${(MAIN_MEASUREMENT_DURATION_MS / 1000).toFixed(1)} s`
+      );
+      setMeasurementProgress(0.0, `0.0 / ${(MAIN_MEASUREMENT_DURATION_MS / 1000).toFixed(1)} s`);
+      startMeasurementProgressTimer(activeRevision, measurementStartedAtMs);
+
+      startRoiSampling();
+
+      if (roiSamplingTimer === null) {
+        mainMeasurementInProgress = false;
+        stopMeasurementProgressTimer();
+        setMainMeasurementButtonsState(false);
+        setMeasurementStatus("Measurement could not start.", "Camera or video frame was not ready.");
+        setMeasurementProgress(0.0, "0%");
+        return;
+      }
+
+      statusEl.innerText =
+        `Measurement started. Hold still for ${(MAIN_MEASUREMENT_DURATION_MS / 1000).toFixed(0)} seconds.`;
+
+      mainMeasurementTimer = setTimeout(async () => {
+        mainMeasurementTimer = null;
+        stopMeasurementProgressTimer();
+
+        try {
+          if (activeRevision !== measurementRevision) {
+            return;
+          }
+
+          setMeasurementProgress(1.0, `${(MAIN_MEASUREMENT_DURATION_MS / 1000).toFixed(1)} / ${(MAIN_MEASUREMENT_DURATION_MS / 1000).toFixed(1)} s`);
+          setMeasurementStatus("Measurement complete.", "Running backend rPPG analysis...");
+
+          stopRoiSampling();
+
+          if (activeRevision !== measurementRevision) {
+            return;
+          }
+
+          statusEl.innerText =
+            `Measurement complete. Collected ${roiSamples.length} sample(s). Running backend analysis...`;
+          setMeasurementStatus(
+            "Analyzing signal...",
+            `Collected ${roiSamples.length} sample(s). Computing spectral HR.`
+          );
+
+          await analyzeRoiSeriesInBackend(activeRevision);
+
+          if (activeRevision !== measurementRevision) {
+            return;
+          }
+
+          statusEl.innerText = "Analysis complete. Running experimental model prediction...";
+          setMeasurementStatus(
+            "Running model prediction...",
+            "Computing experimental CRVSE PhysFormer HR estimate."
+          );
+
+          await runLiveModelPredictionInBackend(activeRevision);
+
+          if (activeRevision === measurementRevision) {
+            setMeasurementStatus(
+              "Prediction complete.",
+              "Review the HR cards and waveform. Use Clear before a new measurement if needed."
+            );
+          }
+        } catch (error) {
+          if (activeRevision === measurementRevision) {
+            statusEl.innerText = `Measurement flow failed: ${error}`;
+            setMeasurementStatus("Measurement failed.", `${error}`);
+          }
+        } finally {
+          if (activeRevision === measurementRevision) {
+            mainMeasurementInProgress = false;
+            stopMeasurementProgressTimer();
+            setMainMeasurementButtonsState(false);
+          }
+        }
+      }, MAIN_MEASUREMENT_DURATION_MS);
+    }
+
+    function stopMainMeasurement() {
+      const statusEl = document.getElementById("camera-status");
+
+      if (mainMeasurementTimer !== null) {
+        clearTimeout(mainMeasurementTimer);
+        mainMeasurementTimer = null;
+      }
+
+      measurementRevision += 1;
+      stopMeasurementProgressTimer();
+
+      if (roiSamplingTimer !== null) {
+        stopRoiSampling();
+      }
+
+      mainMeasurementInProgress = false;
+      setMainMeasurementButtonsState(false);
+
+      statusEl.innerText =
+        `Measurement stopped. Collected ${roiSamples.length} sample(s). Camera is still active.`;
+      setMeasurementStatus(
+        "Measurement stopped.",
+        `Collected ${roiSamples.length} sample(s). You can analyze manually from diagnostics or clear and retry.`
+      );
+      setMeasurementProgress(0.0, "Stopped");
+    }
+
+    function setMeasurementQuality(summary, detail = "") {
+      setElementText("measurement-quality-summary", summary);
+      setElementText("measurement-quality-detail", detail);
+    }
+
+    function summarizeSpectralQualityFromEntries(entries) {
+      const validEntries = entries.filter(entry => entry !== null);
+
+      if (validEntries.length === 0) {
+        return {
+          summary: "Not available",
+          detail: "No spectral channel results returned."
+        };
+      }
+
+      const bpmValues = validEntries
+        .map(entry => getValidNumber(entry.bpm))
+        .filter(value => value !== null);
+
+      const goodEntries = validEntries.filter(entry => entry.status === "good");
+      const moderateEntries = validEntries.filter(entry => entry.status === "moderate");
+      const usableEntries = goodEntries.concat(moderateEntries);
+
+      if (bpmValues.length === 0) {
+        return {
+          summary: "Rejected",
+          detail: "No dominant HR peak detected in the cardiac band."
+        };
+      }
+
+      const bpmMin = Math.min(...bpmValues);
+      const bpmMax = Math.max(...bpmValues);
+      const bpmSpread = bpmMax - bpmMin;
+      const maxAllowedSpread = 20.0;
+
+      if (bpmSpread > maxAllowedSpread) {
+        return {
+          summary: "Rejected",
+          detail: `Channel HR peaks disagree: spread ${bpmSpread.toFixed(1)} bpm.`
+        };
+      }
+
+      if (goodEntries.length > 0) {
+        return {
+          summary: "Accepted / good",
+          detail: `${goodEntries.length} good channel(s), spread ${bpmSpread.toFixed(1)} bpm.`
+        };
+      }
+
+      if (usableEntries.length > 0) {
+        return {
+          summary: "Accepted / moderate",
+          detail: `${usableEntries.length} moderate channel(s), spread ${bpmSpread.toFixed(1)} bpm.`
+        };
+      }
+
+      return {
+        summary: "Rejected",
+        detail: "No channel reached moderate or good spectral quality."
+      };
+    }
+
+    function updateMeasurementQualityFromAnalysis(data) {
+      const entries = ["green", "pos", "chrom"].map(signalName => {
+        const spectral = data.signals?.[signalName]?.spectral;
+
+        if (!spectral) {
+          return null;
+        }
+
+        return {
+          name: signalName,
+          bpm: spectral.dominant_bpm,
+          sqi: spectral.sqi,
+          status: spectral.status ?? "unknown"
+        };
+      });
+
+      const quality = summarizeSpectralQualityFromEntries(entries);
+      setMeasurementQuality(quality.summary, quality.detail);
+    }
+
+    function updateMeasurementQualityFromModelPrediction(data) {
+      const summary = data.classical_spectral_summary ?? {};
+
+      const entries = ["green", "pos", "chrom"].map(signalName => {
+        const spectral = summary[signalName];
+
+        if (!spectral) {
+          return null;
+        }
+
+        return {
+          name: signalName,
+          bpm: spectral.dominant_bpm,
+          sqi: spectral.sqi,
+          status: spectral.status ?? "unknown"
+        };
+      });
+
+      const quality = summarizeSpectralQualityFromEntries(entries);
+      setMeasurementQuality(quality.summary, quality.detail);
     }
 
     function computeSpectralConsensusFromAnalysis(data) {
@@ -1283,7 +1697,11 @@ function drawMainPulseWaveformFromAnalysis(data) {
       return mean(values);
     }
 
-    async function analyzeRoiSeriesInBackend() {
+    async function analyzeRoiSeriesInBackend(expectedRevision = null) {
+      if (typeof expectedRevision !== "number") {
+        expectedRevision = null;
+      }
+
       const statusEl = document.getElementById("camera-status");
       const outputEl = document.getElementById("roi-series-analysis-output");
       const analyzeButton = document.getElementById("analyze-roi-series-button");
@@ -1352,6 +1770,10 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
         const data = await parseJsonResponseEvenOnError(response);
 
+        if (expectedRevision !== null && expectedRevision !== measurementRevision) {
+          return;
+        }
+
         setCompactSignalSummaries(data);
         drawMainPulseWaveformFromAnalysis(data);
 
@@ -1368,6 +1790,8 @@ function drawMainPulseWaveformFromAnalysis(data) {
         if (spectralConsensusEl) {
           spectralConsensusEl.innerText = formatBpm(spectralConsensus);
         }
+
+        updateMeasurementQualityFromAnalysis(data);
 
         const compactSummary = [
           `status: ${data.status}`,
@@ -1409,9 +1833,13 @@ function drawMainPulseWaveformFromAnalysis(data) {
         if (chromSummaryEl) {
           chromSummaryEl.innerText = "Analysis failed";
         }
+
+        setMeasurementQuality("Analysis failed", "Signal quality could not be computed.");
       } finally {
-        analyzeButton.disabled = false;
-        analyzeButton.innerText = "Analyze ROI series";
+        if (analyzeButton) {
+          analyzeButton.disabled = false;
+          analyzeButton.innerText = "Analyze ROI series";
+        }
       }
     }
 
@@ -1578,7 +2006,11 @@ function drawMainPulseWaveformFromAnalysis(data) {
       renderRepeatabilityTable(outputEl);
     }
 
-    async function runLiveModelPredictionInBackend() {
+    async function runLiveModelPredictionInBackend(expectedRevision = null) {
+      if (typeof expectedRevision !== "number") {
+        expectedRevision = null;
+      }
+
       const statusEl = document.getElementById("camera-status");
       const outputEl = document.getElementById("live-model-prediction-output");
       const runButton = document.getElementById("run-live-model-button");
@@ -1596,8 +2028,10 @@ function drawMainPulseWaveformFromAnalysis(data) {
         return;
       }
 
-      runButton.disabled = true;
-      runButton.innerText = "Predicting...";
+      if (runButton) {
+        runButton.disabled = true;
+        runButton.innerText = "Predicting...";
+      }
 
       try {
         const response = await fetch("/api/predict-live-roi-series", {
@@ -1611,6 +2045,11 @@ function drawMainPulseWaveformFromAnalysis(data) {
         });
 
         const data = await parseJsonResponseEvenOnError(response);
+
+        if (expectedRevision !== null && expectedRevision !== measurementRevision) {
+          return;
+        }
+
         const summary = summarizeModelPrediction(data);
 
         if (modelHrEl) {
@@ -1624,6 +2063,8 @@ function drawMainPulseWaveformFromAnalysis(data) {
         if (modelDifferenceEl) {
           modelDifferenceEl.innerText = formatSignedBpm(summary.difference);
         }
+
+        updateMeasurementQualityFromModelPrediction(data);
 
         outputEl.innerText = summary.text;
 
@@ -1647,9 +2088,13 @@ function drawMainPulseWaveformFromAnalysis(data) {
         if (modelDifferenceEl) {
           modelDifferenceEl.innerText = "Prediction failed";
         }
+
+        setMeasurementQuality("Prediction failed", "Model prediction failed before quality summary update.");
       } finally {
-        runButton.disabled = false;
-        runButton.innerText = "Run live model prediction";
+        if (runButton) {
+          runButton.disabled = false;
+          runButton.innerText = "Run live model prediction";
+        }
       }
     }
 
@@ -1660,6 +2105,8 @@ function drawMainPulseWaveformFromAnalysis(data) {
       const sendFrameButton = document.getElementById("send-frame-button");
       const detectFaceButton = document.getElementById("detect-face-button");
       const stopCameraButton = document.getElementById("stop-camera-button");
+      const startMeasurementButton = document.getElementById("start-measurement-button");
+      const stopMeasurementButton = document.getElementById("stop-measurement-button");
       const startRoiSamplingButton = document.getElementById("start-roi-sampling-button");
       const stopRoiSamplingButton = document.getElementById("stop-roi-sampling-button");
       const clearRoiSamplesButton = document.getElementById("clear-roi-samples-button");
@@ -1668,6 +2115,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
       drawAllRoiPlots();
       drawMainPulseWaveformPlaceholder();
+      resetMeasurementProgress();
 
       if (refreshButton) {
         refreshButton.addEventListener("click", refreshSyntheticResult);
@@ -1691,6 +2139,15 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
       if (stopCameraButton) {
         stopCameraButton.addEventListener("click", stopCameraPreview);
+      }
+
+      if (startMeasurementButton) {
+        startMeasurementButton.addEventListener("click", startMainMeasurement);
+      }
+
+      if (stopMeasurementButton) {
+        stopMeasurementButton.addEventListener("click", stopMainMeasurement);
+        stopMeasurementButton.disabled = true;
       }
 
       if (startRoiSamplingButton) {

@@ -5,7 +5,6 @@ This module keeps backend API endpoints separate from the FastHTML app shell.
 The routes support frame diagnostics, face/ROI diagnostics, ROI signal analysis,
 and experimental live model prediction from browser-collected ROI RGB samples.
 """
-
 from __future__ import annotations
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -13,7 +12,6 @@ from backend.face_debug import summarize_face_from_data_url_frame
 from backend.frame_debug import summarize_data_url_frame
 from backend.live_prediction import make_json_safe_for_api, make_live_roi_model_prediction_payload
 from rppg.live_methods import analyze_roi_series_payload
-
 
 def register_api_routes(rt, model_bundle) -> None:
     """

@@ -5,12 +5,10 @@ def camera_preview_card() -> FT:
     """
     Render the live camera-based HR estimation interface.
 
-    The component contains the main demo panel and a collapsible diagnostics
-    section. The main panel exposes camera controls, ROI sampling controls,
-    the primary spectral HR estimate, the experimental CRVSE model estimate,
-    and the pulse waveform canvas. The diagnostics section keeps development
-    tools such as ROI overlays, candidate signal summaries, trace plots,
-    repeatability results, and raw backend JSON responses.
+    The component contains a clean main measurement panel and a collapsible
+    diagnostics section. The main panel is intended for demo use, while the
+    diagnostics section preserves manual controls for ROI sampling, backend
+    frame checks, signal inspection, and model-prediction debugging.
 
     Returns
     -------
@@ -19,18 +17,33 @@ def camera_preview_card() -> FT:
 
     Notes
     -----
-    This component only defines the page structure. Camera access, ROI sampling,
-    backend requests, waveform drawing, and model prediction updates are handled
-    by ``live_demo_script()``.
+    This component only defines page structure. Camera access, sampling,
+    backend requests, waveform drawing, and prediction updates are handled by
+    ``live_demo_script()``.
     """
-    
+
     button_primary = (
-        "mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium "
+        "rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium "
         "text-white shadow-sm hover:bg-slate-700"
     )
 
     button_secondary = (
-        "mt-4 ml-2 rounded-lg border border-slate-300 bg-white px-4 py-2 "
+        "rounded-lg border border-slate-300 bg-white px-4 py-2 "
+        "text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+    )
+
+    button_measurement = (
+        "rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium "
+        "text-white shadow-sm hover:bg-emerald-600"
+    )
+
+    button_stop_measurement = (
+        "rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium "
+        "text-white shadow-sm hover:bg-amber-500"
+    )
+
+    button_diagnostic = (
+        "rounded-lg border border-slate-300 bg-white px-4 py-2 "
         "text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
     )
 
@@ -38,8 +51,9 @@ def camera_preview_card() -> FT:
         Div(
             H2("Live rPPG HR Demo", cls="text-2xl font-bold text-slate-900"),
             P(
-                "Live monitor-style rPPG waveform from facial ROI color changes. "
-                "The waveform is for signal visualization; HR is estimated after backend analysis.",
+                "Camera-based research demo for heart-rate estimation from facial "
+                "rPPG signals. Start the camera, then run a short measurement while "
+                "holding still.",
                 cls="mb-2 text-sm text-slate-600",
             ),
             cls="mb-5",
@@ -62,51 +76,56 @@ def camera_preview_card() -> FT:
                         cls=button_primary,
                     ),
                     Button(
+                        "Start measurement",
+                        id="start-measurement-button",
+                        cls=button_measurement,
+                    ),
+                    Button(
+                        "Stop measurement",
+                        id="stop-measurement-button",
+                        cls=button_stop_measurement,
+                    ),
+                    Button(
                         "Stop camera",
                         id="stop-camera-button",
                         cls=button_secondary,
                     ),
-                    cls="flex flex-wrap items-center gap-0",
-                ),
-                Div(
                     Button(
-                        "Start ROI sampling",
-                        id="start-roi-sampling-button",
-                        cls=(
-                            "mt-3 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium "
-                            "text-white shadow-sm hover:bg-emerald-600"
-                        ),
-                    ),
-                    Button(
-                        "Stop ROI sampling",
-                        id="stop-roi-sampling-button",
-                        cls=button_secondary,
-                    ),
-                    Button(
-                        "Clear ROI samples",
+                        "Clear",
                         id="clear-roi-samples-button",
                         cls=button_secondary,
                     ),
-                    cls="flex flex-wrap items-center gap-0",
+                    cls="mt-4 flex flex-wrap items-center gap-2",
                 ),
                 Div(
-                    Button(
-                        "Analyze ROI series",
-                        id="analyze-roi-series-button",
-                        cls=(
-                            "mt-3 rounded-lg bg-indigo-700 px-4 py-2 text-sm font-medium "
-                            "text-white shadow-sm hover:bg-indigo-600"
-                        ),
+                    Div(
+                        "Measurement status",
+                        cls="text-xs font-semibold uppercase tracking-wide text-slate-500",
                     ),
-                    Button(
-                        "Run live model prediction",
-                        id="run-live-model-button",
-                        cls=(
-                            "mt-3 ml-2 rounded-lg bg-rose-700 px-4 py-2 text-sm font-medium "
-                            "text-white shadow-sm hover:bg-rose-600"
-                        ),
+                    Div(
+                        "Ready.",
+                        id="measurement-status-summary",
+                        cls="mt-1 text-lg font-semibold text-slate-900",
                     ),
-                    cls="flex flex-wrap items-center gap-0",
+                    Div(
+                        "Start the camera, then start a measurement while holding still.",
+                        id="measurement-status-detail",
+                        cls="mt-1 text-sm text-slate-600",
+                    ),
+                    Div(
+                        Div(
+                            id="measurement-progress-bar",
+                            cls="h-2 rounded-full bg-emerald-600 transition-all duration-200",
+                            style="width: 0%;",
+                        ),
+                        cls="mt-3 h-2 overflow-hidden rounded-full bg-slate-200",
+                    ),
+                    Div(
+                        "0%",
+                        id="measurement-progress-text",
+                        cls="mt-1 text-xs text-slate-500",
+                    ),
+                    cls="mt-4 rounded-xl border border-emerald-100 bg-white p-4 shadow-sm",
                 ),
                 Div(
                     "Camera not started.",
@@ -116,14 +135,28 @@ def camera_preview_card() -> FT:
                         "text-sm text-slate-700 shadow-sm"
                     ),
                 ),
+                Div(
+                    Div(
+                        "Measurement guidance",
+                        cls="text-xs font-semibold uppercase tracking-wide text-slate-500",
+                    ),
+                    Ul(
+                        Li("Use steady frontal face position.", cls="mb-1"),
+                        Li("Avoid talking or large head movement.", cls="mb-1"),
+                        Li("Wait for the signal to stabilize before trusting the estimate.", cls="mb-1"),
+                        cls="mt-2 list-disc pl-5 text-sm text-slate-600",
+                    ),
+                    cls="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm",
+                ),
                 cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
             ),
 
             Div(
                 H3("Pulse waveform", cls="mb-3 text-lg font-semibold text-slate-900"),
                 P(
-                    "Main demo waveform slot. Next step will wire this to a blue, "
-                    "medical-style live rPPG pulse trace.",
+                    "Live monitor-style waveform from facial ROI color changes. "
+                    "The waveform is for signal visualization; HR is estimated after "
+                    "backend analysis.",
                     cls="mb-2 text-sm text-slate-600",
                 ),
                 Canvas(
@@ -181,7 +214,24 @@ def camera_preview_card() -> FT:
                         ),
                         cls="rounded-xl border border-slate-200 bg-white p-4 shadow-sm",
                     ),
-                    cls="mt-4 grid gap-3 md:grid-cols-3",
+                    Div(
+                        Div(
+                            "Measurement Quality",
+                            cls="text-xs font-semibold uppercase tracking-wide text-slate-500",
+                        ),
+                        Div(
+                            "Not analyzed yet",
+                            id="measurement-quality-summary",
+                            cls="mt-1 text-2xl font-bold text-slate-900",
+                        ),
+                        Div(
+                            "Signal quality gate",
+                            id="measurement-quality-detail",
+                            cls="mt-1 text-xs text-slate-500",
+                        ),
+                        cls="rounded-xl border border-slate-200 bg-white p-4 shadow-sm",
+                    ),
+                    cls="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4",
                 ),
                 cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
             ),
@@ -198,38 +248,74 @@ def camera_preview_card() -> FT:
             ),
             Div(
                 Div(
+                    H3("Manual acquisition controls", cls="mb-2 text-lg font-semibold"),
+                    P(
+                        "Manual controls for testing the same steps used by the main "
+                        "measurement flow. Keep these for development and debugging.",
+                        cls="mb-3 text-sm text-slate-600",
+                    ),
+                    Div(
+                        Button(
+                            "Start ROI sampling",
+                            id="start-roi-sampling-button",
+                            cls=(
+                                "rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium "
+                                "text-white shadow-sm hover:bg-emerald-600"
+                            ),
+                        ),
+                        Button(
+                            "Stop ROI sampling",
+                            id="stop-roi-sampling-button",
+                            cls=button_diagnostic,
+                        ),
+                        Button(
+                            "Analyze ROI series",
+                            id="analyze-roi-series-button",
+                            cls=(
+                                "rounded-lg bg-indigo-700 px-4 py-2 text-sm font-medium "
+                                "text-white shadow-sm hover:bg-indigo-600"
+                            ),
+                        ),
+                        Button(
+                            "Run live model prediction",
+                            id="run-live-model-button",
+                            cls=(
+                                "rounded-lg bg-rose-700 px-4 py-2 text-sm font-medium "
+                                "text-white shadow-sm hover:bg-rose-600"
+                            ),
+                        ),
+                        cls="flex flex-wrap items-center gap-2",
+                    ),
+                    cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
+                ),
+
+                Div(
                     H3("Frame capture and ROI overlay", cls="mb-2 text-lg font-semibold"),
                     P(
-                        "Use this section to inspect face detection, ROI placement, "
-                        "and backend frame decoding. This is debug UI, not main demo UI.",
+                        "Inspect face detection, ROI placement, and backend frame decoding. "
+                        "This is debug UI, not main demo UI.",
                         cls="mb-3 text-sm text-slate-600",
                     ),
                     Div(
                         Button(
                             "Capture one frame",
                             id="capture-frame-button",
-                            cls=(
-                                "rounded-lg border border-slate-300 bg-white px-4 py-2 "
-                                "text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-                            ),
+                            cls=button_diagnostic,
                         ),
                         Button(
                             "Send frame to backend",
                             id="send-frame-button",
-                            cls=(
-                                "ml-2 rounded-lg border border-slate-300 bg-white px-4 py-2 "
-                                "text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-                            ),
+                            cls=button_diagnostic,
                         ),
                         Button(
                             "Detect face + draw ROIs",
                             id="detect-face-button",
                             cls=(
-                                "ml-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium "
+                                "rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium "
                                 "text-white shadow-sm hover:bg-blue-600"
                             ),
                         ),
-                        cls="mb-3 flex flex-wrap items-center gap-y-2",
+                        cls="mb-3 flex flex-wrap items-center gap-2",
                     ),
                     Canvas(
                         id="snapshot-canvas",

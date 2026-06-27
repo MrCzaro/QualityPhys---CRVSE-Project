@@ -1,30 +1,30 @@
 """
-Smoke-test synthetic rPPG inference outside the FastHTML app.
+Synthetic rPPG inference smoke test.
 
-This script verifies that the model bundle can be loaded, synthetic
-POS/CHROM/GREEN signals can be generated, and the prediction pipeline can
-return a JSON-safe heart-rate result.
+This script runs a compact positive-path check of the live-demo inference stack
+outside the FastHTML app.
 
-Run from the live demo directory:
+It verifies that:
 
-    python scripts/check_synthetic_inference.py
+1. The CRVSE model bundle loads.
+2. Synthetic POS/CHROM/GREEN rPPG-like channels are generated.
+3. Window-level prediction runs successfully.
+4. The prediction result can be converted into a JSON-safe dictionary.
+5. A direct POS spectral check detects a plausible heart-rate peak.
 
-or from the repository root:
-
-    python app/live_hr_demo/scripts/check_synthetic_inference.py
+This is a deployment smoke test, not an accuracy evaluation.
 """
-
 from __future__ import annotations
-
 import sys
 from pathlib import Path
 
-
 SCRIPT_PATH = Path(__file__).resolve()
-LIVE_DEMO_DIR = SCRIPT_PATH.parents[1]
+SCRIPT_DIR = SCRIPT_PATH.parent
+APP_DIR = SCRIPT_DIR.parent
+REPO_DIR = APP_DIR.parents[1]
 
-if str(LIVE_DEMO_DIR) not in sys.path:
-    sys.path.insert(0, str(LIVE_DEMO_DIR))
+if str(APP_DIR) not in sys.path:
+    sys.path.insert(0, str(APP_DIR))
 
 from inference.serialization import prediction_result_to_dict
 from inference.window_inference import predict_hr_from_rppg_window
@@ -33,12 +33,7 @@ from rppg.sqi import estimate_spectral_sqi
 from rppg.windowing import make_synthetic_rppg_channels
 
 
-def run_synthetic_inference_smoke_test(
-    synthetic_hr_bpm: float = 72.0,
-    noise_std: float = 0.05,
-    seed: int = 42,
-    device: str = "cpu",
-) -> dict:
+def run_synthetic_inference_smoke_test(synthetic_hr_bpm: float = 72.0, noise_std: float = 0.05, seed: int = 42, device: str = "cpu") -> dict:
     """
     Run one synthetic rPPG inference smoke test.
 
@@ -48,18 +43,18 @@ def run_synthetic_inference_smoke_test(
         Heart rate used to generate the synthetic rPPG-like signal.
 
     noise_std:
-        Standard deviation of synthetic noise added to the generated channels.
+        Standard deviation of synthetic noise added to each generated channel.
 
     seed:
         Random seed for reproducible synthetic signal generation.
 
     device:
-        Torch device used when loading the model bundle.
+        Device used when loading the model bundle.
 
     Returns
     -------
     dict
-        JSON-safe prediction result with additional smoke-test metadata.
+        Prediction result and metadata for smoke-test reporting.
     """
     model_bundle = load_model_bundle(device=device)
     input_spec = model_bundle.model_spec["input"]
@@ -67,6 +62,7 @@ def run_synthetic_inference_smoke_test(
     window_seconds = float(input_spec["window_seconds"])
     target_frames = int(input_spec["target_frames"])
     fps = float(target_frames) / float(window_seconds)
+
     signals = make_synthetic_rppg_channels(
         hr_bpm=synthetic_hr_bpm,
         duration_seconds=window_seconds,
@@ -105,6 +101,57 @@ def run_synthetic_inference_smoke_test(
     }
 
 
+def validate_smoke_test_result(result: dict, bpm_tolerance: float = 10.0) -> None:
+    """
+    Validate the synthetic inference smoke-test result.
+
+    Parameters
+    ----------
+    result:
+        Result returned by ``run_synthetic_inference_smoke_test``.
+
+    bpm_tolerance:
+        Maximum allowed difference between synthetic HR and direct spectral HR.
+
+    Raises
+    ------
+    ValueError
+        If prediction or spectral checks return implausible values.
+    """
+    prediction = result["prediction"]
+    spectral_check = result["spectral_check"]
+
+    if result.get("status") != "ok":
+        raise ValueError(f"Expected status 'ok', got {result.get('status')}")
+
+    model_hr = prediction.get("model_hr_bpm")
+    spectral_hr = prediction.get("extra", {}).get("spectral_hr_bpm")
+    direct_spectral_hr = spectral_check.get("dominant_bpm")
+
+    if model_hr is None:
+        raise ValueError("Model HR is None for clean synthetic signal.")
+
+    if spectral_hr is None:
+        raise ValueError("Prediction spectral HR is None for clean synthetic signal.")
+
+    if direct_spectral_hr is None:
+        raise ValueError("Direct POS spectral HR is None.")
+
+    direct_error = abs(float(direct_spectral_hr) - float(result["synthetic_hr_bpm"]))
+
+    if direct_error > bpm_tolerance:
+        raise ValueError(
+            f"Direct spectral HR {direct_spectral_hr:.1f} bpm is too far from "
+            f"synthetic HR {result['synthetic_hr_bpm']:.1f} bpm "
+            f"(error {direct_error:.1f} > {bpm_tolerance:.1f})"
+        )
+
+    quality = prediction.get("quality", {})
+
+    if quality.get("status") != "accepted":
+        raise ValueError(f"Expected accepted quality for clean synthetic signal, got {quality.get('status')}")
+
+
 def print_smoke_test_summary(result: dict) -> None:
     """
     Print a compact synthetic inference smoke-test summary.
@@ -122,6 +169,9 @@ def print_smoke_test_summary(result: dict) -> None:
 
     print("Synthetic rPPG inference smoke test")
     print("=" * 72)
+    print(f"App dir: {APP_DIR}")
+    print(f"Repo dir: {REPO_DIR}")
+    print()
     print(f"Status: {result['status']}")
     print(f"Model: {result['model_name']}")
     print(f"Synthetic HR: {result['synthetic_hr_bpm']:.1f} bpm")
@@ -130,8 +180,17 @@ def print_smoke_test_summary(result: dict) -> None:
     print(f"Target frames: {result['target_frames']}")
     print(f"FPS: {result['fps']:.2f}")
     print()
-    print(f"Model HR: {model_hr:.1f} {unit}" if model_hr is not None else "Model HR:            unavailable")
-    print(f"Prediction spectral: {spectral_hr:.1f} {unit}" if spectral_hr is not None else "Prediction spectral: unavailable")
+
+    if model_hr is None:
+        print("Model HR: unavailable")
+    else:
+        print(f"Model HR: {model_hr:.1f} {unit}")
+
+    if spectral_hr is None:
+        print("Prediction spectral: unavailable")
+    else:
+        print(f"Prediction spectral: {spectral_hr:.1f} {unit}")
+
     print(f"Direct POS spectral: {spectral_check['dominant_bpm']:.1f} bpm")
     print(f"Direct POS SQI: {spectral_check['sqi']:.3f} / {spectral_check['status']}")
     print()
@@ -145,11 +204,16 @@ def print_smoke_test_summary(result: dict) -> None:
 
 def main() -> None:
     """
-    Run the synthetic inference smoke test from the command line.
+    Run the synthetic rPPG inference smoke test.
     """
     result = run_synthetic_inference_smoke_test()
+    validate_smoke_test_result(result=result, bpm_tolerance=10.0,)
     print_smoke_test_summary(result)
 
+    print()
+    print("=" * 72)
+    print("PASS: synthetic rPPG inference smoke test ran successfully")
+    print("=" * 72)
 
 if __name__ == "__main__":
     main()
