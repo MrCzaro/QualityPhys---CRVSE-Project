@@ -1,4 +1,8 @@
 from fasthtml.common import *
+from monsterui.all import *
+
+from ui.result_components import demo_button, diagnostic_card, main_panel_card, metric_result_card
+
 
 def camera_preview_card() -> FT:
     """
@@ -21,53 +25,6 @@ def camera_preview_card() -> FT:
     ``live_demo_script()``.
     """
 
-    button_primary = (
-        "rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium "
-        "text-white shadow-sm hover:bg-slate-700"
-    )
-
-    button_secondary = (
-        "rounded-lg border border-slate-300 bg-white px-4 py-2 "
-        "text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-    )
-
-    button_measurement = (
-        "rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium "
-        "text-white shadow-sm hover:bg-emerald-600"
-    )
-
-    button_stop_measurement = (
-        "rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium "
-        "text-white shadow-sm hover:bg-amber-500"
-    )
-
-    button_diagnostic = (
-        "rounded-lg border border-slate-300 bg-white px-4 py-2 "
-        "text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-    )
-
-    metric_card_cls = (
-        "min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-    )
-
-    metric_card_rose_cls = (
-        "min-w-0 rounded-xl border border-rose-100 bg-white p-4 shadow-sm"
-    )
-
-    metric_label_cls = (
-        "text-[11px] font-semibold uppercase leading-tight tracking-wide "
-        "text-slate-500"
-    )
-
-    metric_value_cls = (
-        "mt-2 break-words text-2xl font-bold leading-tight text-slate-900 "
-        "sm:text-3xl"
-    )
-
-    metric_detail_cls = "mt-2 break-words text-xs leading-snug text-slate-500"
-
-    metric_detail_rose_cls = "mt-2 break-words text-xs leading-snug text-rose-700"
-
     return Div(
         Div(
             H2("Live rPPG HR Demo", cls="text-2xl font-bold text-slate-900"),
@@ -81,8 +38,9 @@ def camera_preview_card() -> FT:
         ),
 
         Div(
-            Div(
-                H3("Camera", cls="mb-3 text-lg font-semibold text-slate-900"),
+            main_panel_card(
+                "Camera",
+                None,
                 Video(
                     id="camera-video",
                     autoplay=True,
@@ -91,30 +49,30 @@ def camera_preview_card() -> FT:
                     cls="w-full rounded-xl border border-slate-200 bg-black shadow-sm",
                 ),
                 Div(
-                    Button(
-                        "Start camera",
-                        id="start-camera-button",
-                        cls=button_primary,
+                    demo_button(
+                        label="Start camera",
+                        element_id="start-camera-button",
+                        variant="primary",
                     ),
-                    Button(
-                        "Start measurement",
-                        id="start-measurement-button",
-                        cls=button_measurement,
+                    demo_button(
+                        label="Start measurement",
+                        element_id="start-measurement-button",
+                        variant="measurement",
                     ),
-                    Button(
-                        "Stop measurement",
-                        id="stop-measurement-button",
-                        cls=button_stop_measurement,
+                    demo_button(
+                        label="Stop measurement",
+                        element_id="stop-measurement-button",
+                        variant="stop_measurement",
                     ),
-                    Button(
-                        "Stop camera",
-                        id="stop-camera-button",
-                        cls=button_secondary,
+                    demo_button(
+                        label="Stop camera",
+                        element_id="stop-camera-button",
+                        variant="secondary",
                     ),
-                    Button(
-                        "Clear",
-                        id="clear-roi-samples-button",
-                        cls=button_secondary,
+                    demo_button(
+                        label="Clear",
+                        element_id="clear-roi-samples-button",
+                        variant="secondary",
                     ),
                     cls="mt-4 flex flex-wrap items-center gap-2",
                 ),
@@ -164,22 +122,21 @@ def camera_preview_card() -> FT:
                     Ul(
                         Li("Use steady frontal face position.", cls="mb-1"),
                         Li("Avoid talking or large head movement.", cls="mb-1"),
-                        Li("Wait for the signal to stabilize before trusting the estimate.", cls="mb-1"),
+                        Li(
+                            "Wait for the signal to stabilize before trusting the estimate.",
+                            cls="mb-1",
+                        ),
                         cls="mt-2 list-disc pl-5 text-sm text-slate-600",
                     ),
                     cls="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm",
                 ),
-                cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
             ),
 
-            Div(
-                H3("Pulse waveform", cls="mb-3 text-lg font-semibold text-slate-900"),
-                P(
-                    "Live monitor-style waveform from facial ROI color changes. "
-                    "The waveform is for signal visualization; HR is estimated after "
-                    "backend analysis.",
-                    cls="mb-2 text-sm text-slate-600",
-                ),
+            main_panel_card(
+                "Pulse waveform",
+                "Live monitor-style waveform from facial ROI color changes. "
+                "The waveform is for signal visualization; HR is estimated after "
+                "backend analysis.",
                 Canvas(
                     id="main-pulse-wave-canvas",
                     width="900",
@@ -187,74 +144,34 @@ def camera_preview_card() -> FT:
                     cls="w-full rounded-xl border border-slate-200 bg-white shadow-sm",
                 ),
                 Div(
-                    Div(
-                        Div(
-                            "Estimated HR",
-                            cls=metric_label_cls,
-                        ),
-                        Div(
-                            "Not analyzed yet",
-                            id="spectral-consensus-summary",
-                            cls=metric_value_cls,
-                        ),
-                        Div(
-                            "Primary estimate: spectral consensus",
-                            cls=metric_detail_cls,
-                        ),
-                        cls=metric_card_cls,
+                    metric_result_card(
+                        label="Estimated HR",
+                        value="Not analyzed yet",
+                        detail="Primary estimate: spectral consensus",
+                        value_id="spectral-consensus-summary",
                     ),
-                    Div(
-                        Div(
-                            "Model Estimated HR",
-                            cls=metric_label_cls,
-                        ),
-                        Div(
-                            "Not predicted yet",
-                            id="live-model-hr-summary",
-                            cls=metric_value_cls,
-                        ),
-                        Div(
-                            "Experimental CRVSE PhysFormer output",
-                            cls=metric_detail_rose_cls,
-                        ),
-                        cls=metric_card_rose_cls,
+                    metric_result_card(
+                        label="Model Estimated HR",
+                        value="Not predicted yet",
+                        detail="Experimental CRVSE PhysFormer output",
+                        value_id="live-model-hr-summary",
+                        variant="model",
                     ),
-                    Div(
-                        Div(
-                            "Model - spectral",
-                            cls=metric_label_cls,
-                        ),
-                        Div(
-                            "Not predicted yet",
-                            id="model-spectral-difference-summary",
-                            cls=metric_value_cls,
-                        ),
-                        Div(
-                            "Agreement diagnostic",
-                            cls=metric_detail_cls,
-                        ),
-                        cls=metric_card_cls,
+                    metric_result_card(
+                        label="Model - spectral",
+                        value="Not predicted yet",
+                        detail="Agreement diagnostic",
+                        value_id="model-spectral-difference-summary",
                     ),
-                    Div(
-                        Div(
-                            "Measurement Quality",
-                            cls=metric_label_cls,
-                        ),
-                        Div(
-                            "Not analyzed yet",
-                            id="measurement-quality-summary",
-                            cls=metric_value_cls,
-                        ),
-                        Div(
-                            "Signal quality gate",
-                            id="measurement-quality-detail",
-                            cls=metric_detail_cls,
-                        ),
-                        cls=metric_card_cls,
+                    metric_result_card(
+                        label="Measurement Quality",
+                        value="Not analyzed yet",
+                        detail="Signal quality gate",
+                        value_id="measurement-quality-summary",
+                        detail_id="measurement-quality-detail",
                     ),
                     cls="mt-4 grid gap-3 sm:grid-cols-2",
                 ),
-                cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
             ),
             cls="grid gap-5 lg:grid-cols-2",
         ),
@@ -268,73 +185,54 @@ def camera_preview_card() -> FT:
                 ),
             ),
             Div(
-                Div(
-                    H3("Manual acquisition controls", cls="mb-2 text-lg font-semibold"),
-                    P(
-                        "Manual controls for testing the same steps used by the main "
-                        "measurement flow. Keep these for development and debugging.",
-                        cls="mb-3 text-sm text-slate-600",
-                    ),
+                diagnostic_card(
+                    "Manual acquisition controls",
+                    "Manual controls for testing the same steps used by the main "
+                    "measurement flow. Keep these for development and debugging.",
                     Div(
-                        Button(
-                            "Start ROI sampling",
-                            id="start-roi-sampling-button",
-                            cls=(
-                                "rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium "
-                                "text-white shadow-sm hover:bg-emerald-600"
-                            ),
+                        demo_button(
+                            label="Start ROI sampling",
+                            element_id="start-roi-sampling-button",
+                            variant="measurement",
                         ),
-                        Button(
-                            "Stop ROI sampling",
-                            id="stop-roi-sampling-button",
-                            cls=button_diagnostic,
+                        demo_button(
+                            label="Stop ROI sampling",
+                            element_id="stop-roi-sampling-button",
+                            variant="diagnostic",
                         ),
-                        Button(
-                            "Analyze ROI series",
-                            id="analyze-roi-series-button",
-                            cls=(
-                                "rounded-lg bg-indigo-700 px-4 py-2 text-sm font-medium "
-                                "text-white shadow-sm hover:bg-indigo-600"
-                            ),
+                        demo_button(
+                            label="Analyze ROI series",
+                            element_id="analyze-roi-series-button",
+                            variant="analysis",
                         ),
-                        Button(
-                            "Run live model prediction",
-                            id="run-live-model-button",
-                            cls=(
-                                "rounded-lg bg-rose-700 px-4 py-2 text-sm font-medium "
-                                "text-white shadow-sm hover:bg-rose-600"
-                            ),
+                        demo_button(
+                            label="Run live model prediction",
+                            element_id="run-live-model-button",
+                            variant="model",
                         ),
                         cls="flex flex-wrap items-center gap-2",
                     ),
-                    cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
                 ),
 
-                Div(
-                    H3("Frame capture and ROI overlay", cls="mb-2 text-lg font-semibold"),
-                    P(
-                        "Inspect face detection, ROI placement, and backend frame decoding. "
-                        "This is debug UI, not main demo UI.",
-                        cls="mb-3 text-sm text-slate-600",
-                    ),
+                diagnostic_card(
+                    "Frame capture and ROI overlay",
+                    "Inspect face detection, ROI placement, and backend frame decoding. "
+                    "This is debug UI, not main demo UI.",
                     Div(
-                        Button(
-                            "Capture one frame",
-                            id="capture-frame-button",
-                            cls=button_diagnostic,
+                        demo_button(
+                            label="Capture one frame",
+                            element_id="capture-frame-button",
+                            variant="diagnostic",
                         ),
-                        Button(
-                            "Send frame to backend",
-                            id="send-frame-button",
-                            cls=button_diagnostic,
+                        demo_button(
+                            label="Send frame to backend",
+                            element_id="send-frame-button",
+                            variant="diagnostic",
                         ),
-                        Button(
-                            "Detect face + draw ROIs",
-                            id="detect-face-button",
-                            cls=(
-                                "rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium "
-                                "text-white shadow-sm hover:bg-blue-600"
-                            ),
+                        demo_button(
+                            label="Detect face + draw ROIs",
+                            element_id="detect-face-button",
+                            variant="face",
                         ),
                         cls="mb-3 flex flex-wrap items-center gap-2",
                     ),
@@ -347,60 +245,38 @@ def camera_preview_card() -> FT:
                             "bg-white shadow-sm"
                         ),
                     ),
-                    cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
                 ),
 
-                Div(
-                    H3("Candidate rPPG signal summary", cls="mb-2 text-lg font-semibold"),
-                    P(
-                        "Backend GREEN / POS / CHROM spectral sanity check. "
-                        "Main HR should use spectral consensus when channels agree.",
-                        cls="mb-3 text-sm text-slate-600",
-                    ),
+                diagnostic_card(
+                    "Candidate rPPG signal summary",
+                    "Backend GREEN / POS / CHROM spectral sanity check. "
+                    "Main HR should use spectral consensus when channels agree.",
                     Div(
-                        Div(
-                            Div(
-                                "GREEN",
-                                cls="text-xs font-semibold uppercase tracking-wide text-slate-500",
-                            ),
-                            Div(
-                                "Not analyzed yet",
-                                id="green-signal-summary",
-                                cls="mt-1 text-sm font-medium text-slate-800",
-                            ),
-                            cls="rounded-xl border border-slate-200 bg-white p-4 shadow-sm",
+                        metric_result_card(
+                            label="GREEN",
+                            value="Not analyzed yet",
+                            detail="Classical green-channel signal",
+                            value_id="green-signal-summary",
                         ),
-                        Div(
-                            Div(
-                                "POS",
-                                cls="text-xs font-semibold uppercase tracking-wide text-slate-500",
-                            ),
-                            Div(
-                                "Not analyzed yet",
-                                id="pos-signal-summary",
-                                cls="mt-1 text-sm font-medium text-slate-800",
-                            ),
-                            cls="rounded-xl border border-slate-200 bg-white p-4 shadow-sm",
+                        metric_result_card(
+                            label="POS",
+                            value="Not analyzed yet",
+                            detail="Plane-orthogonal-to-skin signal",
+                            value_id="pos-signal-summary",
                         ),
-                        Div(
-                            Div(
-                                "CHROM",
-                                cls="text-xs font-semibold uppercase tracking-wide text-slate-500",
-                            ),
-                            Div(
-                                "Not analyzed yet",
-                                id="chrom-signal-summary",
-                                cls="mt-1 text-sm font-medium text-slate-800",
-                            ),
-                            cls="rounded-xl border border-slate-200 bg-white p-4 shadow-sm",
+                        metric_result_card(
+                            label="CHROM",
+                            value="Not analyzed yet",
+                            detail="Chrominance-based signal",
+                            value_id="chrom-signal-summary",
                         ),
                         cls="grid gap-3 md:grid-cols-3",
                     ),
-                    cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
                 ),
 
-                Div(
-                    H3("ROI sampling summary", cls="mb-2 text-lg font-semibold"),
+                diagnostic_card(
+                    "ROI sampling summary",
+                    None,
                     Pre(
                         "No ROI samples collected yet.",
                         id="roi-sampling-summary",
@@ -409,41 +285,33 @@ def camera_preview_card() -> FT:
                             "border-slate-200 bg-white p-4 text-xs text-slate-800 shadow-sm"
                         ),
                     ),
-                    cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
                 ),
 
-                Div(
-                    H3("Raw ROI green traces", cls="mb-2 text-lg font-semibold"),
-                    P(
-                        "Raw green-channel means from each ROI over time.",
-                        cls="mb-2 text-sm text-slate-600",
-                    ),
+                diagnostic_card(
+                    "Raw ROI green traces",
+                    "Raw green-channel means from each ROI over time.",
                     Canvas(
                         id="roi-green-trace-canvas",
                         width="900",
                         height="280",
                         cls="w-full rounded-xl border border-slate-200 bg-white shadow-sm",
                     ),
-                    cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
                 ),
 
-                Div(
-                    H3("Normalized ROI green traces", cls="mb-2 text-lg font-semibold"),
-                    P(
-                        "Z-score normalized ROI green traces for signal-shape inspection.",
-                        cls="mb-2 text-sm text-slate-600",
-                    ),
+                diagnostic_card(
+                    "Normalized ROI green traces",
+                    "Z-score normalized ROI green traces for signal-shape inspection.",
                     Canvas(
                         id="roi-green-normalized-trace-canvas",
                         width="900",
                         height="280",
                         cls="w-full rounded-xl border border-slate-200 bg-white shadow-sm",
                     ),
-                    cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
                 ),
 
-                Div(
-                    H3("Experimental model prediction details", cls="mb-2 text-lg font-semibold"),
+                diagnostic_card(
+                    "Experimental model prediction details",
+                    None,
                     Pre(
                         "No live model prediction run yet.",
                         id="live-model-prediction-output",
@@ -452,11 +320,11 @@ def camera_preview_card() -> FT:
                             "border-slate-200 bg-white p-4 text-xs text-slate-800 shadow-sm"
                         ),
                     ),
-                    cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
                 ),
 
-                Div(
-                    H3("Backend rPPG signal analysis JSON", cls="mb-2 text-lg font-semibold"),
+                diagnostic_card(
+                    "Backend rPPG signal analysis JSON",
+                    None,
                     Pre(
                         "No ROI series analyzed yet.",
                         id="roi-series-analysis-output",
@@ -465,11 +333,11 @@ def camera_preview_card() -> FT:
                             "border-slate-200 bg-white p-4 text-xs text-slate-800 shadow-sm"
                         ),
                     ),
-                    cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
                 ),
 
-                Div(
-                    H3("Backend frame debug response", cls="mb-2 text-lg font-semibold"),
+                diagnostic_card(
+                    "Backend frame debug response",
+                    None,
                     Pre(
                         "No frame sent to backend yet.",
                         id="backend-frame-debug",
@@ -478,11 +346,11 @@ def camera_preview_card() -> FT:
                             "border-slate-200 bg-white p-4 text-xs text-slate-800 shadow-sm"
                         ),
                     ),
-                    cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
                 ),
 
-                Div(
-                    H3("Backend face / ROI debug response", cls="mb-2 text-lg font-semibold"),
+                diagnostic_card(
+                    "Backend face / ROI debug response",
+                    None,
                     Pre(
                         "No face detection request sent yet.",
                         id="backend-face-debug",
@@ -491,7 +359,6 @@ def camera_preview_card() -> FT:
                             "border-slate-200 bg-white p-4 text-xs text-slate-800 shadow-sm"
                         ),
                     ),
-                    cls="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm",
                 ),
 
                 cls="mt-3 grid gap-5",
