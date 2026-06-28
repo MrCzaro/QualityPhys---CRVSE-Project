@@ -1,8 +1,14 @@
 from fasthtml.common import *
 from monsterui.all import *
-
-from ui.result_components import demo_button, diagnostic_card, main_panel_card, metric_result_card
-
+from ui.result_components import (
+    demo_button,
+    diagnostic_card,
+    main_panel_card,
+    measurement_result_cards_placeholder,
+    model_prediction_summary_placeholder,
+    roi_analysis_summary_placeholder,
+    signal_summary_cards_placeholder,
+)
 
 def camera_preview_card() -> FT:
     """
@@ -144,33 +150,8 @@ def camera_preview_card() -> FT:
                     cls="w-full rounded-xl border border-slate-200 bg-white shadow-sm",
                 ),
                 Div(
-                    metric_result_card(
-                        label="Estimated HR",
-                        value="Not analyzed yet",
-                        detail="Primary estimate: spectral consensus",
-                        value_id="spectral-consensus-summary",
-                    ),
-                    metric_result_card(
-                        label="Model Estimated HR",
-                        value="Not predicted yet",
-                        detail="Experimental CRVSE PhysFormer output",
-                        value_id="live-model-hr-summary",
-                        variant="model",
-                    ),
-                    metric_result_card(
-                        label="Model - spectral",
-                        value="Not predicted yet",
-                        detail="Agreement diagnostic",
-                        value_id="model-spectral-difference-summary",
-                    ),
-                    metric_result_card(
-                        label="Measurement Quality",
-                        value="Not analyzed yet",
-                        detail="Signal quality gate",
-                        value_id="measurement-quality-summary",
-                        detail_id="measurement-quality-detail",
-                    ),
-                    cls="mt-4 grid gap-3 sm:grid-cols-2",
+                    measurement_result_cards_placeholder(),
+                    id="measurement-result-cards-container",
                 ),
             ),
             cls="grid gap-5 lg:grid-cols-2",
@@ -252,25 +233,8 @@ def camera_preview_card() -> FT:
                     "Backend GREEN / POS / CHROM spectral sanity check. "
                     "Main HR should use spectral consensus when channels agree.",
                     Div(
-                        metric_result_card(
-                            label="GREEN",
-                            value="Not analyzed yet",
-                            detail="Classical green-channel signal",
-                            value_id="green-signal-summary",
-                        ),
-                        metric_result_card(
-                            label="POS",
-                            value="Not analyzed yet",
-                            detail="Plane-orthogonal-to-skin signal",
-                            value_id="pos-signal-summary",
-                        ),
-                        metric_result_card(
-                            label="CHROM",
-                            value="Not analyzed yet",
-                            detail="Chrominance-based signal",
-                            value_id="chrom-signal-summary",
-                        ),
-                        cls="grid gap-3 md:grid-cols-3",
+                        signal_summary_cards_placeholder(),
+                        id="signal-summary-cards-container",
                     ),
                 ),
 
@@ -311,27 +275,19 @@ def camera_preview_card() -> FT:
 
                 diagnostic_card(
                     "Experimental model prediction details",
-                    None,
-                    Pre(
-                        "No live model prediction run yet.",
-                        id="live-model-prediction-output",
-                        cls=(
-                            "max-h-96 overflow-x-auto overflow-y-auto rounded-xl border "
-                            "border-slate-200 bg-white p-4 text-xs text-slate-800 shadow-sm"
-                        ),
+                    "Server-rendered summary of the CRVSE PhysFormer live prediction.",
+                    Div(
+                        model_prediction_summary_placeholder(),
+                        id="live-model-prediction-output-container",
                     ),
                 ),
 
                 diagnostic_card(
-                    "Backend rPPG signal analysis JSON",
-                    None,
-                    Pre(
-                        "No ROI series analyzed yet.",
-                        id="roi-series-analysis-output",
-                        cls=(
-                            "max-h-96 overflow-x-auto overflow-y-auto rounded-xl border "
-                            "border-slate-200 bg-white p-4 text-xs text-slate-800 shadow-sm"
-                        ),
+                    "Backend rPPG signal analysis",
+                    "Server-rendered summary of the analyzed ROI time series.",
+                    Div(
+                        roi_analysis_summary_placeholder(),
+                        id="roi-series-analysis-output-container",
                     ),
                 ),
 

@@ -13,6 +13,7 @@ from backend.frame_debug import summarize_data_url_frame
 from backend.live_prediction import make_json_safe_for_api, make_live_roi_model_prediction_payload
 from rppg.live_methods import analyze_roi_series_payload
 
+
 def register_api_routes(rt, model_bundle) -> None:
     """
     Register backend API routes for the live HR demo.

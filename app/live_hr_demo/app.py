@@ -29,6 +29,7 @@ if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
 from backend.api_routes import register_api_routes
+from backend.ui_routes import register_ui_routes
 from models.loader import load_model_bundle
 from ui.live_demo_script import live_demo_script
 from ui.live_demo_components import camera_preview_card
@@ -44,7 +45,7 @@ app, rt = fast_app(
 
 MODEL_BUNDLE = load_model_bundle(device="cpu")
 register_api_routes(rt=rt, model_bundle=MODEL_BUNDLE)
-
+register_ui_routes(rt=rt)
 
 @rt("/")
 def index() -> FT:
