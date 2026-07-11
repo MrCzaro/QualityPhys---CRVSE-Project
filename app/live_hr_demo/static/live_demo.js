@@ -1,13 +1,14 @@
-let cameraStream = null;
-    let hasCapturedFrame = false;
-    let roiSamplingTimer = null;
-    let roiSamples = [];
-    let roiSamplingStartMs = null;
-    let roiSamplingInFlight = false;
-    let mainMeasurementTimer = null;
-    let mainMeasurementProgressTimer = null;
-    let mainMeasurementInProgress = false;
-    let measurementRevision = 0;
+  let cameraStream = null;
+  let hasCapturedFrame = false;
+  let roiSamplingTimer = null;
+  let roiSamples = [];
+  let roiSamplingStartMs = null;
+  let roiSamplingInFlight = false;
+  let roiSamplingRunId = 0;
+  let mainMeasurementTimer = null;
+  let mainMeasurementProgressTimer = null;
+  let mainMeasurementInProgress = false;
+  let measurementRevision = 0;
 
     const MAIN_MEASUREMENT_DURATION_MS = 15000;
 
@@ -74,15 +75,23 @@ let cameraStream = null;
       routePath,
       params = {},
       method = "GET",
+      expectedRevision = null,
       missingMessage = "Server partial container not found.",
       errorMessage = "Could not render server partial:",
     } = {}) {
       /*
       Fetch a FastHTML partial and swap it into a known container.
 
-      Browser-only responsibilities stay in JavaScript. Layout and diagnostic
-      panels are progressively moved to FastHTML / MonsterUI partial routes.
+      When expectedRevision is provided, the partial is only applied if the
+      measurement revision is still current. This prevents delayed reset/result
+      partials from overwriting newer UI state.
       */
+
+      const hasRevisionGuard = typeof expectedRevision === "number";
+
+      if (hasRevisionGuard && expectedRevision !== measurementRevision) {
+        return false;
+      }
 
       const container = document.getElementById(containerId);
 
@@ -93,6 +102,11 @@ let cameraStream = null;
 
       try {
         const html = await fetchServerPartialHtml(routePath, params, method);
+
+        if (hasRevisionGuard && expectedRevision !== measurementRevision) {
+          return false;
+        }
+
         container.innerHTML = html;
         return true;
       } catch (error) {
@@ -100,6 +114,7 @@ let cameraStream = null;
         return false;
       }
     }
+
     async function renderMeasurementResultCardsFromServer({
         spectralHr = null,
         spectralDetail = null,
@@ -133,18 +148,22 @@ let cameraStream = null;
     }
 
 
-    async function renderMeasurementResultCardsPlaceholderFromServer() {
-        /*
-        Fetch the server-rendered placeholder for the main measurement cards.
-        */
+    async function renderMeasurementResultCardsPlaceholderFromServer({
+      expectedRevision = null,
+    } = {}) {
+      /*
+      Fetch the server-rendered placeholder for the main measurement cards.
+      */
 
-        await renderServerPartial({
-            containerId: "measurement-result-cards-container",
-            routePath: "/ui/measurement-results-placeholder",
-            missingMessage: "Measurement result cards container not found.",
-            errorMessage: "Could not render measurement result card placeholder:",
-        });
+      await renderServerPartial({
+        containerId: "measurement-result-cards-container",
+        routePath: "/ui/measurement-results-placeholder",
+        expectedRevision: expectedRevision,
+        missingMessage: "Measurement result cards container not found.",
+        errorMessage: "Could not render measurement result card placeholder:",
+      });
     }
+
 
 
     async function renderSignalSummaryCardsFromServer({
@@ -176,7 +195,9 @@ let cameraStream = null;
     }
 
 
-    async function renderSignalSummaryCardsPlaceholderFromServer() {
+    async function renderSignalSummaryCardsPlaceholderFromServer({
+      expectedRevision = null,
+    } = {}) {
       /*
       Fetch the server-rendered placeholder for GREEN / POS / CHROM cards.
       */
@@ -184,13 +205,15 @@ let cameraStream = null;
       await renderServerPartial({
         containerId: "signal-summary-cards-container",
         routePath: "/ui/signal-summary-placeholder",
+        expectedRevision: expectedRevision,
         missingMessage: "Signal summary cards container not found.",
         errorMessage: "Could not render signal summary card placeholder:",
       });
     }
 
-
-    async function renderRoiAnalysisSummaryPlaceholderFromServer() {
+    async function renderRoiAnalysisSummaryPlaceholderFromServer({
+      expectedRevision = null,
+    } = {}) {
       /*
       Fetch the server-rendered placeholder for the ROI analysis summary panel.
       */
@@ -198,6 +221,7 @@ let cameraStream = null;
       await renderServerPartial({
         containerId: "roi-series-analysis-output-container",
         routePath: "/ui/roi-analysis-summary-placeholder",
+        expectedRevision: expectedRevision,
         missingMessage: "ROI analysis summary container not found.",
         errorMessage: "Could not render ROI analysis placeholder:",
       });
@@ -287,7 +311,9 @@ let cameraStream = null;
       });
     }
 
-    async function renderModelPredictionSummaryPlaceholderFromServer() {
+    async function renderModelPredictionSummaryPlaceholderFromServer({
+      expectedRevision = null,
+    } = {}) {
       /*
       Fetch the server-rendered placeholder for the model prediction summary panel.
       */
@@ -295,6 +321,7 @@ let cameraStream = null;
       await renderServerPartial({
         containerId: "live-model-prediction-output-container",
         routePath: "/ui/model-prediction-summary-placeholder",
+        expectedRevision: expectedRevision,
         missingMessage: "Model prediction summary container not found.",
         errorMessage: "Could not render model prediction placeholder:",
       });
@@ -419,13 +446,21 @@ let cameraStream = null;
       }
     }
 
-    function resetMeasurementOutputs() {
-      renderMeasurementResultCardsPlaceholderFromServer();
-      renderSignalSummaryCardsPlaceholderFromServer();
+    function resetMeasurementOutputs(expectedRevision = null) {
+      renderMeasurementResultCardsPlaceholderFromServer({
+        expectedRevision: expectedRevision,
+      });
+      renderSignalSummaryCardsPlaceholderFromServer({
+        expectedRevision: expectedRevision,
+      });
 
       setElementText("roi-sampling-summary", "No ROI samples collected yet.");
-      renderRoiAnalysisSummaryPlaceholderFromServer();
-      renderModelPredictionSummaryPlaceholderFromServer();
+      renderRoiAnalysisSummaryPlaceholderFromServer({
+        expectedRevision: expectedRevision,
+      });
+      renderModelPredictionSummaryPlaceholderFromServer({
+        expectedRevision: expectedRevision,
+      });
       setElementText("backend-frame-debug", "No frame sent to backend yet.");
       setElementText("backend-face-debug", "No face detection request sent yet.");
 
@@ -1586,7 +1621,10 @@ function drawMainPulseWaveformFromAnalysis(data) {
       drawMainPulseWaveformFromLiveSamples();
     }
 
-    async function collectOneRoiSample() {
+    async function collectOneRoiSample(
+      expectedSamplingRunId = roiSamplingRunId,
+      expectedRevision = measurementRevision
+    ) {
       const statusEl = document.getElementById("camera-status");
 
       if (roiSamplingInFlight) {
@@ -1602,6 +1640,13 @@ function drawMainPulseWaveformFromAnalysis(data) {
           return;
         }
 
+        if (
+          expectedSamplingRunId !== roiSamplingRunId ||
+          expectedRevision !== measurementRevision
+        ) {
+          return;
+        }
+
         const response = await fetch("/api/debug-face", {
           method: "POST",
           headers: {
@@ -1613,6 +1658,15 @@ function drawMainPulseWaveformFromAnalysis(data) {
         });
 
         const data = await parseJsonResponseEvenOnError(response);
+
+        if (
+          expectedSamplingRunId !== roiSamplingRunId ||
+          expectedRevision !== measurementRevision ||
+          roiSamplingTimer === null
+        ) {
+          return;
+        }
+
         const sample = extractRoiSampleFromBackendResponse(data);
 
         roiSamples.push(sample);
@@ -1623,13 +1677,21 @@ function drawMainPulseWaveformFromAnalysis(data) {
           `ROI sampling active. Collected ${roiSamples.length} sample(s). ` +
           "Frames are processed in memory and not stored.";
       } catch (error) {
-        statusEl.innerText = `ROI sampling error: ${error}`;
+        if (
+          expectedSamplingRunId === roiSamplingRunId &&
+          expectedRevision === measurementRevision &&
+          roiSamplingTimer !== null
+        ) {
+          statusEl.innerText = `ROI sampling error: ${error}`;
+        }
       } finally {
-        roiSamplingInFlight = false;
+        if (expectedSamplingRunId === roiSamplingRunId) {
+          roiSamplingInFlight = false;
+        }
       }
     }
 
-    function startRoiSampling() {
+    function startRoiSampling({ resetOutputs = true } = {}) {
       const statusEl = document.getElementById("camera-status");
       const startButton = document.getElementById("start-roi-sampling-button");
 
@@ -1637,18 +1699,25 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
       if (!cameraStream) {
         statusEl.innerText = "Cannot start ROI sampling: camera is not started.";
-        return;
+        return false;
       }
 
       if (roiSamplingTimer !== null) {
         statusEl.innerText = "ROI sampling is already running.";
-        return;
+        return false;
       }
+
+      roiSamplingRunId += 1;
+      const activeSamplingRunId = roiSamplingRunId;
+      const activeRevision = measurementRevision;
 
       roiSamples = [];
       roiSamplingStartMs = performance.now();
+      roiSamplingInFlight = false;
 
-      resetMeasurementOutputs();
+      if (resetOutputs) {
+        resetMeasurementOutputs(activeRevision);
+      }
 
       if (startButton) {
         startButton.disabled = true;
@@ -1660,16 +1729,22 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
       summarizeCollectedRoiSamples();
 
-      collectOneRoiSample();
-
       roiSamplingTimer = setInterval(() => {
-        collectOneRoiSample();
+        collectOneRoiSample(activeSamplingRunId, activeRevision);
       }, samplingIntervalMs);
+
+      collectOneRoiSample(activeSamplingRunId, activeRevision);
+
+      return true;
     }
+
 
     function stopRoiSampling() {
       const statusEl = document.getElementById("camera-status");
       const startButton = document.getElementById("start-roi-sampling-button");
+
+      roiSamplingRunId += 1;
+      roiSamplingInFlight = false;
 
       if (roiSamplingTimer !== null) {
         clearInterval(roiSamplingTimer);
@@ -1698,6 +1773,9 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
       mainMeasurementInProgress = false;
       measurementRevision += 1;
+      const activeRevision = measurementRevision;
+      roiSamplingRunId += 1;
+
       stopMeasurementProgressTimer();
       setMainMeasurementButtonsState(false);
       setMeasurementStatus("Camera stopped.", "Start the camera again before running a new measurement.");
@@ -1718,7 +1796,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
         startButton.innerText = "Start ROI sampling";
       }
 
-      resetMeasurementOutputs();
+      resetMeasurementOutputs(activeRevision);
       drawMainPulseWaveformPlaceholder();
 
       if (statusEl) {
@@ -1755,9 +1833,11 @@ function drawMainPulseWaveformFromAnalysis(data) {
       setMeasurementProgress(0.0, `0.0 / ${(MAIN_MEASUREMENT_DURATION_MS / 1000).toFixed(1)} s`);
       startMeasurementProgressTimer(activeRevision, measurementStartedAtMs);
 
-      startRoiSampling();
+      const samplingStarted = startRoiSampling({
+        resetOutputs: false,
+      });
 
-      if (roiSamplingTimer === null) {
+      if (!samplingStarted || roiSamplingTimer === null) {
         mainMeasurementInProgress = false;
         stopMeasurementProgressTimer();
         setMainMeasurementButtonsState(false);

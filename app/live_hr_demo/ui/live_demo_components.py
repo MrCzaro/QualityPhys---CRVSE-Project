@@ -52,6 +52,8 @@ def camera_preview_card() -> FT:
                     autoplay=True,
                     muted=True,
                     playsinline=True,
+                    style="transform: scaleX(-1); transform-origin: center;",
+
                     cls="w-full rounded-xl border border-slate-200 bg-black shadow-sm",
                 ),
                 Div(
@@ -221,6 +223,7 @@ def camera_preview_card() -> FT:
                         id="snapshot-canvas",
                         width="320",
                         height="240",
+                        style="transform: scaleX(-1); transform-origin: center;",
                         cls=(
                             "w-full max-w-sm rounded-xl border border-slate-200 "
                             "bg-white shadow-sm"

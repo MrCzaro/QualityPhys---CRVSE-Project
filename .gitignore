@@ -17,3 +17,7 @@ app/live_hr_demo/models/checkpoints/
 
 # MediaPipe local model assets
 app/live_hr_demo/models/mediapipe/*.task
+
+
+# Local Codex / AI collaboration instructions
+AGENTS.md
