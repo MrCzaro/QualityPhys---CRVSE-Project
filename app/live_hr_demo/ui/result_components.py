@@ -142,13 +142,14 @@ def metric_result_card(label: str, value: str, detail: str, value_id: str, detai
     card_variant = CardT.default
     card_cls = "min-w-0 shadow-sm"
     detail_cls = "mt-2 break-words text-xs leading-snug text-slate-500"
+    value_cls = "mt-2 break-normal text-2xl font-bold leading-tight text-slate-900 sm:text-3xl"
 
     if variant == "model":
         card_cls = "min-w-0 border-rose-100 shadow-sm"
         detail_cls = "mt-2 break-words text-xs leading-snug text-rose-700"
+        value_cls = "mt-2 break-normal text-2xl font-bold leading-tight text-slate-900"
 
-    label_cls = ("text-[11px] font-semibold uppercase leading-tight tracking-wide text-slate-500")
-    value_cls = ("mt-2 break-words text-2xl font-bold leading-tight text-slate-900 sm:text-3xl")
+    label_cls = "text-[11px] font-semibold uppercase leading-tight tracking-wide text-slate-500"
 
     if detail_id is None:
         detail_node = Div(detail, cls=detail_cls)
@@ -164,7 +165,6 @@ def metric_result_card(label: str, value: str, detail: str, value_id: str, detai
         ),
         cls=(card_variant, card_cls),
     )
-
 
 def measurement_result_cards(
     spectral_hr_value: str,
@@ -420,24 +420,6 @@ def main_panel_card(title: str, description: str | None = None, *children) -> FT
 def demo_button(label: str, element_id: str, variant: str = "secondary") -> FT:
     """
     Render one live demo control button.
-
-    Parameters
-    ----------
-    label:
-        Button text.
-
-    element_id:
-        HTML element ID used by JavaScript event listeners.
-
-    variant:
-        Visual variant. Supported values are ``primary``, ``secondary``,
-        ``measurement``, ``stop_measurement``, ``diagnostic``, ``analysis``,
-        ``model``, and ``face``.
-
-    Returns
-    -------
-    FT
-        FastHTML button component.
     """
     variant_classes = {
         "primary": (
@@ -474,7 +456,8 @@ def demo_button(label: str, element_id: str, variant: str = "secondary") -> FT:
         ),
     }
 
-    button_cls = variant_classes.get(variant, variant_classes["secondary"])
+    disabled_cls = "disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
+    button_cls = f"{variant_classes.get(variant, variant_classes['secondary'])} {disabled_cls}"
 
     return Button(label, id=element_id, cls=button_cls)
 

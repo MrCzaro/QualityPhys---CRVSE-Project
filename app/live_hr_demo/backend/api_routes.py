@@ -14,7 +14,77 @@ from backend.live_prediction import make_json_safe_for_api, make_live_roi_model_
 from rppg.live_methods import analyze_roi_series_payload
 
 
-def register_api_routes(rt, model_bundle) -> None:
+def _classical_spectral_summary_from_payload(payload: dict) -> dict:
+    """
+    Compute the spectral summary that remains available without the model.
+    """
+
+    try:
+        analysis = analyze_roi_series_payload(payload)
+        analysis = make_json_safe_for_api(analysis)
+    except Exception as exc:
+        return {
+            "status": "error",
+            "message": str(exc),
+            "summary": None,
+        }
+
+    if analysis.get("status") != "ok":
+        return {
+            "status": analysis.get("status", "error"),
+            "message": analysis.get("message", "Classical spectral analysis was not available."),
+            "summary": None,
+        }
+
+    signals = analysis.get("signals", {})
+
+    return {
+        "status": "ok",
+        "message": "Classical spectral analysis completed.",
+        "summary": {
+            "green": signals.get("green", {}).get("spectral"),
+            "pos": signals.get("pos", {}).get("spectral"),
+            "chrom": signals.get("chrom", {}).get("spectral"),
+        },
+    }
+
+
+def build_model_unavailable_prediction_payload(
+    payload: dict,
+    model_status: dict | None = None,
+) -> dict:
+    """
+    Build a graceful API response when experimental model prediction is unavailable.
+
+    The input payload contains numeric ROI summaries only, not raw frames.
+    """
+
+    classical_result = _classical_spectral_summary_from_payload(payload)
+
+    return make_json_safe_for_api(
+        {
+            "status": "model_unavailable",
+            "message": (
+                "Experimental model prediction is unavailable due to a model "
+                "loading issue. Spectral rPPG analysis remains available."
+            ),
+            "model_available": False,
+            "model_load": model_status,
+            "model_prediction": None,
+            "model_input": None,
+            "classical_analysis_status": classical_result["status"],
+            "classical_analysis_message": classical_result["message"],
+            "classical_spectral_summary": classical_result["summary"],
+            "notes": [
+                "The experimental CRVSE model prediction is unavailable.",
+                "The browser camera workflow and classical spectral rPPG analysis can still be used.",
+                "This is not a medical measurement.",
+            ],
+        }
+    )
+
+
+def register_api_routes(rt, model_bundle, model_status: dict | None = None) -> None:
     """
     Register backend API routes for the live HR demo.
 
@@ -140,7 +210,15 @@ def register_api_routes(rt, model_bundle) -> None:
 
         try:
             payload = await request.json()
-
+            if model_bundle is None:
+                return JSONResponse(
+                    build_model_unavailable_prediction_payload(
+                        payload=payload,
+                        model_status=model_status,
+                    ),
+                    status_code=200,
+                )
+            
             result = make_live_roi_model_prediction_payload(
                 payload=payload,
                 model_bundle=model_bundle,

@@ -30,21 +30,39 @@ if str(APP_DIR) not in sys.path:
 
 from backend.api_routes import register_api_routes
 from backend.ui_routes import register_ui_routes
-from models.loader import load_model_bundle
+from models.runtime import load_model_bundle_for_demo
 from ui.live_demo_script import live_demo_script
 from ui.live_demo_components import camera_preview_card
 
 
 app, rt = fast_app(
     title="QualityPhys Live HR Demo",
-    hdrs=Theme.blue.headers(),
+    hdrs=(
+        *Theme.blue.headers(),
+        *Favicon(
+            "/static/favicon.ico",
+            "/static/favicon.ico",
+        ),
+    ),
     bodykw={
         "class": "bg-slate-100 text-slate-950",
     },
 )
 
-MODEL_BUNDLE = load_model_bundle(device="cpu")
-register_api_routes(rt=rt, model_bundle=MODEL_BUNDLE)
+MODEL_BUNDLE, MODEL_STATUS = load_model_bundle_for_demo(device="cpu")
+
+if not MODEL_STATUS["available"]:
+    print(
+        "WARNING: Experimental CRVSE model unavailable; "
+        "serving live HR demo in limited spectral-only mode. "
+        f"Reason: {MODEL_STATUS['message']}",
+        file=sys.stderr,
+    )
+register_api_routes(
+    rt=rt,
+    model_bundle=MODEL_BUNDLE,
+    model_status=MODEL_STATUS,
+)
 register_ui_routes(rt=rt)
 
 @rt("/")

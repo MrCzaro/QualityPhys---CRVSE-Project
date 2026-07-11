@@ -327,34 +327,34 @@
       });
     }
 
-    function buildCompactModelPredictionDebugResponse(data) {
-      /*
-      Build a compact diagnostic payload for the collapsible model prediction panel.
+        function buildCompactModelPredictionDebugResponse(data) {
+          /*
+          Build a compact diagnostic payload for the collapsible model prediction panel.
+          */
 
-      The full backend response can contain model input arrays or verbose metadata.
-      The server-rendered panel receives the clinically useful summary plus a compact
-      debug payload, keeping URL size reasonable.
-      */
-
-      return {
-        status: data.status,
-        message: data.message ?? null,
-        model_prediction: data.model_prediction ?? null,
-        classical_spectral_summary: data.classical_spectral_summary ?? null,
-        model_input: {
-          window_metadata: data.model_input?.window_metadata ?? null,
-          source_estimated_fps: data.model_input?.source_estimated_fps ?? null,
-          channel_names: data.model_input?.channel_names ?? null,
-          target_frames: data.model_input?.target_frames ?? null,
-        },
-        notes: data.notes ?? [],
-        omitted_from_compact_view: [
-          "model_input.tensor",
-          "model_input.values",
-          "raw ROI sample buffer",
-        ],
-      };
-    }
+          return {
+            status: data.status,
+            message: data.message ?? null,
+            model_available: data.model_available ?? null,
+            model_load: data.model_load ?? null,
+            model_prediction: data.model_prediction ?? null,
+            classical_analysis_status: data.classical_analysis_status ?? null,
+            classical_analysis_message: data.classical_analysis_message ?? null,
+            classical_spectral_summary: data.classical_spectral_summary ?? null,
+            model_input: {
+              window_metadata: data.model_input?.window_metadata ?? null,
+              source_estimated_fps: data.model_input?.source_estimated_fps ?? null,
+              channel_names: data.model_input?.channel_names ?? null,
+              target_frames: data.model_input?.target_frames ?? null,
+            },
+            notes: data.notes ?? [],
+            omitted_from_compact_view: [
+              "model_input.tensor",
+              "model_input.values",
+              "raw ROI sample buffer",
+            ],
+          };
+        }
 
     async function renderModelPredictionSummaryFromServer({
       status = null,
@@ -540,18 +540,56 @@
     }
 
 
-    function setMainMeasurementButtonsState(isRunning) {
+    function hasPrimaryStateToClear() {
+      const predictionRunCount = Array.isArray(window.livePredictionRuns)
+        ? window.livePredictionRuns.length
+        : 0;
+
+      return (
+        roiSamples.length > 0 ||
+        predictionRunCount > 0 ||
+        roiSamplingTimer !== null ||
+        mainMeasurementInProgress
+      );
+    }
+
+    function updatePrimaryControlButtons() {
+      const cameraActive = Boolean(cameraStream);
+      const measurementActive = Boolean(mainMeasurementInProgress);
+      const clearable = hasPrimaryStateToClear();
+
+      const startCameraButton = document.getElementById("start-camera-button");
       const startMeasurementButton = document.getElementById("start-measurement-button");
       const stopMeasurementButton = document.getElementById("stop-measurement-button");
+      const stopCameraButton = document.getElementById("stop-camera-button");
+      const clearButton = document.getElementById("clear-roi-samples-button");
+
+      if (startCameraButton) {
+        startCameraButton.disabled = cameraActive;
+        startCameraButton.innerText = cameraActive ? "Camera started" : "Start camera";
+      }
 
       if (startMeasurementButton) {
-        startMeasurementButton.disabled = isRunning;
-        startMeasurementButton.innerText = isRunning ? "Measuring..." : "Start measurement";
+        startMeasurementButton.disabled = !cameraActive || measurementActive;
+        startMeasurementButton.innerText = measurementActive ? "Measuring..." : "Start measurement";
       }
 
       if (stopMeasurementButton) {
-        stopMeasurementButton.disabled = !isRunning;
+        stopMeasurementButton.disabled = !measurementActive;
       }
+
+      if (stopCameraButton) {
+        stopCameraButton.disabled = !cameraActive;
+      }
+
+      if (clearButton) {
+        clearButton.disabled = measurementActive || !clearable;
+      }
+    }
+
+    function setMainMeasurementButtonsState(isRunning) {
+      mainMeasurementInProgress = Boolean(isRunning);
+      updatePrimaryControlButtons();
     }
 
     function mean(values) {
@@ -646,6 +684,7 @@
       } finally {
         startButton.disabled = false;
         startButton.innerText = "Start camera";
+        updatePrimaryControlButtons();
       }
     }
 
@@ -659,10 +698,9 @@
         mainMeasurementTimer = null;
       }
 
-      mainMeasurementInProgress = false;
+      setMainMeasurementButtonsState(false);
       measurementRevision += 1;
       stopMeasurementProgressTimer();
-      setMainMeasurementButtonsState(false);
       setMeasurementStatus("Camera stopped.", "Start the camera again before running a new measurement.");
 
       if (roiSamplingTimer !== null) {
@@ -689,7 +727,11 @@
         videoEl.srcObject = null;
       }
 
-      statusEl.innerText = "Camera stopped. Captured frame remains local in the canvas.";
+      if (statusEl) {
+        statusEl.innerText = "Camera stopped. Captured frame remains local in the canvas.";
+      }
+
+      updatePrimaryControlButtons();
     }
 
     function captureOneFrame() {
@@ -1699,11 +1741,13 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
       if (!cameraStream) {
         statusEl.innerText = "Cannot start ROI sampling: camera is not started.";
+        updatePrimaryControlButtons();
         return false;
       }
 
       if (roiSamplingTimer !== null) {
         statusEl.innerText = "ROI sampling is already running.";
+        updatePrimaryControlButtons();
         return false;
       }
 
@@ -1734,6 +1778,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
       }, samplingIntervalMs);
 
       collectOneRoiSample(activeSamplingRunId, activeRevision);
+      updatePrimaryControlButtons();
 
       return true;
     }
@@ -1760,6 +1805,8 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
       statusEl.innerText =
         `ROI sampling stopped. Collected ${roiSamples.length} sample(s).`;
+
+      updatePrimaryControlButtons();
     }
 
     function clearRoiSamples() {
@@ -1771,14 +1818,18 @@ function drawMainPulseWaveformFromAnalysis(data) {
         mainMeasurementTimer = null;
       }
 
-      mainMeasurementInProgress = false;
+      setMainMeasurementButtonsState(false);
       measurementRevision += 1;
       const activeRevision = measurementRevision;
       roiSamplingRunId += 1;
 
       stopMeasurementProgressTimer();
-      setMainMeasurementButtonsState(false);
-      setMeasurementStatus("Camera stopped.", "Start the camera again before running a new measurement.");
+
+      if (cameraStream) {
+        setMeasurementStatus("Ready.", "Start a measurement while holding still.");
+      } else {
+        setMeasurementStatus("Camera stopped.", "Start the camera before running a measurement.");
+      }
 
       if (roiSamplingTimer !== null) {
         clearInterval(roiSamplingTimer);
@@ -1802,6 +1853,8 @@ function drawMainPulseWaveformFromAnalysis(data) {
       if (statusEl) {
         statusEl.innerText = "ROI samples and measurement results cleared.";
       }
+
+      updatePrimaryControlButtons();
     }
 
     async function startMainMeasurement() {
@@ -1924,7 +1977,6 @@ function drawMainPulseWaveformFromAnalysis(data) {
         stopRoiSampling();
       }
 
-      mainMeasurementInProgress = false;
       setMainMeasurementButtonsState(false);
 
       statusEl.innerText =
@@ -1934,6 +1986,8 @@ function drawMainPulseWaveformFromAnalysis(data) {
         `Collected ${roiSamples.length} sample(s). You can analyze manually from diagnostics or clear and retry.`
       );
       setMeasurementProgress(0.0, "Stopped");
+
+      updatePrimaryControlButtons();
     }
 
     function summarizeSpectralQualityFromEntries(entries) {
@@ -2225,6 +2279,27 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
       return [greenBpm, posBpm, chromBpm].filter(value => value !== null);
     }
+    
+    function isModelUnavailableResponse(data) {
+      return data?.model_available === false || data?.status === "model_unavailable";
+    }
+
+    function modelUnavailableDetail(data) {
+      return (
+        data?.message ??
+        "Experimental model prediction is unavailable. Spectral rPPG analysis remains available."
+      );
+    }
+
+    function formatSecondsOrNone(value) {
+      const formatted = formatNumber(value, 2);
+      return formatted === "none" ? "none" : `${formatted} s`;
+    }
+
+    function formatHzOrNone(value) {
+      const formatted = formatNumber(value, 2);
+      return formatted === "none" ? "none" : `${formatted} Hz`;
+    }
 
     function summarizeModelPrediction(data) {
       const modelHr = getValidNumber(data.model_prediction?.value);
@@ -2338,7 +2413,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
       await renderRepeatabilityTableFromServer();
     }
 
-async function runLiveModelPredictionInBackend(expectedRevision = null) {
+    async function runLiveModelPredictionInBackend(expectedRevision = null) {
       if (typeof expectedRevision !== "number") {
         expectedRevision = null;
       }
@@ -2378,36 +2453,53 @@ async function runLiveModelPredictionInBackend(expectedRevision = null) {
         }
 
         const summary = summarizeModelPrediction(data);
-
+        const modelUnavailable = isModelUnavailableResponse(data);
         const quality = updateMeasurementQualityFromModelPrediction(data);
+
+        const modelHrText = modelUnavailable ? "Unavailable" : formatBpm(summary.modelHr);
+        const modelDetail = modelUnavailable
+          ? modelUnavailableDetail(data)
+          : "Experimental CRVSE PhysFormer output";
+        const modelDifferenceText = modelUnavailable
+          ? "Not available"
+          : formatSignedBpm(summary.difference);
+        const modelDifferenceDetail = modelUnavailable
+          ? "Agreement diagnostic unavailable because model prediction is unavailable."
+          : "Agreement diagnostic";
 
         await renderMeasurementResultCardsFromServer({
           spectralHr: formatBpm(summary.consensus),
           spectralDetail: "Primary estimate: spectral consensus",
-          modelHr: formatBpm(summary.modelHr),
-          modelDetail: "Experimental CRVSE PhysFormer output",
-          modelDifference: formatSignedBpm(summary.difference),
-          modelDifferenceDetail: "Agreement diagnostic",
+          modelHr: modelHrText,
+          modelDetail: modelDetail,
+          modelDifference: modelDifferenceText,
+          modelDifferenceDetail: modelDifferenceDetail,
           quality: quality.summary,
           qualityDetail: quality.detail
         });
 
         await renderModelPredictionSummaryFromServer({
-          status: data.status ?? "unknown",
-          modelHr: formatBpm(summary.modelHr),
+          status: modelUnavailable ? "Model unavailable" : data.status ?? "unknown",
+          modelHr: modelHrText,
           spectralConsensus: formatBpm(summary.consensus),
-          modelDifference: formatSignedBpm(summary.difference),
+          modelDifference: modelDifferenceText,
           greenSummary: `${formatBpm(summary.greenBpm)} / SQI ${formatNumber(summary.greenSqi, 3)} / ${summary.greenStatus}`,
           posSummary: `${formatBpm(summary.posBpm)} / SQI ${formatNumber(summary.posSqi, 3)} / ${summary.posStatus}`,
           chromSummary: `${formatBpm(summary.chromBpm)} / SQI ${formatNumber(summary.chromSqi, 3)} / ${summary.chromStatus}`,
-          originalDurationS: `${formatNumber(summary.originalDurationS, 2)} s`,
-          usedDurationS: `${formatNumber(summary.usedDurationS, 2)} s`,
+          originalDurationS: formatSecondsOrNone(summary.originalDurationS),
+          usedDurationS: formatSecondsOrNone(summary.usedDurationS),
           usedSamples: String(summary.usedSamples ?? "none"),
-          sourceFps: `${formatNumber(summary.sourceFps, 2)} Hz`,
+          sourceFps: formatHzOrNone(summary.sourceFps),
           rawResponse: JSON.stringify(buildCompactModelPredictionDebugResponse(data), null, 2),
         });
 
         if (expectedRevision !== null && expectedRevision !== measurementRevision) {
+          return;
+        }
+
+        if (modelUnavailable) {
+          statusEl.innerText =
+            `Experimental model unavailable. Spectral consensus=${formatBpm(summary.consensus)}.`;
           return;
         }
 
@@ -2496,7 +2588,6 @@ async function runLiveModelPredictionInBackend(expectedRevision = null) {
 
       if (stopMeasurementButton) {
         stopMeasurementButton.addEventListener("click", stopMainMeasurement);
-        stopMeasurementButton.disabled = true;
       }
 
       if (startRoiSamplingButton) {
@@ -2518,4 +2609,6 @@ async function runLiveModelPredictionInBackend(expectedRevision = null) {
       if (runLiveModelButton) {
         runLiveModelButton.addEventListener("click", runLiveModelPredictionInBackend);
       }
+
+      updatePrimaryControlButtons();
     });
