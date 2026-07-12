@@ -218,7 +218,6 @@ def register_api_routes(rt, model_bundle, model_status: dict | None = None) -> N
                     ),
                     status_code=200,
                 )
-            
             result = make_live_roi_model_prediction_payload(
                 payload=payload,
                 model_bundle=model_bundle,

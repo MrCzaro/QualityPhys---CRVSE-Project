@@ -438,6 +438,13 @@
       context.clearRect(0, 0, canvasEl.width, canvasEl.height);
     }
 
+    function resetCapturedFrameDiagnostics() {
+      hasCapturedFrame = false;
+      clearCanvasById("snapshot-canvas");
+      setElementText("backend-frame-debug", "No frame sent to backend yet.");
+      setElementText("backend-face-debug", "No face detection request sent yet.");
+    }
+
     function removeRepeatabilityTable() {
       const repeatabilityContainer = document.getElementById("live-model-repeatability-container");
 
@@ -485,6 +492,41 @@
       if (progressTextEl) {
         progressTextEl.innerText = progressText ?? percentText;
       }
+    }
+    function resetMeasurementRunState(activeRevision, { resetCapturedFrame = false } = {}) {
+      const startButton = document.getElementById("start-roi-sampling-button");
+
+      if (mainMeasurementTimer !== null) {
+        clearTimeout(mainMeasurementTimer);
+        mainMeasurementTimer = null;
+      }
+
+      roiSamplingRunId += 1;
+      stopMeasurementProgressTimer();
+
+      if (roiSamplingTimer !== null) {
+        clearInterval(roiSamplingTimer);
+        roiSamplingTimer = null;
+      }
+
+      roiSamples = [];
+      roiSamplingStartMs = null;
+      roiSamplingInFlight = false;
+
+      window.livePredictionRuns = [];
+
+      if (startButton) {
+        startButton.disabled = false;
+        startButton.innerText = "Start ROI sampling";
+      }
+
+      resetMeasurementOutputs(activeRevision);
+
+      if (resetCapturedFrame) {
+        resetCapturedFrameDiagnostics();
+      }
+
+      drawMainPulseWaveformPlaceholder();
     }
 
     function setMeasurementStatus(summary, detail = "") {
@@ -546,6 +588,7 @@
         : 0;
 
       return (
+        hasCapturedFrame ||
         roiSamples.length > 0 ||
         predictionRunCount > 0 ||
         roiSamplingTimer !== null ||
@@ -553,16 +596,95 @@
       );
     }
 
+    function hasEnoughRoiSamplesForBackend() {
+      return roiSamples.length >= 20;
+    }
+
+    function updateAdvancedDiagnosticStatus({
+      cameraActive,
+      measurementActive,
+      samplingActive,
+      enoughRoiSamples,
+    }) {
+      if (measurementActive) {
+        setElementText(
+          "advanced-manual-controls-status",
+          "Main measurement is running. Manual diagnostic controls are paused."
+        );
+        setElementText(
+          "advanced-frame-controls-status",
+          "Frame diagnostics are paused during the main measurement."
+        );
+        return;
+      }
+
+      if (!cameraActive) {
+        setElementText(
+          "advanced-manual-controls-status",
+          "Start the camera to enable manual ROI sampling."
+        );
+        setElementText(
+          "advanced-frame-controls-status",
+          "Start the camera to enable frame capture."
+        );
+        return;
+      }
+
+      if (samplingActive) {
+        setElementText(
+          "advanced-manual-controls-status",
+          `ROI sampling active. Collected ${roiSamples.length} sample(s). Stop sampling before analysis or model prediction.`
+        );
+      } else if (enoughRoiSamples) {
+        setElementText(
+          "advanced-manual-controls-status",
+          `Collected ${roiSamples.length} sample(s). Analysis and model prediction are available.`
+        );
+      } else if (roiSamples.length > 0) {
+        setElementText(
+          "advanced-manual-controls-status",
+          `Collected ${roiSamples.length} / 20 sample(s). Continue sampling before analysis or model prediction.`
+        );
+      } else {
+        setElementText(
+          "advanced-manual-controls-status",
+          "Camera is ready. Start ROI sampling to collect diagnostic samples."
+        );
+      }
+
+      if (hasCapturedFrame) {
+        setElementText(
+          "advanced-frame-controls-status",
+          "Captured frame is ready. You can send it to the backend or run face / ROI overlay diagnostics."
+        );
+      } else {
+        setElementText(
+          "advanced-frame-controls-status",
+          "Camera is ready. Capture one frame to enable frame diagnostics."
+        );
+      }
+    }
+
     function updatePrimaryControlButtons() {
       const cameraActive = Boolean(cameraStream);
       const measurementActive = Boolean(mainMeasurementInProgress);
+      const samplingActive = roiSamplingTimer !== null;
       const clearable = hasPrimaryStateToClear();
+      const enoughRoiSamples = hasEnoughRoiSamplesForBackend();
 
       const startCameraButton = document.getElementById("start-camera-button");
       const startMeasurementButton = document.getElementById("start-measurement-button");
       const stopMeasurementButton = document.getElementById("stop-measurement-button");
       const stopCameraButton = document.getElementById("stop-camera-button");
       const clearButton = document.getElementById("clear-roi-samples-button");
+
+      const captureFrameButton = document.getElementById("capture-frame-button");
+      const sendFrameButton = document.getElementById("send-frame-button");
+      const detectFaceButton = document.getElementById("detect-face-button");
+      const startRoiSamplingButton = document.getElementById("start-roi-sampling-button");
+      const stopRoiSamplingButton = document.getElementById("stop-roi-sampling-button");
+      const analyzeRoiSeriesButton = document.getElementById("analyze-roi-series-button");
+      const runLiveModelButton = document.getElementById("run-live-model-button");
 
       if (startCameraButton) {
         startCameraButton.disabled = cameraActive;
@@ -585,6 +707,42 @@
       if (clearButton) {
         clearButton.disabled = measurementActive || !clearable;
       }
+
+      if (captureFrameButton) {
+        captureFrameButton.disabled = !cameraActive || measurementActive;
+      }
+
+      if (sendFrameButton) {
+        sendFrameButton.disabled = !hasCapturedFrame || measurementActive;
+      }
+
+      if (detectFaceButton) {
+        detectFaceButton.disabled = !hasCapturedFrame || measurementActive;
+      }
+
+      if (startRoiSamplingButton) {
+        startRoiSamplingButton.disabled = !cameraActive || samplingActive || measurementActive;
+        startRoiSamplingButton.innerText = samplingActive ? "Sampling..." : "Start ROI sampling";
+      }
+
+      if (stopRoiSamplingButton) {
+        stopRoiSamplingButton.disabled = !samplingActive || measurementActive;
+      }
+
+      if (analyzeRoiSeriesButton) {
+        analyzeRoiSeriesButton.disabled = !enoughRoiSamples || samplingActive || measurementActive;
+      }
+
+      if (runLiveModelButton) {
+        runLiveModelButton.disabled = !enoughRoiSamples || samplingActive || measurementActive;
+      }
+
+      updateAdvancedDiagnosticStatus({
+        cameraActive,
+        measurementActive,
+        samplingActive,
+        enoughRoiSamples,
+      });
     }
 
     function setMainMeasurementButtonsState(isRunning) {
@@ -741,6 +899,7 @@
 
       if (!cameraStream) {
         statusEl.innerText = "Cannot capture frame: camera is not started.";
+        updatePrimaryControlButtons();
         return false;
       }
 
@@ -749,6 +908,7 @@
 
       if (width === 0 || height === 0) {
         statusEl.innerText = "Cannot capture frame yet: video dimensions are not ready.";
+        updatePrimaryControlButtons();
         return false;
       }
 
@@ -762,6 +922,8 @@
 
       statusEl.innerText =
         `Captured one local frame: ${width} x ${height}. Frame was not sent to backend.`;
+
+      updatePrimaryControlButtons();
 
       return true;
     }
@@ -1608,6 +1770,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
         drawAllRoiPlots();
         drawMainPulseWaveformPlaceholder();
+        updatePrimaryControlButtons();
         return;
       }
 
@@ -1661,6 +1824,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
       drawAllRoiPlots();
       drawMainPulseWaveformFromLiveSamples();
+      updatePrimaryControlButtons();
     }
 
     async function collectOneRoiSample(
@@ -1811,19 +1975,14 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
     function clearRoiSamples() {
       const statusEl = document.getElementById("camera-status");
-      const startButton = document.getElementById("start-roi-sampling-button");
-
-      if (mainMeasurementTimer !== null) {
-        clearTimeout(mainMeasurementTimer);
-        mainMeasurementTimer = null;
-      }
 
       setMainMeasurementButtonsState(false);
       measurementRevision += 1;
       const activeRevision = measurementRevision;
-      roiSamplingRunId += 1;
 
-      stopMeasurementProgressTimer();
+      resetMeasurementRunState(activeRevision, {
+        resetCapturedFrame: true,
+      });
 
       if (cameraStream) {
         setMeasurementStatus("Ready.", "Start a measurement while holding still.");
@@ -1831,27 +1990,8 @@ function drawMainPulseWaveformFromAnalysis(data) {
         setMeasurementStatus("Camera stopped.", "Start the camera before running a measurement.");
       }
 
-      if (roiSamplingTimer !== null) {
-        clearInterval(roiSamplingTimer);
-        roiSamplingTimer = null;
-      }
-
-      roiSamples = [];
-      roiSamplingStartMs = null;
-      roiSamplingInFlight = false;
-
-      window.livePredictionRuns = [];
-
-      if (startButton) {
-        startButton.disabled = false;
-        startButton.innerText = "Start ROI sampling";
-      }
-
-      resetMeasurementOutputs(activeRevision);
-      drawMainPulseWaveformPlaceholder();
-
       if (statusEl) {
-        statusEl.innerText = "ROI samples and measurement results cleared.";
+        statusEl.innerText = "ROI samples, captured frame, and measurement results cleared.";
       }
 
       updatePrimaryControlButtons();
@@ -1870,10 +2010,12 @@ function drawMainPulseWaveformFromAnalysis(data) {
         return;
       }
 
-      clearRoiSamples();
-
       measurementRevision += 1;
       const activeRevision = measurementRevision;
+
+      resetMeasurementRunState(activeRevision, {
+        resetCapturedFrame: true,
+      });
 
       mainMeasurementInProgress = true;
       setMainMeasurementButtonsState(true);
@@ -2279,7 +2421,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
       return [greenBpm, posBpm, chromBpm].filter(value => value !== null);
     }
-    
+
     function isModelUnavailableResponse(data) {
       return data?.model_available === false || data?.status === "model_unavailable";
     }

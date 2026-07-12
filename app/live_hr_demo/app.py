@@ -34,9 +34,9 @@ from models.runtime import load_model_bundle_for_demo
 from ui.live_demo_script import live_demo_script
 from ui.live_demo_components import camera_preview_card
 
-
 app, rt = fast_app(
     title="QualityPhys Live HR Demo",
+    static_path=str(APP_DIR),
     hdrs=(
         *Theme.blue.headers(),
         *Favicon(

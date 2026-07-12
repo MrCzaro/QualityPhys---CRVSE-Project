@@ -21,3 +21,5 @@ app/live_hr_demo/models/mediapipe/*.task
 
 # Local Codex / AI collaboration instructions
 AGENTS.md
+
+CRVSE_training_preprocessing_audit_2026-07-11.md

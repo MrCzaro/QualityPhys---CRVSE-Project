@@ -173,6 +173,14 @@ def camera_preview_card() -> FT:
                     "Manual controls for testing the same steps used by the main "
                     "measurement flow. Keep these for development and debugging.",
                     Div(
+                        "Start the camera to enable manual ROI sampling.",
+                        id="advanced-manual-controls-status",
+                        cls=(
+                            "mb-3 rounded-lg border border-slate-200 bg-slate-50 "
+                            "px-3 py-2 text-xs text-slate-600"
+                        ),
+                    ),
+                    Div(
                         demo_button(
                             label="Start ROI sampling",
                             element_id="start-roi-sampling-button",
@@ -201,6 +209,14 @@ def camera_preview_card() -> FT:
                     "Frame capture and ROI overlay",
                     "Inspect face detection, ROI placement, and backend frame decoding. "
                     "This is debug UI, not main demo UI.",
+                    Div(
+                        "Start the camera to enable frame capture.",
+                        id="advanced-frame-controls-status",
+                        cls=(
+                            "mb-3 rounded-lg border border-slate-200 bg-slate-50 "
+                            "px-3 py-2 text-xs text-slate-600"
+                        ),
+                    ),
                     Div(
                         demo_button(
                             label="Capture one frame",
