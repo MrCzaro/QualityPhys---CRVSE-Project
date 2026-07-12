@@ -171,34 +171,23 @@ def register_api_routes(rt, model_bundle, model_status: dict | None = None) -> N
             )
 
     @rt("/api/analyze-roi-series", methods=["POST"])
-    async def analyze_roi_series_api(request: Request):
-        """
-        Analyze browser-collected ROI RGB samples into candidate rPPG signals.
-
-        This endpoint receives numeric ROI summaries only, not raw frames.
-        """
-
+    async def analyze_roi_series_api(request: Request) -> JSONResponse:
+        """Analyze browser-collected ROI RGB samples into candidate rPPG signals."""
         try:
             payload = await request.json()
             result = analyze_roi_series_payload(payload)
-
+            result = make_json_safe_for_api(result)
             status_code = 200 if result.get("status") == "ok" else 400
-
-            return JSONResponse(
-                result,
-                status_code=status_code,
-            )
-
+            return JSONResponse(result, status_code=status_code)
         except Exception as exc:
             return JSONResponse(
                 {
                     "status": "error",
-                    "stage": "analyze_roi_series_api",
-                    "exception_type": type(exc).__name__,
-                    "message": str(exc),
+                    "message": f"{type(exc).__name__}: {exc}",
                 },
                 status_code=400,
             )
+        
 
     @rt("/api/predict-live-roi-series", methods=["POST"])
     async def predict_live_roi_series_api(request: Request):

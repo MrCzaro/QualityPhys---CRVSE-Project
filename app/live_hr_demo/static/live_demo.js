@@ -327,34 +327,44 @@
       });
     }
 
-        function buildCompactModelPredictionDebugResponse(data) {
-          /*
-          Build a compact diagnostic payload for the collapsible model prediction panel.
-          */
+    function buildCompactModelPredictionDebugResponse(data) {
+      /*
+      Build a compact diagnostic payload for the collapsible model prediction panel.
+      */
 
-          return {
-            status: data.status,
-            message: data.message ?? null,
-            model_available: data.model_available ?? null,
-            model_load: data.model_load ?? null,
-            model_prediction: data.model_prediction ?? null,
-            classical_analysis_status: data.classical_analysis_status ?? null,
-            classical_analysis_message: data.classical_analysis_message ?? null,
-            classical_spectral_summary: data.classical_spectral_summary ?? null,
-            model_input: {
-              window_metadata: data.model_input?.window_metadata ?? null,
-              source_estimated_fps: data.model_input?.source_estimated_fps ?? null,
-              channel_names: data.model_input?.channel_names ?? null,
-              target_frames: data.model_input?.target_frames ?? null,
-            },
-            notes: data.notes ?? [],
-            omitted_from_compact_view: [
-              "model_input.tensor",
-              "model_input.values",
-              "raw ROI sample buffer",
-            ],
-          };
-        }
+      const modelInput = data.model_input ?? {};
+
+      return {
+        status: data.status,
+        message: data.message ?? null,
+        model_available: data.model_available ?? null,
+        model_load: data.model_load ?? null,
+        model_prediction: data.model_prediction ?? null,
+        classical_analysis_status: data.classical_analysis_status ?? null,
+        classical_analysis_message: data.classical_analysis_message ?? null,
+        classical_spectral_summary: data.classical_spectral_summary ?? null,
+        model_input: {
+          input_shape: modelInput.input_shape ?? null,
+          channel_order: modelInput.channel_order ?? null,
+          target_length: modelInput.target_length ?? null,
+          model_target_frames: modelInput.model_target_frames ?? null,
+          model_window_seconds: modelInput.model_window_seconds ?? null,
+          model_assumed_fps_after_resampling:
+            modelInput.model_assumed_fps_after_resampling ?? null,
+          window_metadata: modelInput.window_metadata ?? null,
+          source_sample_count: modelInput.source_sample_count ?? null,
+          source_duration_s: modelInput.source_duration_s ?? null,
+          source_estimated_fps: modelInput.source_estimated_fps ?? null,
+          preprocessing: modelInput.preprocessing ?? null,
+        },
+        notes: data.notes ?? [],
+        omitted_from_compact_view: [
+          "model_input.tensor",
+          "model_input.values",
+          "raw ROI sample buffer",
+        ],
+      };
+    }
 
     async function renderModelPredictionSummaryFromServer({
       status = null,
@@ -2081,12 +2091,12 @@ function drawMainPulseWaveformFromAnalysis(data) {
             "Computing experimental CRVSE PhysFormer HR estimate."
           );
 
-          await runLiveModelPredictionInBackend(activeRevision);
+          const predictionStatus = await runLiveModelPredictionInBackend(activeRevision);
 
-          if (activeRevision === measurementRevision) {
+          if (activeRevision === measurementRevision && predictionStatus !== null) {
             setMeasurementStatus(
-              "Prediction complete.",
-              "Review the HR cards and waveform. Use Clear before a new measurement if needed."
+              predictionStatus.summary,
+              predictionStatus.detail
             );
           }
         } catch (error) {
@@ -2132,60 +2142,62 @@ function drawMainPulseWaveformFromAnalysis(data) {
       updatePrimaryControlButtons();
     }
 
-    function summarizeSpectralQualityFromEntries(entries) {
+    function summarizeSpectralQualityFromEntries(entries, contextLabel = "Spectral gate") {
       const validEntries = entries.filter(entry => entry !== null);
 
       if (validEntries.length === 0) {
         return {
           summary: "Not available",
-          detail: "No spectral channel results returned."
+          detail: `${contextLabel}: no spectral channel results returned.`
         };
       }
-
-      const bpmValues = validEntries
-        .map(entry => getValidNumber(entry.bpm))
-        .filter(value => value !== null);
 
       const goodEntries = validEntries.filter(entry => entry.status === "good");
       const moderateEntries = validEntries.filter(entry => entry.status === "moderate");
-      const usableEntries = goodEntries.concat(moderateEntries);
+      const supportedEntries = goodEntries.concat(moderateEntries);
 
-      if (bpmValues.length === 0) {
+      const supportedBpmValues = supportedEntries
+        .map(entry => getValidNumber(entry.bpm))
+        .filter(value => value !== null);
+
+      const minSupportedChannels = 2;
+      const maxAllowedSpread = 20.0;
+
+      if (supportedEntries.length < minSupportedChannels) {
         return {
           summary: "Rejected",
-          detail: "No dominant HR peak detected in the cardiac band."
+          detail: `${contextLabel}: fewer than ${minSupportedChannels} channels have moderate-or-better spectral support.`
         };
       }
 
-      const bpmMin = Math.min(...bpmValues);
-      const bpmMax = Math.max(...bpmValues);
+      if (supportedBpmValues.length < minSupportedChannels) {
+        return {
+          summary: "Rejected",
+          detail: `${contextLabel}: not enough supported channels have valid dominant HR peaks.`
+        };
+      }
+
+      const bpmMin = Math.min(...supportedBpmValues);
+      const bpmMax = Math.max(...supportedBpmValues);
       const bpmSpread = bpmMax - bpmMin;
-      const maxAllowedSpread = 20.0;
 
       if (bpmSpread > maxAllowedSpread) {
         return {
           summary: "Rejected",
-          detail: `Channel HR peaks disagree: spread ${bpmSpread.toFixed(1)} bpm.`
+          detail: `${contextLabel}: supported-channel HR peaks disagree, spread ${bpmSpread.toFixed(1)} bpm.`
         };
       }
 
       if (goodEntries.length > 0) {
         return {
           summary: "Accepted / good",
-          detail: `${goodEntries.length} good channel(s), spread ${bpmSpread.toFixed(1)} bpm.`
-        };
-      }
-
-      if (usableEntries.length > 0) {
-        return {
-          summary: "Accepted / moderate",
-          detail: `${usableEntries.length} moderate channel(s), spread ${bpmSpread.toFixed(1)} bpm.`
+          detail: `${contextLabel}: ${supportedEntries.length} supported channel(s), ${goodEntries.length} good, spread ${bpmSpread.toFixed(1)} bpm.`
         };
       }
 
       return {
-        summary: "Rejected",
-        detail: "No channel reached moderate or good spectral quality."
+        summary: "Accepted / moderate",
+        detail: `${contextLabel}: ${supportedEntries.length} moderate channel(s), spread ${bpmSpread.toFixed(1)} bpm.`
       };
     }
 
@@ -2205,7 +2217,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
         };
       });
 
-      return summarizeSpectralQualityFromEntries(entries);
+      return summarizeSpectralQualityFromEntries(entries, "Full-buffer spectral gate");
     }
 
     function updateMeasurementQualityFromModelPrediction(data) {
@@ -2226,7 +2238,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
         };
       });
 
-      return summarizeSpectralQualityFromEntries(entries);
+      return summarizeSpectralQualityFromEntries(entries, "Model-window spectral gate");
     }
 
     function computeSpectralConsensusFromAnalysis(data) {
@@ -2344,11 +2356,11 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
         await renderMeasurementResultCardsFromServer({
           spectralHr: formatBpm(spectralConsensus),
-          spectralDetail: "Primary estimate: spectral consensus from GREEN / POS / CHROM",
+          spectralDetail: "Primary estimate: full-buffer spectral consensus from GREEN / POS / CHROM",
           modelHr: "Not predicted yet",
-          modelDetail: "Run live model prediction to compare with spectral HR",
+          modelDetail: "Run live model prediction to compare with model-window spectral HR",
           modelDifference: "Not predicted yet",
-          modelDifferenceDetail: "Agreement diagnostic",
+          modelDifferenceDetail: "Model-vs-model-window spectral agreement diagnostic",
           quality: quality.summary,
           qualityDetail: quality.detail,
         });
@@ -2366,7 +2378,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
         });
 
         statusEl.innerText =
-          `ROI series analyzed. Spectral consensus=${formatBpm(spectralConsensus)}. ` +
+          `ROI series analyzed. Full-buffer spectral consensus=${formatBpm(spectralConsensus)}. ` +
           `GREEN=${greenBpm?.toFixed(1) ?? "none"} BPM, ` +
           `POS=${posBpm?.toFixed(1) ?? "none"} BPM, ` +
           `CHROM=${chromBpm?.toFixed(1) ?? "none"} BPM.`;
@@ -2386,13 +2398,13 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
         await renderMeasurementResultCardsFromServer({
           spectralHr: "Analysis failed",
-          spectralDetail: "Spectral HR could not be computed",
+          spectralDetail: "Full-buffer spectral HR could not be computed",
           modelHr: "Not predicted yet",
           modelDetail: "Model prediction was not run",
           modelDifference: "Not predicted yet",
           modelDifferenceDetail: "Agreement diagnostic unavailable",
           quality: "Analysis failed",
-          qualityDetail: "Signal quality could not be computed.",
+          qualityDetail: "Full-buffer spectral quality could not be computed.",
         });
 
         await renderRoiAnalysisSummaryFromServer({
@@ -2443,9 +2455,45 @@ function drawMainPulseWaveformFromAnalysis(data) {
       return formatted === "none" ? "none" : `${formatted} Hz`;
     }
 
+    function modelSpectralAgreementDetail(difference) {
+      /*
+      Return cautious wording for model-vs-model-window-spectral agreement.
+      */
+
+      const value = getValidNumber(difference);
+
+      if (value === null) {
+        return "Agreement diagnostic unavailable.";
+      }
+
+      const absValue = Math.abs(value);
+
+      if (absValue >= 10) {
+        return "Model differs from model-window spectral consensus; treat model HR as experimental.";
+      }
+
+      if (absValue >= 5) {
+        return "Model and model-window spectral estimates differ moderately.";
+      }
+
+      return "Model and model-window spectral estimates are close in this window.";
+    }
+
     function summarizeModelPrediction(data) {
       const modelHr = getValidNumber(data.model_prediction?.value);
-      const consensus = mean(spectralBpmValues(data));
+      const qualityStatus = data.model_prediction?.quality?.status ?? null;
+      const gatedSpectralHr = getValidNumber(data.model_prediction?.extra?.spectral_hr_bpm);
+      const rawSpectralConsensus = mean(spectralBpmValues(data));
+
+      let consensus = gatedSpectralHr;
+
+      if (
+        consensus === null &&
+        (isModelUnavailableResponse(data) || qualityStatus === "accepted")
+      ) {
+        consensus = rawSpectralConsensus;
+      }
+
       const difference =
         modelHr !== null && consensus !== null
           ? modelHr - consensus
@@ -2460,6 +2508,8 @@ function drawMainPulseWaveformFromAnalysis(data) {
         modelHr,
         consensus,
         difference,
+        qualityStatus,
+        rawSpectralConsensus,
         greenBpm: getValidNumber(green?.dominant_bpm),
         posBpm: getValidNumber(pos?.dominant_bpm),
         chromBpm: getValidNumber(chrom?.dominant_bpm),
@@ -2568,8 +2618,12 @@ function drawMainPulseWaveformFromAnalysis(data) {
       }
 
       if (roiSamples.length < 20) {
-        statusEl.innerText = "Collect at least 20 ROI samples before live model prediction.";
-        return;
+        const detail = "Collect at least 20 ROI samples before live model prediction.";
+        statusEl.innerText = detail;
+        return {
+          summary: "Prediction unavailable.",
+          detail: detail,
+        };
       }
 
       if (runButton) {
@@ -2591,27 +2645,47 @@ function drawMainPulseWaveformFromAnalysis(data) {
         const data = await parseJsonResponseEvenOnError(response);
 
         if (expectedRevision !== null && expectedRevision !== measurementRevision) {
-          return;
+          return null;
         }
 
         const summary = summarizeModelPrediction(data);
         const modelUnavailable = isModelUnavailableResponse(data);
+        const modelRejected = !modelUnavailable && summary.qualityStatus === "rejected";
         const quality = updateMeasurementQualityFromModelPrediction(data);
 
-        const modelHrText = modelUnavailable ? "Unavailable" : formatBpm(summary.modelHr);
+        const modelHrText = modelUnavailable
+          ? "Unavailable"
+          : modelRejected
+            ? "Rejected"
+            : formatBpm(summary.modelHr);
+
         const modelDetail = modelUnavailable
           ? modelUnavailableDetail(data)
-          : "Experimental CRVSE PhysFormer output";
-        const modelDifferenceText = modelUnavailable
+          : modelRejected
+            ? "Experimental model did not return HR because the model-window quality gate rejected this input."
+            : "Experimental CRVSE PhysFormer output";
+
+        const spectralHrText = modelRejected
+          ? "Unavailable"
+          : formatBpm(summary.consensus);
+
+        const spectralDetail = modelRejected
+          ? "Model-window spectral gate rejected this window; no primary HR from this model run."
+          : "Primary estimate: model-window spectral consensus from latest model window";
+
+        const modelDifferenceText = modelUnavailable || modelRejected
           ? "Not available"
           : formatSignedBpm(summary.difference);
+
         const modelDifferenceDetail = modelUnavailable
           ? "Agreement diagnostic unavailable because model prediction is unavailable."
-          : "Agreement diagnostic";
+          : modelRejected
+            ? "Agreement diagnostic unavailable because the model-window spectral gate rejected the input."
+            : modelSpectralAgreementDetail(summary.difference);
 
         await renderMeasurementResultCardsFromServer({
-          spectralHr: formatBpm(summary.consensus),
-          spectralDetail: "Primary estimate: spectral consensus",
+          spectralHr: spectralHrText,
+          spectralDetail: spectralDetail,
           modelHr: modelHrText,
           modelDetail: modelDetail,
           modelDifference: modelDifferenceText,
@@ -2621,9 +2695,13 @@ function drawMainPulseWaveformFromAnalysis(data) {
         });
 
         await renderModelPredictionSummaryFromServer({
-          status: modelUnavailable ? "Model unavailable" : data.status ?? "unknown",
+          status: modelUnavailable
+            ? "Model unavailable"
+            : modelRejected
+              ? "Rejected"
+              : data.status ?? "unknown",
           modelHr: modelHrText,
-          spectralConsensus: formatBpm(summary.consensus),
+          spectralConsensus: spectralHrText,
           modelDifference: modelDifferenceText,
           greenSummary: `${formatBpm(summary.greenBpm)} / SQI ${formatNumber(summary.greenSqi, 3)} / ${summary.greenStatus}`,
           posSummary: `${formatBpm(summary.posBpm)} / SQI ${formatNumber(summary.posSqi, 3)} / ${summary.posStatus}`,
@@ -2636,26 +2714,66 @@ function drawMainPulseWaveformFromAnalysis(data) {
         });
 
         if (expectedRevision !== null && expectedRevision !== measurementRevision) {
-          return;
+          return null;
         }
 
         if (modelUnavailable) {
-          statusEl.innerText =
-            `Experimental model unavailable. Spectral consensus=${formatBpm(summary.consensus)}.`;
-          return;
+          const detail =
+            `Experimental model unavailable. Model-window spectral consensus=${formatBpm(summary.consensus)}.`;
+
+          statusEl.innerText = detail;
+
+          return {
+            summary: "Model unavailable.",
+            detail: detail,
+          };
         }
 
         await addPredictionRun(summary);
 
+        if (modelRejected) {
+          const detail =
+            "Model-window spectral gate rejected this window. Review channel SQI and spread diagnostics.";
+
+          statusEl.innerText =
+            "Live model prediction rejected by model-window spectral gate. Review channel SQI and spread diagnostics.";
+
+          return {
+            summary: "Prediction rejected.",
+            detail: detail,
+          };
+        }
+
+        const absoluteDifference = Math.abs(getValidNumber(summary.difference) ?? 0.0);
+        const modelText = formatBpm(summary.modelHr);
+        const spectralText = formatBpm(summary.consensus);
+        const differenceText = formatSignedBpm(summary.difference);
+
         statusEl.innerText =
-          `Live model prediction completed. Model=${formatBpm(summary.modelHr)}, ` +
-          `spectral consensus=${formatBpm(summary.consensus)}.`;
+          `Live model prediction completed. Model=${modelText}, ` +
+          `model-window spectral consensus=${spectralText}.`;
+
+        if (absoluteDifference >= 10.0) {
+          return {
+            summary: "Prediction complete with model disagreement.",
+            detail:
+              `Model=${modelText}, model-window spectral=${spectralText}, ` +
+              `difference=${differenceText}. Treat model HR as experimental.`,
+          };
+        }
+
+        return {
+          summary: "Prediction complete.",
+          detail:
+            `Model=${modelText}, model-window spectral=${spectralText}. ` +
+            "Review the HR cards and waveform. Use Clear before a new measurement if needed.",
+        };
       } catch (error) {
         statusEl.innerText = `Live model prediction failed: ${error}`;
 
         await renderMeasurementResultCardsFromServer({
           spectralHr: "Prediction failed",
-          spectralDetail: "Spectral consensus unavailable after prediction failure",
+          spectralDetail: "Model-window spectral consensus unavailable after prediction failure",
           modelHr: "Prediction failed",
           modelDetail: "Experimental model prediction failed",
           modelDifference: "Prediction failed",
@@ -2678,6 +2796,11 @@ function drawMainPulseWaveformFromAnalysis(data) {
           sourceFps: "none",
           rawResponse: `${error}`,
         });
+
+        return {
+          summary: "Prediction failed.",
+          detail: `${error}`,
+        };
       } finally {
         if (runButton) {
           runButton.disabled = false;

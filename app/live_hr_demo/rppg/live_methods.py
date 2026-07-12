@@ -32,7 +32,7 @@ Limitation:
 """
 
 from __future__ import annotations
-from scipy.signal import resample
+from scipy.signal import butter, filtfilt, resample
 from typing import Any
 import numpy as np
 from rppg.sqi import estimate_spectral_sqi
@@ -638,10 +638,7 @@ def resample_signal_to_length(
 
     return zscore_1d_numpy(resampled.astype(np.float32))
 
-def keep_latest_window_samples(
-    samples: list[dict[str, Any]],
-    window_seconds: float,
-) -> dict[str, Any]:
+def keep_latest_window_samples(samples: list[dict[str, Any]], window_seconds: float) -> dict[str, Any]:
     """
     Keep only the latest time window from browser-collected ROI samples.
 
@@ -668,7 +665,6 @@ def keep_latest_window_samples(
         This function assumes the browser timestamps are monotonic enough for
         local demo use.
     """
-
     if not isinstance(samples, list):
         return {
             "ok": False,
@@ -706,10 +702,7 @@ def keep_latest_window_samples(
             "used_duration_s": 0.0,
         }
 
-    valid_samples = sorted(
-        valid_samples,
-        key=lambda sample: float(sample["t_s"]),
-    )
+    valid_samples = sorted(valid_samples, key=lambda sample: float(sample["t_s"]))
 
     original_start_s = float(valid_samples[0]["t_s"])
     original_end_s = float(valid_samples[-1]["t_s"])
@@ -717,11 +710,7 @@ def keep_latest_window_samples(
 
     cutoff_s = original_end_s - float(window_seconds)
 
-    filtered_samples = [
-        sample
-        for sample in valid_samples
-        if float(sample["t_s"]) >= cutoff_s
-    ]
+    filtered_samples = [sample for sample in valid_samples if float(sample["t_s"]) >= cutoff_s]
 
     if len(filtered_samples) == 0:
         filtered_samples = valid_samples
@@ -742,56 +731,174 @@ def keep_latest_window_samples(
         "cutoff_s": float(cutoff_s),
     }
 
+def bandpass_filter_1d_numpy(
+    signal: np.ndarray,
+    fps: float,
+    low_hz: float = 0.7,
+    high_hz: float = 3.5,
+    order: int = 4,
+) -> np.ndarray:
+    """Apply a training-style cardiac bandpass filter to one signal."""
+    signal = np.asarray(signal, dtype=np.float32)
+
+    if signal.ndim != 1:
+        raise ValueError(f"Expected 1D signal, got shape {signal.shape}.")
+
+    if fps <= 0:
+        raise ValueError(f"fps must be positive, got {fps}.")
+
+    nyquist_hz = 0.5 * float(fps)
+
+    if high_hz >= nyquist_hz:
+        raise ValueError(
+            f"Estimated FPS {fps:.2f} is too low for high_hz={high_hz:.2f}. "
+            "Training-style bandpass requires a higher source sampling rate."
+        )
+
+    b, a = butter(
+        int(order),
+        [float(low_hz) / nyquist_hz, float(high_hz) / nyquist_hz],
+        btype="band",
+    )
+
+    min_len = 3 * max(len(a), len(b))
+    if len(signal) <= min_len:
+        raise ValueError(
+            f"Signal too short for bandpass: len={len(signal)}, required>{min_len}."
+        )
+
+    filtered = filtfilt(b, a, signal)
+
+    return filtered.astype(np.float32)
+
+
+def roi_rgb_dict_to_array(roi_rgb: dict[str, np.ndarray], roi_names: list[str]) -> np.ndarray:
+    """Convert ROI RGB dictionary into array with shape (time, roi, rgb)."""
+    arrays = []
+
+    for roi_name in roi_names:
+        if roi_name not in roi_rgb:
+            raise ValueError(f"Missing ROI RGB series: {roi_name}")
+
+        values = np.asarray(roi_rgb[roi_name], dtype=np.float32)
+
+        if values.ndim != 2 or values.shape[1] != 3:
+            raise ValueError(
+                f"Expected ROI {roi_name!r} to have shape (time, 3), "
+                f"got {values.shape}."
+            )
+
+        arrays.append(values)
+
+    lengths = {array.shape[0] for array in arrays}
+    if len(lengths) != 1:
+        raise ValueError(f"ROI arrays must have equal length, got {sorted(lengths)}.")
+
+    return np.stack(arrays, axis=1).astype(np.float32)
+
+
+def make_training_style_green_signal(roi_rgb_array: np.ndarray, fps: float) -> np.ndarray:
+    """Build GREEN signal from per-ROI RGB using training-style filtering."""
+    green_by_roi = roi_rgb_array[:, :, 1]
+    signal = np.mean(green_by_roi, axis=1)
+
+    return zscore_1d_numpy(
+        bandpass_filter_1d_numpy(
+            signal=signal,
+            fps=fps,
+        )
+    )
+
+
+def make_training_style_pos_signal(roi_rgb_array: np.ndarray, fps: float) -> np.ndarray:
+    """Build POS signal by computing POS per ROI before averaging."""
+    projection = np.array(
+        [
+            [0.0, 1.0, -1.0],
+            [-2.0, 1.0, 1.0],
+        ],
+        dtype=np.float32,
+    )
+    roi_signals = []
+
+    for roi_index in range(roi_rgb_array.shape[1]):
+        rgb = roi_rgb_array[:, roi_index, :].astype(np.float32)
+        normalized = normalize_rgb_by_channel_mean(rgb)
+
+        projected = projection @ normalized.T
+        s0 = projected[0]
+        s1 = projected[1]
+
+        alpha = float(np.std(s0)) / (float(np.std(s1)) + 1e-8)
+        roi_signals.append(s0 + alpha * s1)
+
+    signal = np.mean(np.stack(roi_signals, axis=0), axis=0)
+
+    return zscore_1d_numpy(
+        bandpass_filter_1d_numpy(
+            signal=signal,
+            fps=fps,
+        )
+    )
+
+
+def make_training_style_chrom_signal(
+    roi_rgb_array: np.ndarray,
+    fps: float,
+) -> np.ndarray:
+    """Build CHROM signal by computing CHROM per ROI before averaging."""
+
+    roi_signals = []
+
+    for roi_index in range(roi_rgb_array.shape[1]):
+        rgb = roi_rgb_array[:, roi_index, :].astype(np.float32)
+        normalized = normalize_rgb_by_channel_mean(rgb)
+
+        r = normalized[:, 0]
+        g = normalized[:, 1]
+        b = normalized[:, 2]
+
+        x = 3.0 * r - 2.0 * g
+        y = 1.5 * r + g - 1.5 * b
+
+        alpha = float(np.std(x)) / (float(np.std(y)) + 1e-8)
+        roi_signals.append(x - alpha * y)
+
+    signal = np.mean(np.stack(roi_signals, axis=0), axis=0)
+
+    return zscore_1d_numpy(
+        bandpass_filter_1d_numpy(
+            signal=signal,
+            fps=fps,
+        )
+    )
+
+
+def make_training_style_rppg_signals(roi_rgb_array: np.ndarray, fps: float) -> dict[str, np.ndarray]:
+    """Build POS, CHROM, and GREEN using the training-style ROI pipeline."""
+    return {
+        "pos": make_training_style_pos_signal(roi_rgb_array=roi_rgb_array, fps=fps),
+        "chrom": make_training_style_chrom_signal(roi_rgb_array=roi_rgb_array, fps=fps),
+        "green": make_training_style_green_signal(roi_rgb_array=roi_rgb_array, fps=fps),
+    }
+
 def build_model_input_from_roi_series_payload(
     payload: dict[str, Any],
     target_length: int = 240,
     window_seconds: float = 8.0,
+    model_buffer_seconds: float = 12.0,
 ) -> dict[str, Any]:
-    """
-    Build model-ready POS / CHROM / GREEN tensor data from ROI RGB samples.
-
-    Parameters
-    ----------
-    payload:
-        Browser-collected ROI RGB sample payload.
-
-    target_length:
-        Number of time samples expected by the model.
-
-    window_seconds:
-        Latest source-data window to use before resampling.
-
-    Returns
-    -------
-    dict[str, Any]
-        JSON-safe metadata plus private NumPy array under "_model_input".
-
-    Model contract:
-        Output model input has shape:
-            (1, 3, target_length)
-
-        Channel order:
-            0 = POS
-            1 = CHROM
-            2 = GREEN
-
-    Why this matters:
-        The model expects an 8-second window. If the user collects 10-12 seconds
-        and we resample the whole buffer to 240 samples, we compress time and
-        artificially increase apparent frequency. Therefore we first crop to the
-        latest 8 seconds and only then resample.
-
-    Limitation:
-        The input is still resampled from browser-collected ROI RGB summaries.
-        This is not yet a true 30 fps frame-level preprocessing path.
-    """
+    """Build model-ready POS/CHROM/GREEN input from browser ROI RGB samples."""
 
     samples = payload.get("samples", [])
 
-    latest_window = keep_latest_window_samples(
-        samples=samples,
-        window_seconds=window_seconds,
-    )
+    roi_names = [
+        "forehead",
+        "image_left_cheek",
+        "image_right_cheek",
+    ]
+
+    latest_window = keep_latest_window_samples(samples=samples, window_seconds=window_seconds)
 
     if not latest_window["ok"]:
         return {
@@ -800,15 +907,11 @@ def build_model_input_from_roi_series_payload(
             "window_metadata": latest_window,
         }
 
-    cropped_payload = dict(payload)
-    cropped_payload["samples"] = latest_window["samples"]
-    cropped_payload["window_seconds"] = None
-
-    analysis_payload = {
-        "samples": latest_window["samples"],
-    }
-
-    analysis = analyze_roi_series_payload(analysis_payload)
+    analysis = analyze_roi_series_payload(
+        {
+            "samples": latest_window["samples"],
+        }
+    )
 
     if analysis.get("status") != "ok":
         return {
@@ -818,69 +921,118 @@ def build_model_input_from_roi_series_payload(
             "window_metadata": latest_window,
         }
 
-    roi_names = [
-        "forehead",
-        "image_left_cheek",
-        "image_right_cheek",
-    ]
+    model_buffer_seconds = max(float(model_buffer_seconds), float(window_seconds))
+    model_buffer = keep_latest_window_samples(samples=samples, window_seconds=model_buffer_seconds)
 
-    extraction = extract_roi_rgb_series(
-        samples=latest_window["samples"],
-        roi_names=roi_names,
-    )
+    if not model_buffer["ok"]:
+        return {
+            "status": "error",
+            "message": model_buffer["message"],
+            "window_metadata": {
+                "latest_window": latest_window,
+                "model_buffer": model_buffer,
+            },
+        }
+
+    extraction = extract_roi_rgb_series(samples=model_buffer["samples"], roi_names=roi_names)
 
     if not extraction["ok"]:
         return {
             "status": "error",
             "message": extraction["message"],
             "dropped_count": extraction["dropped_count"],
-            "window_metadata": latest_window,
+            "window_metadata": {
+                "latest_window": latest_window,
+                "model_buffer": model_buffer,
+            },
         }
 
     time_s = extraction["_time_s"]
     roi_rgb = extraction["_roi_rgb"]
 
-    combined_rgb = combine_roi_rgb_by_mean(
-        roi_rgb=roi_rgb,
-        roi_names=roi_names,
-    )
+    estimated_fps = estimate_sampling_rate_hz(time_s)
 
-    green_signal = make_green_signal(combined_rgb)
-    pos_signal = make_pos_signal(combined_rgb)
-    chrom_signal = make_chrom_signal(combined_rgb)
+    if estimated_fps is None:
+        return {
+            "status": "error",
+            "message": "Could not estimate sampling rate from ROI sample timestamps.",
+            "sample_count": int(len(time_s)),
+            "window_metadata": {
+                "latest_window": latest_window,
+                "model_buffer": model_buffer,
+            },
+        }
 
-    pos_240 = resample_signal_to_length(
-        signal=pos_signal,
-        target_length=target_length,
-    )
-    chrom_240 = resample_signal_to_length(
-        signal=chrom_signal,
-        target_length=target_length,
-    )
-    green_240 = resample_signal_to_length(
-        signal=green_signal,
-        target_length=target_length,
-    )
+    try:
+        roi_rgb_array = roi_rgb_dict_to_array(roi_rgb=roi_rgb, roi_names=roi_names)
+        buffer_signals = make_training_style_rppg_signals(roi_rgb_array=roi_rgb_array, fps=float(estimated_fps))
+    except ValueError as exc:
+        return {
+            "status": "error",
+            "message": str(exc),
+            "sample_count": int(len(time_s)),
+            "estimated_fps": float(estimated_fps),
+            "window_metadata": {
+                "latest_window": latest_window,
+                "model_buffer": model_buffer,
+            },
+            "preprocessing": {
+                "mode": "training_style_per_roi_local_buffer",
+                "model_buffer_seconds": float(model_buffer_seconds),
+                "model_window_seconds": float(window_seconds),
+                "status": "failed",
+            },
+            "classical_analysis": analysis,
+        }
 
-    model_input = np.stack(
-        [
-            pos_240,
-            chrom_240,
-            green_240,
-        ],
-        axis=0,
-    ).astype(np.float32)
+    if len(time_s) == 0:
+        return {
+            "status": "error",
+            "message": "No timestamped model-buffer samples available.",
+            "window_metadata": {
+                "latest_window": latest_window,
+                "model_buffer": model_buffer,
+            },
+            "classical_analysis": analysis,
+        }
 
+    window_cutoff_s = float(time_s[-1]) - float(window_seconds)
+    model_window_mask = time_s >= window_cutoff_s
+
+    if int(np.sum(model_window_mask)) < 8:
+        return {
+            "status": "error",
+            "message": "Too few samples in latest model window after buffer filtering.",
+            "sample_count": int(np.sum(model_window_mask)),
+            "estimated_fps": float(estimated_fps),
+            "window_metadata": {
+                "latest_window": latest_window,
+                "model_buffer": model_buffer,
+            },
+            "classical_analysis": analysis,
+        }
+
+    model_window_time_s = time_s[model_window_mask]
+    pos_240 = resample_signal_to_length(signal=buffer_signals["pos"][model_window_mask], target_length=target_length)
+    chrom_240 = resample_signal_to_length(signal=buffer_signals["chrom"][model_window_mask], target_length=target_length)
+    green_240 = resample_signal_to_length(signal=buffer_signals["green"][model_window_mask], target_length=target_length,)
+
+    model_input = np.stack([pos_240, chrom_240, green_240], axis=0).astype(np.float32)
     model_input = model_input[None, :, :]
 
-    used_duration_s = float(time_s[-1] - time_s[0]) if len(time_s) > 1 else 0.0
+    buffer_duration_s = float(time_s[-1] - time_s[0]) if len(time_s) > 1 else 0.0
+    model_window_duration_s = (
+        float(model_window_time_s[-1] - model_window_time_s[0])
+        if len(model_window_time_s) > 1
+        else 0.0
+    )
 
     return {
         "status": "ok",
-        "message": "Model input built from latest live ROI window.",
-        "sample_count": int(len(time_s)),
-        "duration_s": used_duration_s,
-        "estimated_fps": analysis["estimated_fps"],
+        "message": "Model input built with training-style per-ROI local-buffer preprocessing.",
+        "sample_count": int(len(model_window_time_s)),
+        "duration_s": float(model_window_duration_s),
+        "estimated_fps": float(estimated_fps),
         "target_length": int(target_length),
         "window_seconds": float(window_seconds),
         "channel_order": ["pos", "chrom", "green"],
@@ -888,10 +1040,27 @@ def build_model_input_from_roi_series_payload(
         "window_metadata": {
             "requested_window_seconds": float(window_seconds),
             "original_sample_count": latest_window["original_sample_count"],
-            "used_sample_count": latest_window["used_sample_count"],
+            "used_sample_count": int(len(model_window_time_s)),
             "original_duration_s": latest_window["original_duration_s"],
-            "used_duration_s": latest_window["used_duration_s"],
-            "cutoff_s": latest_window["cutoff_s"],
+            "used_duration_s": float(model_window_duration_s),
+            "cutoff_s": float(window_cutoff_s),
+            "model_buffer_seconds": float(model_buffer_seconds),
+            "model_buffer_sample_count": int(len(time_s)),
+            "model_buffer_duration_s": float(buffer_duration_s),
+        },
+        "preprocessing": {
+            "mode": "training_style_per_roi_local_buffer",
+            "roi_names": roi_names,
+            "model_buffer_seconds": float(model_buffer_seconds),
+            "model_window_seconds": float(window_seconds),
+            "bandpass_low_hz": 0.7,
+            "bandpass_high_hz": 3.5,
+            "bandpass_order": 4,
+            "notes": [
+                "POS, CHROM, and GREEN are computed per ROI before averaging.",
+                "Bandpass is applied on the local model buffer before cropping the latest model window.",
+                "This is closer to training preprocessing, but it is still not identical to full-recording non-causal preprocessing.",
+            ],
         },
         "classical_analysis": analysis,
         "_model_input": model_input,

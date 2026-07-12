@@ -62,44 +62,7 @@ def evaluate_window_quality(
     max_channel_bpm_spread: float = 20.0,
 ) -> WindowQualityResult:
     """
-    Evaluate whether a POS/CHROM/GREEN rPPG window is usable.
-
-    Parameters
-    ----------
-    signals:
-        Dictionary with POS / CHROM / GREEN signals.
-
-    fps:
-        Sampling frequency in Hz.
-
-    channel_names:
-        Channels to evaluate.
-
-    low_hz:
-        Lower cardiac-band frequency.
-
-    high_hz:
-        Upper cardiac-band frequency.
-
-    min_good_channels:
-        Candidate-accept window if at least this many channels are good.
-
-    min_moderate_channels:
-        Candidate-accept window if at least this many channels are moderate or better.
-
-    good_sqi_threshold:
-        SQI threshold for good channel.
-
-    moderate_sqi_threshold:
-        SQI threshold for moderate channel.
-
-    max_channel_bpm_spread:
-        Maximum allowed spread between valid channel dominant BPMs.
-
-    Returns
-    -------
-    WindowQualityResult
-        Accepted/rejected decision with reasons and metrics.
+    Evaluate whether a POS/CHROM/GREEN rPPG window has usable multichannel support.
     """
     sqi_by_channel = summarize_multichannel_sqi(
         signals=signals,
@@ -113,76 +76,103 @@ def evaluate_window_quality(
     metrics: dict[str, Any] = {}
     good_channels: list[str] = []
     moderate_or_good_channels: list[str] = []
-    valid_bpms: list[float] = []
+    all_valid_bpms: list[float] = []
+    supported_bpms: list[float] = []
 
     for channel_name, sqi_result in sqi_by_channel.items():
-        metrics[f"{channel_name}_sqi"] = float(sqi_result.sqi)
-        metrics[f"{channel_name}_dominant_bpm"] = float(sqi_result.dominant_bpm)
+        sqi_value = float(sqi_result.sqi) if sqi_result.sqi is not None else 0.0
+        bpm_value = (
+            float(sqi_result.dominant_bpm)
+            if sqi_result.dominant_bpm is not None
+            else float("nan")
+        )
+
+        metrics[f"{channel_name}_sqi"] = sqi_value
+        metrics[f"{channel_name}_dominant_bpm"] = bpm_value
         metrics[f"{channel_name}_status"] = sqi_result.status
 
-        if np.isfinite(sqi_result.dominant_bpm):
-            valid_bpms.append(float(sqi_result.dominant_bpm))
-        if sqi_result.sqi >= good_sqi_threshold:
-            good_channels.append(channel_name)
-        if sqi_result.sqi >= moderate_sqi_threshold:
-            moderate_or_good_channels.append(channel_name)
+        if np.isfinite(bpm_value):
+            all_valid_bpms.append(bpm_value)
 
-    if len(valid_bpms) > 0:
-        bpm_spread = float(np.max(valid_bpms) - np.min(valid_bpms))
+        if sqi_value >= good_sqi_threshold:
+            good_channels.append(channel_name)
+
+        if sqi_value >= moderate_sqi_threshold:
+            moderate_or_good_channels.append(channel_name)
+            if np.isfinite(bpm_value):
+                supported_bpms.append(bpm_value)
+
+    if len(supported_bpms) > 0:
+        bpm_spread = float(np.max(supported_bpms) - np.min(supported_bpms))
     else:
         bpm_spread = float("nan")
+
+    if len(all_valid_bpms) > 0:
+        all_channel_bpm_spread = float(np.max(all_valid_bpms) - np.min(all_valid_bpms))
+    else:
+        all_channel_bpm_spread = float("nan")
 
     metrics["n_good_channels"] = len(good_channels)
     metrics["n_moderate_or_good_channels"] = len(moderate_or_good_channels)
     metrics["bpm_spread_across_channels"] = bpm_spread
-    has_good_channel_support = len(good_channels) >= min_good_channels
-    has_moderate_channel_support = len(moderate_or_good_channels) >= min_moderate_channels
-    has_enough_spectral_support = (has_good_channel_support or has_moderate_channel_support)
-    has_consistent_channel_bpm = (np.isfinite(bpm_spread) and bpm_spread <= max_channel_bpm_spread)
-    accepted = has_enough_spectral_support and has_consistent_channel_bpm
+    metrics["bpm_spread_across_all_detected_channels"] = all_channel_bpm_spread
+
+    has_required_channel_support = len(moderate_or_good_channels) >= min_moderate_channels
+    has_good_confidence = len(good_channels) >= min_good_channels
+    has_consistent_channel_bpm = (
+        np.isfinite(bpm_spread)
+        and bpm_spread <= max_channel_bpm_spread
+    )
+
+    accepted = has_required_channel_support and has_consistent_channel_bpm
 
     if accepted:
-        if has_good_channel_support:
-            confidence = "good"
+        confidence = "good" if has_good_confidence else "moderate"
+
+        reasons.append(
+            f"Accepted: at least {min_moderate_channels} channel(s) have "
+            f"moderate-or-better SQI ({moderate_or_good_channels})."
+        )
+
+        if has_good_confidence:
             reasons.append(
-                f"Accepted: at least {min_good_channels} channel(s) have good SQI "
-                f"({good_channels})."
+                f"Confidence good: at least {min_good_channels} channel(s) have "
+                f"good SQI ({good_channels})."
             )
         else:
-            confidence = "moderate"
             reasons.append(
-                f"Accepted: at least {min_moderate_channels} channel(s) have "
-                f"moderate-or-better SQI ({moderate_or_good_channels})."
+                "Confidence moderate: multichannel support is present, but no "
+                "channel reached good SQI."
             )
 
         reasons.append(
-            f"Channel dominant BPM spread is acceptable "
+            f"Supported-channel dominant BPM spread is acceptable "
             f"({bpm_spread:.1f} BPM <= {max_channel_bpm_spread:.1f} BPM)."
         )
 
     else:
         confidence = "rejected"
 
-        if not has_enough_spectral_support:
+        if not has_required_channel_support:
             reasons.append(
-                "Rejected: not enough channels have a clear cardiac-band peak."
+                f"Rejected: fewer than {min_moderate_channels} channel(s) have "
+                "moderate-or-better spectral support."
             )
 
-        if not has_consistent_channel_bpm:
+        if has_required_channel_support and not has_consistent_channel_bpm:
             if np.isfinite(bpm_spread):
                 reasons.append(
-                    f"Rejected: channel dominant BPM spread is too large "
+                    f"Rejected: supported-channel dominant BPM spread is too large "
                     f"({bpm_spread:.1f} BPM > {max_channel_bpm_spread:.1f} BPM)."
                 )
             else:
                 reasons.append(
-                    "Rejected: channel dominant BPM spread could not be computed."
+                    "Rejected: supported-channel dominant BPM spread could not be computed."
                 )
 
-        if has_enough_spectral_support and not has_consistent_channel_bpm:
+        if not has_required_channel_support:
             reasons.append(
-                "Some channels had moderate/good SQI, but their dominant HR peaks "
-                "did not agree with each other."
+                "A single good channel is not enough for model-window acceptance."
             )
 
     for channel_name, sqi_result in sqi_by_channel.items():

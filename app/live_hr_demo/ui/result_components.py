@@ -25,35 +25,21 @@ def repeatability_table_placeholder() -> FT:
 
 
 def repeatability_table(runs: list[dict]) -> FT:
-    """
-    Render the live model prediction repeatability table.
-
-    Parameters
-    ----------
-    runs:
-        List of prediction run dictionaries. Each run may contain model HR,
-        spectral consensus, model difference, SQI values, used duration,
-        sample count, and source FPS.
-
-    Returns
-    -------
-    FT
-        FastHTML component containing the repeatability table.
-    """
+    """Render the live model prediction repeatability table."""
     if len(runs) == 0:
         table_body = Tbody(
             Tr(
-                Td("No live model prediction runs yet.", colspan="10",cls="py-3 text-slate-500"),
-                cls="border-b border-slate-100",), id="live-model-repeatability-table-body")
+                Td("No live model prediction runs yet.", colspan="10", cls="py-3 text-slate-500"),
+                cls="border-b border-slate-100",
+            ),
+            id="live-model-repeatability-table-body",
+        )
     else:
         table_body = Tbody(
             *[
                 Tr(
                     Td(str(run.get("run_index", "")), cls="py-2 pr-3"),
-                    Td(
-                        str(run.get("model_hr", "none")),
-                        cls="py-2 pr-3 font-medium",
-                    ),
+                    Td(str(run.get("model_hr", "none")), cls="py-2 pr-3 font-medium"),
                     Td(str(run.get("spectral", "none")), cls="py-2 pr-3"),
                     Td(str(run.get("difference", "none")), cls="py-2 pr-3"),
                     Td(str(run.get("green_sqi", "none")), cls="py-2 pr-3"),
@@ -71,10 +57,7 @@ def repeatability_table(runs: list[dict]) -> FT:
 
     return Div(
         Div(
-            Div(
-                "Live prediction repeatability table",
-                cls="text-sm font-semibold text-slate-900",
-            ),
+            Div("Live prediction repeatability table", cls="text-sm font-semibold text-slate-900"),
             Div(
                 "Each row is one model-prediction run using the current ROI "
                 "sample buffer. Starting a new main measurement clears this table.",
@@ -88,7 +71,7 @@ def repeatability_table(runs: list[dict]) -> FT:
                     Tr(
                         Th("Run", cls="py-2 pr-3"),
                         Th("Model HR", cls="py-2 pr-3"),
-                        Th("Spectral", cls="py-2 pr-3"),
+                        Th("Model-window spectral", cls="py-2 pr-3"),
                         Th("Diff", cls="py-2 pr-3"),
                         Th("GREEN SQI", cls="py-2 pr-3"),
                         Th("POS SQI", cls="py-2 pr-3"),
@@ -176,40 +159,7 @@ def measurement_result_cards(
     quality_value: str,
     quality_detail: str,
 ) -> FT:
-    """
-    Render the main four measurement result cards.
-
-    Parameters
-    ----------
-    spectral_hr_value:
-        Main text for the primary spectral-consensus HR card.
-
-    spectral_hr_detail:
-        Detail text for the primary spectral-consensus HR card.
-
-    model_hr_value:
-        Main text for the experimental model HR card.
-
-    model_hr_detail:
-        Detail text for the experimental model HR card.
-
-    model_difference_value:
-        Main text for the model-vs-spectral agreement card.
-
-    model_difference_detail:
-        Detail text for the model-vs-spectral agreement card.
-
-    quality_value:
-        Main text for the measurement-quality card.
-
-    quality_detail:
-        Detail text for the measurement-quality card.
-
-    Returns
-    -------
-    FT
-        FastHTML component containing the four main result cards.
-    """
+    """Render the main four measurement result cards."""
     return Div(
         metric_result_card(
             label="Estimated HR",
@@ -231,7 +181,7 @@ def measurement_result_cards(
             value_id="model-spectral-difference-summary",
         ),
         metric_result_card(
-            label="Measurement Quality",
+            label="Signal Quality",
             value=quality_value,
             detail=quality_detail,
             value_id="measurement-quality-summary",
@@ -241,16 +191,8 @@ def measurement_result_cards(
     )
 
 
-
 def measurement_result_cards_placeholder() -> FT:
-    """
-    Render default placeholder measurement result cards.
-
-    Returns
-    -------
-    FT
-        FastHTML component containing the default measurement result cards.
-    """
+    """Render default placeholder measurement result cards."""
     return measurement_result_cards(
         spectral_hr_value="Not analyzed yet",
         spectral_hr_detail="Primary estimate: spectral consensus",
@@ -259,9 +201,8 @@ def measurement_result_cards_placeholder() -> FT:
         model_difference_value="Not predicted yet",
         model_difference_detail="Agreement diagnostic",
         quality_value="Not analyzed yet",
-        quality_detail="Signal quality gate",
+        quality_detail="Spectral signal-quality gate",
     )
-
 
 def signal_summary_cards(
     green_value: str,
@@ -701,12 +642,12 @@ def model_prediction_summary_panel(
                 cls="rounded-xl border border-rose-100 bg-rose-50 p-3",
             ),
             Div(
-                Div("Spectral HR", cls="text-xs font-medium uppercase text-slate-500"),
+                Div("Model-window spectral HR", cls="text-xs font-medium uppercase text-slate-500"),
                 Div(spectral_consensus, cls="mt-1 text-lg font-semibold text-slate-900"),
                 cls="rounded-xl border border-emerald-100 bg-emerald-50 p-3",
             ),
             Div(
-                Div("Model - Spectral", cls="text-xs font-medium uppercase text-slate-500"),
+                Div("Model - model-window spectral", cls="text-xs font-medium uppercase text-slate-500"),
                 Div(model_difference, cls="mt-1 text-lg font-semibold text-slate-900"),
                 cls="rounded-xl border border-slate-200 bg-white p-3",
             ),
