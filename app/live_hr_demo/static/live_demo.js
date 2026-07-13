@@ -9,6 +9,8 @@
   let mainMeasurementProgressTimer = null;
   let mainMeasurementInProgress = false;
   let measurementRevision = 0;
+  let latestRoiAnalysisDisplayState = null;
+
 
     const MAIN_MEASUREMENT_DURATION_MS = 15000;
 
@@ -2306,7 +2308,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
       if (roiSamples.length < 20) {
         statusEl.innerText = "Collect at least 20 ROI samples before analysis.";
-        return;
+        return null;
       }
 
       if (analyzeButton) {
@@ -2328,7 +2330,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
         const data = await parseJsonResponseEvenOnError(response);
 
         if (expectedRevision !== null && expectedRevision !== measurementRevision) {
-          return;
+          return null;
         }
 
         drawMainPulseWaveformFromAnalysis(data);
@@ -2345,6 +2347,19 @@ function drawMainPulseWaveformFromAnalysis(data) {
             detail: "Signal quality summary was not returned."
           };
 
+        const spectralHrText = formatBpm(spectralConsensus);
+        const spectralDetail =
+          "Primary estimate: full-buffer spectral consensus from GREEN / POS / CHROM";
+
+        latestRoiAnalysisDisplayState = {
+          revision: measurementRevision,
+          sampleCount: roiSamples.length,
+          spectralHr: spectralHrText,
+          spectralDetail: spectralDetail,
+          quality: quality.summary,
+          qualityDetail: quality.detail,
+        };
+
         await renderSignalSummaryCardsFromServer({
           green: formatSignalSummary("GREEN", data.signals?.green),
           greenDetail: formatSignalDetail("GREEN", data.signals?.green),
@@ -2355,8 +2370,8 @@ function drawMainPulseWaveformFromAnalysis(data) {
         });
 
         await renderMeasurementResultCardsFromServer({
-          spectralHr: formatBpm(spectralConsensus),
-          spectralDetail: "Primary estimate: full-buffer spectral consensus from GREEN / POS / CHROM",
+          spectralHr: spectralHrText,
+          spectralDetail: spectralDetail,
           modelHr: "Not predicted yet",
           modelDetail: "Run live model prediction to compare with model-window spectral HR",
           modelDifference: "Not predicted yet",
@@ -2370,7 +2385,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
           sampleCount: String(data.sample_count ?? "none"),
           durationS: `${formatNumber(data.duration_s, 2)} s`,
           estimatedFps: `${formatNumber(data.estimated_fps, 2)} Hz`,
-          spectralConsensus: formatBpm(spectralConsensus),
+          spectralConsensus: spectralHrText,
           greenSummary: formatSignalSummary("GREEN", data.signals?.green),
           posSummary: formatSignalSummary("POS", data.signals?.pos),
           chromSummary: formatSignalSummary("CHROM", data.signals?.chrom),
@@ -2378,11 +2393,17 @@ function drawMainPulseWaveformFromAnalysis(data) {
         });
 
         statusEl.innerText =
-          `ROI series analyzed. Full-buffer spectral consensus=${formatBpm(spectralConsensus)}. ` +
+          `ROI series analyzed. Full-buffer spectral consensus=${spectralHrText}. ` +
           `GREEN=${greenBpm?.toFixed(1) ?? "none"} BPM, ` +
           `POS=${posBpm?.toFixed(1) ?? "none"} BPM, ` +
           `CHROM=${chromBpm?.toFixed(1) ?? "none"} BPM.`;
+
+        return latestRoiAnalysisDisplayState;
       } catch (error) {
+        if (expectedRevision === null || expectedRevision === measurementRevision) {
+          latestRoiAnalysisDisplayState = null;
+        }
+
         statusEl.innerText = `ROI series analysis failed: ${error}`;
 
         drawMainPulseWaveformPlaceholder();
@@ -2418,6 +2439,8 @@ function drawMainPulseWaveformFromAnalysis(data) {
           chromSummary: "CHROM signal could not be analyzed",
           rawResponse: `${error}`,
         });
+
+        return null;
       } finally {
         if (analyzeButton) {
           analyzeButton.disabled = false;
@@ -2425,7 +2448,6 @@ function drawMainPulseWaveformFromAnalysis(data) {
         }
       }
     }
-
     function spectralBpmValues(data) {
       const greenBpm = getValidNumber(data.classical_spectral_summary?.green?.dominant_bpm);
       const posBpm = getValidNumber(data.classical_spectral_summary?.pos?.dominant_bpm);
@@ -2769,7 +2791,50 @@ function drawMainPulseWaveformFromAnalysis(data) {
             "Review the HR cards and waveform. Use Clear before a new measurement if needed.",
         };
       } catch (error) {
-        statusEl.innerText = `Live model prediction failed: ${error}`;
+        const modelError = `${error}`;
+        const preservedAnalysis =
+          latestRoiAnalysisDisplayState !== null &&
+          latestRoiAnalysisDisplayState.revision === measurementRevision &&
+          latestRoiAnalysisDisplayState.sampleCount === roiSamples.length
+            ? latestRoiAnalysisDisplayState
+            : null;
+
+        statusEl.innerText = `Live model prediction failed: ${modelError}`;
+
+        if (preservedAnalysis !== null) {
+          await renderMeasurementResultCardsFromServer({
+            spectralHr: preservedAnalysis.spectralHr,
+            spectralDetail: preservedAnalysis.spectralDetail,
+            modelHr: "Unavailable",
+            modelDetail: "Experimental model prediction unavailable for this run.",
+            modelDifference: "Not available",
+            modelDifferenceDetail: "Agreement diagnostic unavailable because model prediction failed.",
+            quality: preservedAnalysis.quality,
+            qualityDetail: preservedAnalysis.qualityDetail,
+          });
+
+          await renderModelPredictionSummaryFromServer({
+            status: "Prediction unavailable",
+            modelHr: "none",
+            spectralConsensus: "none",
+            modelDifference: "none",
+            greenSummary: "GREEN model-side spectral summary unavailable",
+            posSummary: "POS model-side spectral summary unavailable",
+            chromSummary: "CHROM model-side spectral summary unavailable",
+            originalDurationS: "none",
+            usedDurationS: "none",
+            usedSamples: "none",
+            sourceFps: "none",
+            rawResponse: modelError,
+          });
+
+          return {
+            summary: "Model prediction unavailable.",
+            detail:
+              `Kept full-buffer spectral estimate (${preservedAnalysis.spectralHr}). ` +
+              `Model error: ${modelError}`,
+          };
+        }
 
         await renderMeasurementResultCardsFromServer({
           spectralHr: "Prediction failed",
@@ -2794,12 +2859,12 @@ function drawMainPulseWaveformFromAnalysis(data) {
           usedDurationS: "none",
           usedSamples: "none",
           sourceFps: "none",
-          rawResponse: `${error}`,
+          rawResponse: modelError,
         });
 
         return {
           summary: "Prediction failed.",
-          detail: `${error}`,
+          detail: modelError,
         };
       } finally {
         if (runButton) {
