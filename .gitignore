@@ -23,3 +23,8 @@ app/live_hr_demo/models/mediapipe/*.task
 AGENTS.md
 
 CRVSE_training_preprocessing_audit_2026-07-11.md
+
+# CRVSE generated audit / fine-tuning artifacts
+Data/audit_live_compatible_window_*.csv
+Data/live_finetune_manifest.csv
+Data/live_finetune_frozen_baseline_*.csv
