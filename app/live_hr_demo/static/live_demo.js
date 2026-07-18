@@ -770,6 +770,24 @@
       return values.reduce((sum, value) => sum + value, 0) / values.length;
     }
 
+
+    function finiteValues(values) {
+      return values
+        .filter(value => value !== null && value !== undefined)
+        .map(value => Number(value))
+        .filter(value => Number.isFinite(value));
+    }
+
+    function meanFinite(values) {
+      const numericValues = finiteValues(values);
+
+      if (numericValues.length === 0) {
+        return null;
+      }
+
+      return mean(numericValues);
+    }
+
     function formatBpm(value) {
       const numberValue = getValidNumber(value);
 
@@ -1202,7 +1220,7 @@
       return canvasEl.toDataURL("image/jpeg", 0.85);
     }
 
-    function extractRoiSampleFromBackendResponse(data) {
+    function extractRoiSampleFromBackendResponse(data, acquisitionTiming = {}) {
       const nowMs = performance.now();
       const elapsedS =
         roiSamplingStartMs === null
@@ -1217,6 +1235,20 @@
         t_s: elapsedS,
         face_detected: Boolean(faceDebug?.face_detected),
         roi_quality_overall: roiDebug?.quality_summary?.overall_status ?? "unknown",
+        acquisition_timing: {
+          capture_to_data_url_ms: getValidNumber(acquisitionTiming.captureToDataUrlMs),
+          request_round_trip_ms: getValidNumber(acquisitionTiming.requestRoundTripMs),
+          response_parse_ms: getValidNumber(acquisitionTiming.responseParseMs),
+          total_browser_sample_ms: getValidNumber(acquisitionTiming.totalBrowserSampleMs),
+          backend_total_request_processing_ms:
+            getValidNumber(data?.timing_ms?.total_request_processing_ms),
+          backend_face_debug_total_ms:
+            getValidNumber(data?.timing_ms?.face_debug_total_ms),
+          backend_decode_ms: getValidNumber(data?.timing_ms?.decode_ms),
+          http_status: Number.isInteger(acquisitionTiming.httpStatus)
+            ? acquisitionTiming.httpStatus
+            : null
+        },
         rois: {}
       };
 
@@ -1772,7 +1804,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
 }
      
 
-    function summarizeCollectedRoiSamples() {
+  function summarizeCollectedRoiSamples() {
       const summaryEl = document.getElementById("roi-sampling-summary");
 
       if (roiSamples.length === 0) {
@@ -1790,10 +1822,49 @@ function drawMainPulseWaveformFromAnalysis(data) {
       const lastT = roiSamples[roiSamples.length - 1].t_s;
       const durationS = Math.max(0, lastT - firstT);
 
+      const faceDetectedCount = roiSamples
+        .filter(sample => sample.face_detected)
+        .length;
+
+      const roiUsableSamples = roiSamples.filter(sample =>
+        ROI_NAMES.some(roiName => sample.rois[roiName] !== undefined)
+      );
+
+      const roiUsableDurationS =
+        roiUsableSamples.length > 1
+          ? Math.max(
+              0,
+              roiUsableSamples[roiUsableSamples.length - 1].t_s - roiUsableSamples[0].t_s
+            )
+          : 0;
+
+      const roiUsableEffectiveFps =
+        roiUsableSamples.length > 1 && roiUsableDurationS > 0
+          ? (roiUsableSamples.length - 1) / roiUsableDurationS
+          : null;
+
+      const timingEntries = roiSamples
+        .map(sample => sample.acquisition_timing)
+        .filter(value => value !== undefined && value !== null);
+
       const lines = [];
 
       lines.push(`samples: ${roiSamples.length}`);
       lines.push(`duration_s: ${durationS.toFixed(2)}`);
+      lines.push(`face_detected_samples: ${faceDetectedCount}/${roiSamples.length}`);
+      lines.push(`roi_usable_samples: ${roiUsableSamples.length}/${roiSamples.length}`);
+      lines.push(`roi_usable_effective_fps: ${formatNumber(roiUsableEffectiveFps, 2)}`);
+
+      if (timingEntries.length > 0) {
+        lines.push(
+          "timing_ms_mean: " +
+          `capture=${formatNumber(meanFinite(timingEntries.map(value => value.capture_to_data_url_ms)), 1)}, ` +
+          `round_trip=${formatNumber(meanFinite(timingEntries.map(value => value.request_round_trip_ms)), 1)}, ` +
+          `backend=${formatNumber(meanFinite(timingEntries.map(value => value.backend_total_request_processing_ms)), 1)}, ` +
+          `browser_total=${formatNumber(meanFinite(timingEntries.map(value => value.total_browser_sample_ms)), 1)}`
+        );
+      }
+
       lines.push("");
 
       for (const roiName of ROI_NAMES) {
@@ -1839,7 +1910,8 @@ function drawMainPulseWaveformFromAnalysis(data) {
       updatePrimaryControlButtons();
     }
 
-    async function collectOneRoiSample(
+
+  async function collectOneRoiSample(
       expectedSamplingRunId = roiSamplingRunId,
       expectedRevision = measurementRevision
     ) {
@@ -1852,7 +1924,10 @@ function drawMainPulseWaveformFromAnalysis(data) {
       roiSamplingInFlight = true;
 
       try {
+        const sampleStartMs = performance.now();
+        const captureStartMs = performance.now();
         const imageDataUrl = captureFrameForSamplingDataUrl();
+        const captureEndMs = performance.now();
 
         if (!imageDataUrl) {
           return;
@@ -1865,6 +1940,8 @@ function drawMainPulseWaveformFromAnalysis(data) {
           return;
         }
 
+        const requestStartMs = performance.now();
+
         const response = await fetch("/api/debug-face", {
           method: "POST",
           headers: {
@@ -1875,7 +1952,9 @@ function drawMainPulseWaveformFromAnalysis(data) {
           })
         });
 
+        const responseReceivedMs = performance.now();
         const data = await parseJsonResponseEvenOnError(response);
+        const responseParsedMs = performance.now();
 
         if (
           expectedSamplingRunId !== roiSamplingRunId ||
@@ -1885,7 +1964,13 @@ function drawMainPulseWaveformFromAnalysis(data) {
           return;
         }
 
-        const sample = extractRoiSampleFromBackendResponse(data);
+        const sample = extractRoiSampleFromBackendResponse(data, {
+          captureToDataUrlMs: captureEndMs - captureStartMs,
+          requestRoundTripMs: responseReceivedMs - requestStartMs,
+          responseParseMs: responseParsedMs - responseReceivedMs,
+          totalBrowserSampleMs: responseParsedMs - sampleStartMs,
+          httpStatus: response.status
+        });
 
         roiSamples.push(sample);
 
@@ -2257,6 +2342,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
       return mean(values);
     }
 
+    
     async function analyzeRoiSeriesInBackend(expectedRevision = null) {
       if (typeof expectedRevision !== "number") {
         expectedRevision = null;
@@ -2347,16 +2433,27 @@ function drawMainPulseWaveformFromAnalysis(data) {
             detail: "Signal quality summary was not returned."
           };
 
-        const spectralHrText = formatBpm(spectralConsensus);
-        const spectralDetail =
-          "Primary estimate: full-buffer spectral consensus from GREEN / POS / CHROM";
+        const diagnosticSpectralHrText = formatBpm(spectralConsensus);
+        const fullBufferRejected = quality.summary === "Rejected";
+
+        const primarySpectralHrText = fullBufferRejected
+          ? "Rejected"
+          : diagnosticSpectralHrText;
+
+        const primarySpectralDetail = fullBufferRejected
+          ? (
+              `Full-buffer spectral candidate was ${diagnosticSpectralHrText}, ` +
+              "but the quality gate rejected this window. Review channel SQI and diagnostics."
+            )
+          : "Primary estimate: full-buffer spectral consensus from GREEN / POS / CHROM";
 
         latestRoiAnalysisDisplayState = {
           revision: measurementRevision,
           sampleCount: roiSamples.length,
           spectralBpm: spectralConsensus,
-          spectralHr: spectralHrText,
-          spectralDetail: spectralDetail,
+          spectralHr: primarySpectralHrText,
+          spectralDetail: primarySpectralDetail,
+          diagnosticSpectralHr: diagnosticSpectralHrText,
           quality: quality.summary,
           qualityDetail: quality.detail,
         };
@@ -2371,8 +2468,8 @@ function drawMainPulseWaveformFromAnalysis(data) {
         });
 
         await renderMeasurementResultCardsFromServer({
-          spectralHr: spectralHrText,
-          spectralDetail: spectralDetail,
+          spectralHr: primarySpectralHrText,
+          spectralDetail: primarySpectralDetail,
           modelHr: "Not predicted yet",
           modelDetail: "Run live model prediction to compare with model-window spectral HR",
           modelDifference: "Not predicted yet",
@@ -2386,15 +2483,26 @@ function drawMainPulseWaveformFromAnalysis(data) {
           sampleCount: String(data.sample_count ?? "none"),
           durationS: `${formatNumber(data.duration_s, 2)} s`,
           estimatedFps: `${formatNumber(data.estimated_fps, 2)} Hz`,
-          spectralConsensus: spectralHrText,
+          spectralConsensus: diagnosticSpectralHrText,
           greenSummary: formatSignalSummary("GREEN", data.signals?.green),
           posSummary: formatSignalSummary("POS", data.signals?.pos),
           chromSummary: formatSignalSummary("CHROM", data.signals?.chrom),
           rawResponse: JSON.stringify(buildCompactRoiAnalysisDebugResponse(data), null, 2),
         });
 
+        if (fullBufferRejected) {
+          statusEl.innerText =
+            `ROI series analyzed but rejected by full-buffer spectral gate. ` +
+            `Candidate consensus=${diagnosticSpectralHrText}. ` +
+            `GREEN=${greenBpm?.toFixed(1) ?? "none"} BPM, ` +
+            `POS=${posBpm?.toFixed(1) ?? "none"} BPM, ` +
+            `CHROM=${chromBpm?.toFixed(1) ?? "none"} BPM.`;
+
+          return latestRoiAnalysisDisplayState;
+        }
+
         statusEl.innerText =
-          `ROI series analyzed. Full-buffer spectral consensus=${spectralHrText}. ` +
+          `ROI series analyzed. Full-buffer spectral consensus=${diagnosticSpectralHrText}. ` +
           `GREEN=${greenBpm?.toFixed(1) ?? "none"} BPM, ` +
           `POS=${posBpm?.toFixed(1) ?? "none"} BPM, ` +
           `CHROM=${chromBpm?.toFixed(1) ?? "none"} BPM.`;

@@ -23,6 +23,7 @@ app/live_hr_demo/models/mediapipe/*.task
 AGENTS.md
 
 CRVSE_training_preprocessing_audit_2026-07-11.md
+CRVSE_optuna_scratch_audit_2026-07-17.md
 
 # CRVSE generated audit / fine-tuning artifacts
 Data/audit_live_compatible_window_*.csv
