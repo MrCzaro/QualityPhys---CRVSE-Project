@@ -17,7 +17,7 @@ Synthetic inference checks are kept outside the app in
 from __future__ import annotations
 
 from pathlib import Path
-import sys
+import sys, os
 
 from fasthtml.common import *
 from monsterui.all import *
@@ -109,4 +109,18 @@ def index() -> FT:
     )
 
 
-serve()
+ssl_certfile = os.getenv("QUALITYPHYS_HTTPS_CERT")
+ssl_keyfile = os.getenv("QUALITYPHYS_HTTPS_KEY")
+
+serve_kwargs = {
+    "host": "0.0.0.0",
+    "port": 5001,
+}
+
+if ssl_certfile and ssl_keyfile:
+    serve_kwargs["ssl_certfile"] = ssl_certfile
+    serve_kwargs["ssl_keyfile"] = ssl_keyfile
+    print("HTTPS enabled for local network testing.")
+    print("Open on mobile with: https://YOUR_LAPTOP_IP:5001/")
+
+serve(**serve_kwargs)

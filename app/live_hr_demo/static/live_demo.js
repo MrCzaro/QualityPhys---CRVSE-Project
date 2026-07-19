@@ -487,7 +487,6 @@
       clearCanvasById("roi-green-trace-canvas");
       clearCanvasById("roi-green-normalized-trace-canvas");
       resetMeasurementProgress();
-      removeRepeatabilityTable();
     }
 
     function setMeasurementProgress(progressFraction, progressText) {
@@ -505,6 +504,7 @@
         progressTextEl.innerText = progressText ?? percentText;
       }
     }
+
     function resetMeasurementRunState(activeRevision, { resetCapturedFrame = false } = {}) {
       const startButton = document.getElementById("start-roi-sampling-button");
 
@@ -525,7 +525,11 @@
       roiSamplingStartMs = null;
       roiSamplingInFlight = false;
 
-      window.livePredictionRuns = [];
+      /*
+      Do not clear window.livePredictionRuns here.
+      The repeatability table compares predictions across repeated measurements
+      during the same browser page session.
+      */
 
       if (startButton) {
         startButton.disabled = false;

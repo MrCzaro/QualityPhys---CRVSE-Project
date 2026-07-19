@@ -59,8 +59,9 @@ def repeatability_table(runs: list[dict]) -> FT:
         Div(
             Div("Live prediction repeatability table", cls="text-sm font-semibold text-slate-900"),
             Div(
-                "Each row is one model-prediction run using the current ROI "
-                "sample buffer. Starting a new main measurement clears this table.",
+                "Each row is one live model-prediction run from this browser page "
+                "session. Rows persist across repeated main and advanced/manual "
+                "measurements until the page is refreshed.",
                 cls="text-xs text-slate-600",
             ),
             cls="mb-2",

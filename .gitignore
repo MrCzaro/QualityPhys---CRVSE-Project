@@ -8,7 +8,7 @@ __pycache__/
 # FastHTML / local session key
 app/live_hr_demo/.sesskey
 .sesskey
-
+*.pem
 # Model checkpoints
 app/live_hr_demo/models/checkpoints/
 *.pt
