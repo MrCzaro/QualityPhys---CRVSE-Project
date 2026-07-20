@@ -32,7 +32,7 @@ from backend.api_routes import register_api_routes
 from backend.ui_routes import register_ui_routes
 from models.runtime import load_model_bundle_for_demo
 from ui.live_demo_script import live_demo_script
-from ui.live_demo_components import camera_preview_card
+from ui.live_demo_components import camera_preview_card, mobile_demo_style
 
 app, rt = fast_app(
     title="QualityPhys Live HR Demo",
@@ -43,6 +43,7 @@ app, rt = fast_app(
             "/static/favicon.ico",
             "/static/favicon.ico",
         ),
+        mobile_demo_style(),
     ),
     bodykw={
         "class": "bg-slate-100 text-slate-950",
@@ -109,12 +110,21 @@ def index() -> FT:
     )
 
 
+default_ssl_certfile = APP_DIR / "certs" / "qualityphys-local.pem"
+default_ssl_keyfile = APP_DIR / "certs" / "qualityphys-local-key.pem"
+
 ssl_certfile = os.getenv("QUALITYPHYS_HTTPS_CERT")
 ssl_keyfile = os.getenv("QUALITYPHYS_HTTPS_KEY")
 
+if not ssl_certfile and default_ssl_certfile.exists():
+    ssl_certfile = str(default_ssl_certfile)
+
+if not ssl_keyfile and default_ssl_keyfile.exists():
+    ssl_keyfile = str(default_ssl_keyfile)
+
 serve_kwargs = {
     "host": "0.0.0.0",
-    "port": 5001,
+    "port": int(os.getenv("PORT", "5001")),
 }
 
 if ssl_certfile and ssl_keyfile:
@@ -122,5 +132,8 @@ if ssl_certfile and ssl_keyfile:
     serve_kwargs["ssl_keyfile"] = ssl_keyfile
     print("HTTPS enabled for local network testing.")
     print("Open on mobile with: https://YOUR_LAPTOP_IP:5001/")
+else:
+    print("HTTP enabled for local desktop testing.")
+    print("Open locally with: http://localhost:5001/")
 
 serve(**serve_kwargs)

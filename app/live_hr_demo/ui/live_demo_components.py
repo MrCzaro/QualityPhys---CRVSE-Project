@@ -342,3 +342,171 @@ def camera_preview_card() -> FT:
 
         cls="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm",
     )
+
+def mobile_demo_style() -> FT:
+    """Render mobile-only presentation rules for the live demo page."""
+    return Style(
+        """
+        @media (max-width: 767px) {
+          html {
+            color-scheme: light;
+            background: #f8fafc !important;
+          }
+
+          body {
+            background: #f8fafc !important;
+            color: #0f172a !important;
+          }
+
+          main {
+            padding: 1rem !important;
+            background: #f8fafc !important;
+          }
+
+          #start-camera-button,
+          #stop-camera-button,
+          #clear-roi-samples-button,
+          details {
+            display: none !important;
+          }
+
+          #main-pulse-wave-canvas {
+            display: none !important;
+          }
+
+          #mobile-camera-preview-frame {
+            position: relative;
+            width: 100%;
+          }
+
+          #camera-video {
+            aspect-ratio: 4 / 3;
+            object-fit: cover;
+            border: 2px solid #cbd5e1 !important;
+            border-radius: 1rem !important;
+            background: #e2e8f0 !important;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+          }
+
+          #mobile-camera-guidance-overlay {
+            display: none;
+            position: absolute;
+            inset: 0;
+            z-index: 5;
+            align-items: center;
+            justify-content: center;
+            border-radius: 1rem;
+            background: rgba(248, 250, 252, 0.68);
+            backdrop-filter: blur(1px);
+            color: #0f172a;
+            padding: 1.25rem;
+            text-align: center;
+            pointer-events: none;
+          }
+
+          #mobile-camera-guidance-overlay[data-visible="true"] {
+            display: flex;
+          }
+
+          #mobile-camera-guidance-primary {
+            font-size: 1.5rem;
+            line-height: 1.15;
+            font-weight: 900;
+            color: #0f172a;
+          }
+
+          #mobile-camera-guidance-secondary {
+            margin-top: 0.5rem;
+            font-size: 1rem;
+            line-height: 1.35;
+            font-weight: 700;
+            color: #334155;
+          }
+
+          #start-measurement-button,
+          #stop-measurement-button {
+            width: 100%;
+            min-height: 3.35rem;
+            flex: 1 1 100%;
+            border-radius: 9999px !important;
+            font-size: 1rem !important;
+            font-weight: 800 !important;
+            letter-spacing: 0 !important;
+            opacity: 1 !important;
+          }
+
+          #start-measurement-button {
+            background: #059669 !important;
+            color: #ffffff !important;
+            box-shadow: 0 10px 18px rgba(5, 150, 105, 0.22);
+          }
+
+          #start-measurement-button:disabled {
+            background: #d1fae5 !important;
+            color: #047857 !important;
+            border: 1px solid #a7f3d0 !important;
+            box-shadow: none !important;
+          }
+
+          #stop-measurement-button {
+            background: #dc2626 !important;
+            color: #ffffff !important;
+            box-shadow: 0 10px 18px rgba(220, 38, 38, 0.18);
+          }
+
+          #stop-measurement-button:disabled {
+            background: #f8fafc !important;
+            color: #475569 !important;
+            border: 1px solid #cbd5e1 !important;
+            box-shadow: none !important;
+          }
+
+          #measurement-status-summary {
+            font-size: 1.3rem !important;
+            line-height: 1.25 !important;
+            color: #0f172a !important;
+          }
+
+          #measurement-status-detail {
+            font-size: 0.98rem !important;
+            line-height: 1.45 !important;
+            color: #334155 !important;
+          }
+
+          #measurement-progress-text {
+            font-size: 1.05rem !important;
+            font-weight: 800 !important;
+            color: #047857 !important;
+          }
+
+          #measurement-progress-bar {
+            background: #10b981 !important;
+          }
+
+          #camera-status {
+            background: #ffffff !important;
+            color: #334155 !important;
+            border-color: #cbd5e1 !important;
+          }
+
+          #measurement-result-cards-container {
+            scroll-margin-top: 1rem;
+            color: #0f172a !important;
+          }
+
+          #measurement-result-cards-container * {
+            color: #0f172a !important;
+          }
+
+          #measurement-result-cards-container > div > * {
+            background: #ffffff !important;
+            border: 1px solid #cbd5e1 !important;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08) !important;
+          }
+
+          #measurement-quality-detail {
+            color: #334155 !important;
+          }
+        }
+        """
+    )

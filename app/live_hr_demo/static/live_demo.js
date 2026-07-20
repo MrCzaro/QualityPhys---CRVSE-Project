@@ -516,10 +516,7 @@
       roiSamplingRunId += 1;
       stopMeasurementProgressTimer();
 
-      if (roiSamplingTimer !== null) {
-        clearInterval(roiSamplingTimer);
-        roiSamplingTimer = null;
-      }
+      clearRoiSamplingSchedule();
 
       roiSamples = [];
       roiSamplingStartMs = null;
@@ -576,15 +573,28 @@
 
         const elapsedMs = performance.now() - startedAtMs;
         const progress = elapsedMs / MAIN_MEASUREMENT_DURATION_MS;
+        const totalSeconds = MAIN_MEASUREMENT_DURATION_MS / 1000.0;
         const elapsedSeconds = Math.min(
-          MAIN_MEASUREMENT_DURATION_MS / 1000.0,
+          totalSeconds,
           Math.max(0.0, elapsedMs / 1000.0)
         );
-        const totalSeconds = MAIN_MEASUREMENT_DURATION_MS / 1000.0;
+        const remainingSeconds = Math.max(0.0, totalSeconds - elapsedSeconds);
 
         const phaseText = elapsedSeconds < 3.0
           ? "Stabilizing signal. Hold still."
           : "Collecting rPPG signal. Keep your face steady.";
+
+        if (isMobileDemoViewport()) {
+          setMeasurementStatus(
+            "Measuring...",
+            `${phaseText} ${remainingSeconds.toFixed(1)} s remaining.`
+          );
+          setMeasurementProgress(
+            progress,
+            `${remainingSeconds.toFixed(1)} s remaining`
+          );
+          return;
+        }
 
         setMeasurementStatus(
           "Measuring...",
@@ -681,6 +691,228 @@
       }
     }
 
+    function isMobileDemoViewport() {
+      return window.matchMedia("(max-width: 767px)").matches;
+    }
+
+    function waitForVideoPreviewReady(timeoutMs = 4000) {
+      const videoEl = document.getElementById("camera-video");
+
+      if (!videoEl) {
+        return Promise.resolve(false);
+      }
+
+      if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+        return Promise.resolve(true);
+      }
+
+      return new Promise(resolve => {
+        let settled = false;
+
+        const cleanup = () => {
+          videoEl.removeEventListener("loadedmetadata", checkReady);
+          videoEl.removeEventListener("canplay", checkReady);
+          clearInterval(intervalId);
+          clearTimeout(timeoutId);
+        };
+
+        const finish = value => {
+          if (settled) {
+            return;
+          }
+
+          settled = true;
+          cleanup();
+          resolve(value);
+        };
+
+        const checkReady = () => {
+          if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+            finish(true);
+          }
+        };
+
+        const intervalId = setInterval(checkReady, 100);
+        const timeoutId = setTimeout(() => finish(false), timeoutMs);
+
+        videoEl.addEventListener("loadedmetadata", checkReady);
+        videoEl.addEventListener("canplay", checkReady);
+
+        checkReady();
+      });
+    }
+
+    function ensureMobileCameraGuidanceOverlay() {
+      const videoEl = document.getElementById("camera-video");
+
+      if (!videoEl) {
+        return null;
+      }
+
+      let overlayEl = document.getElementById("mobile-camera-guidance-overlay");
+
+      if (overlayEl) {
+        return overlayEl;
+      }
+
+      const parentEl = videoEl.parentElement;
+
+      if (!parentEl) {
+        return null;
+      }
+
+      let frameEl = document.getElementById("mobile-camera-preview-frame");
+
+      if (!frameEl) {
+        frameEl = document.createElement("div");
+        frameEl.id = "mobile-camera-preview-frame";
+
+        parentEl.insertBefore(frameEl, videoEl);
+        frameEl.appendChild(videoEl);
+      }
+
+      overlayEl = document.createElement("div");
+      overlayEl.id = "mobile-camera-guidance-overlay";
+      overlayEl.setAttribute("data-visible", "false");
+
+      overlayEl.innerHTML = `
+        <div>
+          <div id="mobile-camera-guidance-primary">Position your face</div>
+          <div id="mobile-camera-guidance-secondary">Place your head in the middle of the camera view.</div>
+        </div>
+      `;
+
+      frameEl.appendChild(overlayEl);
+
+      return overlayEl;
+    }
+
+    function setMobileCameraGuidanceOverlay(primaryText, secondaryText = "", visible = true) {
+      const overlayEl = ensureMobileCameraGuidanceOverlay();
+
+      if (!overlayEl) {
+        return;
+      }
+
+      const primaryEl = document.getElementById("mobile-camera-guidance-primary");
+      const secondaryEl = document.getElementById("mobile-camera-guidance-secondary");
+
+      if (primaryEl) {
+        primaryEl.innerText = primaryText;
+      }
+
+      if (secondaryEl) {
+        secondaryEl.innerText = secondaryText;
+      }
+
+      overlayEl.setAttribute("data-visible", visible ? "true" : "false");
+    }
+
+    function hideMobileCameraGuidanceOverlay() {
+      const overlayEl = document.getElementById("mobile-camera-guidance-overlay");
+
+      if (overlayEl) {
+        overlayEl.setAttribute("data-visible", "false");
+      }
+    }
+
+    function runMobileMeasurementPrepareCountdown(activeRevision, prepareSeconds = 3) {
+      if (!isMobileDemoViewport()) {
+        return Promise.resolve(true);
+      }
+
+      return new Promise(resolve => {
+        let settled = false;
+        let remainingSeconds = prepareSeconds;
+        let intervalId = null;
+        let startTimeoutId = null;
+
+        const finish = value => {
+          if (settled) {
+            return;
+          }
+
+          settled = true;
+
+          if (intervalId !== null) {
+            clearInterval(intervalId);
+          }
+
+          if (startTimeoutId !== null) {
+            clearTimeout(startTimeoutId);
+          }
+
+          if (!value) {
+            hideMobileCameraGuidanceOverlay();
+          }
+
+          resolve(value);
+        };
+
+        const renderStep = () => {
+          if (activeRevision !== measurementRevision || !mainMeasurementInProgress) {
+            finish(false);
+            return;
+          }
+
+          if (remainingSeconds > 0) {
+            setMobileCameraGuidanceOverlay(
+              "Position your face",
+              `Place your head in the middle. Measurement starts in ${remainingSeconds}.`,
+              true
+            );
+            setMeasurementStatus(
+              "Get ready.",
+              `Place your head in the middle of the camera view. Measurement starts in ${remainingSeconds}.`
+            );
+            setMeasurementProgress(0.0, `Starts in ${remainingSeconds}`);
+
+            remainingSeconds -= 1;
+            return;
+          }
+
+          setMobileCameraGuidanceOverlay(
+            "Start",
+            "Hold still and keep your face centered.",
+            true
+          );
+          setMeasurementStatus(
+            "Measuring...",
+            "Start. Hold still and keep your face centered."
+          );
+          setMeasurementProgress(0.0, "15.0 s remaining");
+
+          if (intervalId !== null) {
+            clearInterval(intervalId);
+            intervalId = null;
+          }
+
+          startTimeoutId = setTimeout(() => {
+            hideMobileCameraGuidanceOverlay();
+            finish(true);
+          }, 450);
+        };
+
+        renderStep();
+        intervalId = setInterval(renderStep, 1000);
+      });
+    }
+
+    function scrollToMeasurementResultsOnMobile() {
+      if (!isMobileDemoViewport()) {
+        return;
+      }
+
+      const resultsEl = document.getElementById("measurement-result-cards-container");
+
+      if (resultsEl) {
+        resultsEl.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+    }
+
     function updatePrimaryControlButtons() {
       const cameraActive = Boolean(cameraStream);
       const measurementActive = Boolean(mainMeasurementInProgress);
@@ -708,7 +940,7 @@
       }
 
       if (startMeasurementButton) {
-        startMeasurementButton.disabled = !cameraActive || measurementActive;
+        startMeasurementButton.disabled = measurementActive || (!cameraActive && !isMobileDemoViewport());
         startMeasurementButton.innerText = measurementActive ? "Measuring..." : "Start measurement";
       }
 
@@ -854,8 +1086,15 @@
       const statusEl = document.getElementById("camera-status");
       const startButton = document.getElementById("start-camera-button");
 
-      startButton.disabled = true;
-      startButton.innerText = "Starting...";
+      if (cameraStream) {
+        updatePrimaryControlButtons();
+        return true;
+      }
+
+      if (startButton) {
+        startButton.disabled = true;
+        startButton.innerText = "Starting...";
+      }
 
       try {
         cameraStream = await navigator.mediaDevices.getUserMedia({
@@ -869,13 +1108,26 @@
 
         videoEl.srcObject = cameraStream;
 
-        statusEl.innerText =
-          "Camera started. Preview is local in the browser. Frames are not sent to the backend automatically.";
+        if (statusEl) {
+          statusEl.innerText =
+            "Camera started. Preview is local in the browser. Frames are not sent to the backend automatically.";
+        }
+
+        updatePrimaryControlButtons();
+        return true;
       } catch (error) {
-        statusEl.innerText = `Camera start failed: ${error}`;
+        if (statusEl) {
+          statusEl.innerText = `Camera start failed: ${error}`;
+        }
+
+        updatePrimaryControlButtons();
+        return false;
       } finally {
-        startButton.disabled = false;
-        startButton.innerText = "Start camera";
+        if (startButton) {
+          startButton.disabled = false;
+          startButton.innerText = "Start camera";
+        }
+
         updatePrimaryControlButtons();
       }
     }
@@ -895,10 +1147,7 @@
       stopMeasurementProgressTimer();
       setMeasurementStatus("Camera stopped.", "Start the camera again before running a new measurement.");
 
-      if (roiSamplingTimer !== null) {
-        clearInterval(roiSamplingTimer);
-        roiSamplingTimer = null;
-      }
+      clearRoiSamplingSchedule();
 
       if (startSamplingButton) {
         startSamplingButton.disabled = false;
@@ -1915,11 +2164,36 @@ function drawMainPulseWaveformFromAnalysis(data) {
     }
 
 
-  async function collectOneRoiSample(
+    function clearRoiSamplingSchedule() {
+      if (roiSamplingTimer !== null) {
+        clearTimeout(roiSamplingTimer);
+        roiSamplingTimer = null;
+      }
+    }
+
+    function scheduleNextRoiSample(expectedSamplingRunId, expectedRevision, delayMs = 0) {
+      if (
+        expectedSamplingRunId !== roiSamplingRunId ||
+        expectedRevision !== measurementRevision ||
+        roiSamplingTimer === null ||
+        !cameraStream
+      ) {
+        return;
+      }
+
+      const safeDelayMs = Math.max(0, Number(delayMs) || 0);
+
+      roiSamplingTimer = setTimeout(() => {
+        collectOneRoiSample(expectedSamplingRunId, expectedRevision);
+      }, safeDelayMs);
+    }
+  
+    async function collectOneRoiSample(
       expectedSamplingRunId = roiSamplingRunId,
       expectedRevision = measurementRevision
     ) {
       const statusEl = document.getElementById("camera-status");
+      let nextSampleDelayMs = 0;
 
       if (roiSamplingInFlight) {
         return;
@@ -1934,6 +2208,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
         const captureEndMs = performance.now();
 
         if (!imageDataUrl) {
+          nextSampleDelayMs = 100;
           return;
         }
 
@@ -1980,14 +2255,19 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
         summarizeCollectedRoiSamples();
 
-        statusEl.innerText =
-          `ROI sampling active. Collected ${roiSamples.length} sample(s). ` +
-          "Frames are processed in memory and not stored.";
+        if (statusEl) {
+          statusEl.innerText =
+            `ROI sampling active. Collected ${roiSamples.length} sample(s). ` +
+            "Frames are processed in memory and not stored.";
+        }
       } catch (error) {
+        nextSampleDelayMs = 150;
+
         if (
           expectedSamplingRunId === roiSamplingRunId &&
           expectedRevision === measurementRevision &&
-          roiSamplingTimer !== null
+          roiSamplingTimer !== null &&
+          statusEl
         ) {
           statusEl.innerText = `ROI sampling error: ${error}`;
         }
@@ -1995,14 +2275,18 @@ function drawMainPulseWaveformFromAnalysis(data) {
         if (expectedSamplingRunId === roiSamplingRunId) {
           roiSamplingInFlight = false;
         }
+
+        scheduleNextRoiSample(
+          expectedSamplingRunId,
+          expectedRevision,
+          nextSampleDelayMs
+        );
       }
     }
 
     function startRoiSampling({ resetOutputs = true } = {}) {
       const statusEl = document.getElementById("camera-status");
       const startButton = document.getElementById("start-roi-sampling-button");
-
-      const samplingIntervalMs = 100;
 
       if (!cameraStream) {
         statusEl.innerText = "Cannot start ROI sampling: camera is not started.";
@@ -2034,20 +2318,16 @@ function drawMainPulseWaveformFromAnalysis(data) {
       }
 
       statusEl.innerText =
-        `ROI sampling started at ${samplingIntervalMs} ms interval. Hold still for about 8-10 seconds.`;
+        "ROI sampling started in completion-driven mode. Hold still while each backend ROI sample completes.";
 
       summarizeCollectedRoiSamples();
 
-      roiSamplingTimer = setInterval(() => {
-        collectOneRoiSample(activeSamplingRunId, activeRevision);
-      }, samplingIntervalMs);
-
-      collectOneRoiSample(activeSamplingRunId, activeRevision);
+      roiSamplingTimer = 0;
+      scheduleNextRoiSample(activeSamplingRunId, activeRevision, 0);
       updatePrimaryControlButtons();
 
       return true;
     }
-
 
     function stopRoiSampling() {
       const statusEl = document.getElementById("camera-status");
@@ -2055,11 +2335,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
       roiSamplingRunId += 1;
       roiSamplingInFlight = false;
-
-      if (roiSamplingTimer !== null) {
-        clearInterval(roiSamplingTimer);
-        roiSamplingTimer = null;
-      }
+      clearRoiSamplingSchedule();
 
       if (startButton) {
         startButton.disabled = false;
@@ -2068,8 +2344,10 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
       summarizeCollectedRoiSamples();
 
-      statusEl.innerText =
-        `ROI sampling stopped. Collected ${roiSamples.length} sample(s).`;
+      if (statusEl) {
+        statusEl.innerText =
+          `ROI sampling stopped. Collected ${roiSamples.length} sample(s).`;
+      }
 
       updatePrimaryControlButtons();
     }
@@ -2100,14 +2378,51 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
     async function startMainMeasurement() {
       const statusEl = document.getElementById("camera-status");
-
-      if (!cameraStream) {
-        statusEl.innerText = "Cannot start measurement: camera is not started.";
-        return;
-      }
+      const totalSeconds = MAIN_MEASUREMENT_DURATION_MS / 1000.0;
+      const mobileViewport = isMobileDemoViewport();
 
       if (mainMeasurementInProgress) {
         statusEl.innerText = "Measurement is already running.";
+        return;
+      }
+
+      if (!cameraStream) {
+        if (!mobileViewport) {
+          statusEl.innerText = "Cannot start measurement: camera is not started.";
+          return;
+        }
+
+        setMeasurementStatus(
+          "Starting camera...",
+          "Camera permission is needed before the measurement can begin."
+        );
+
+        if (statusEl) {
+          statusEl.innerText = "Starting camera for mobile measurement...";
+        }
+
+        const cameraStarted = await startCameraPreview();
+
+        if (!cameraStarted || !cameraStream) {
+          setMeasurementStatus(
+            "Camera unavailable.",
+            "Camera permission or browser security blocked the measurement."
+          );
+          return;
+        }
+      }
+
+      const videoReady = await waitForVideoPreviewReady();
+
+      if (!videoReady) {
+        if (statusEl) {
+          statusEl.innerText = "Cannot start measurement: camera preview is not ready yet.";
+        }
+
+        setMeasurementStatus(
+          "Measurement could not start.",
+          "Camera preview is not ready yet. Try again in a moment."
+        );
         return;
       }
 
@@ -2121,12 +2436,30 @@ function drawMainPulseWaveformFromAnalysis(data) {
       mainMeasurementInProgress = true;
       setMainMeasurementButtonsState(true);
 
+      if (mobileViewport) {
+        const prepareCompleted = await runMobileMeasurementPrepareCountdown(activeRevision, 3);
+
+        if (!prepareCompleted || activeRevision !== measurementRevision) {
+          return;
+        }
+      }
+
       const measurementStartedAtMs = performance.now();
-      setMeasurementStatus(
-        "Measuring...",
-        `Stabilizing signal. 0.0 / ${(MAIN_MEASUREMENT_DURATION_MS / 1000).toFixed(1)} s`
-      );
-      setMeasurementProgress(0.0, `0.0 / ${(MAIN_MEASUREMENT_DURATION_MS / 1000).toFixed(1)} s`);
+
+      if (mobileViewport) {
+        setMeasurementStatus(
+          "Measuring...",
+          `Collecting rPPG signal. ${totalSeconds.toFixed(1)} s remaining.`
+        );
+        setMeasurementProgress(0.0, `${totalSeconds.toFixed(1)} s remaining`);
+      } else {
+        setMeasurementStatus(
+          "Measuring...",
+          `Stabilizing signal. 0.0 / ${totalSeconds.toFixed(1)} s`
+        );
+        setMeasurementProgress(0.0, `0.0 / ${totalSeconds.toFixed(1)} s`);
+      }
+
       startMeasurementProgressTimer(activeRevision, measurementStartedAtMs);
 
       const samplingStarted = startRoiSampling({
@@ -2137,13 +2470,14 @@ function drawMainPulseWaveformFromAnalysis(data) {
         mainMeasurementInProgress = false;
         stopMeasurementProgressTimer();
         setMainMeasurementButtonsState(false);
+        hideMobileCameraGuidanceOverlay();
         setMeasurementStatus("Measurement could not start.", "Camera or video frame was not ready.");
         setMeasurementProgress(0.0, "0%");
         return;
       }
 
       statusEl.innerText =
-        `Measurement started. Hold still for ${(MAIN_MEASUREMENT_DURATION_MS / 1000).toFixed(0)} seconds.`;
+        `Measurement started. Hold still for ${totalSeconds.toFixed(0)} seconds.`;
 
       mainMeasurementTimer = setTimeout(async () => {
         mainMeasurementTimer = null;
@@ -2154,7 +2488,12 @@ function drawMainPulseWaveformFromAnalysis(data) {
             return;
           }
 
-          setMeasurementProgress(1.0, `${(MAIN_MEASUREMENT_DURATION_MS / 1000).toFixed(1)} / ${(MAIN_MEASUREMENT_DURATION_MS / 1000).toFixed(1)} s`);
+          setMeasurementProgress(
+            1.0,
+            mobileViewport
+              ? "0.0 s remaining"
+              : `${totalSeconds.toFixed(1)} / ${totalSeconds.toFixed(1)} s`
+          );
           setMeasurementStatus("Measurement complete.", "Running backend rPPG analysis...");
 
           stopRoiSampling();
@@ -2200,12 +2539,15 @@ function drawMainPulseWaveformFromAnalysis(data) {
             mainMeasurementInProgress = false;
             stopMeasurementProgressTimer();
             setMainMeasurementButtonsState(false);
+            hideMobileCameraGuidanceOverlay();
+            scrollToMeasurementResultsOnMobile();
           }
         }
       }, MAIN_MEASUREMENT_DURATION_MS);
     }
 
     function stopMainMeasurement() {
+      const videoEl = document.getElementById("camera-video");
       const statusEl = document.getElementById("camera-status");
 
       if (mainMeasurementTimer !== null) {
@@ -2214,7 +2556,44 @@ function drawMainPulseWaveformFromAnalysis(data) {
       }
 
       measurementRevision += 1;
+      const activeRevision = measurementRevision;
+
       stopMeasurementProgressTimer();
+
+      if (isMobileDemoViewport()) {
+        if (cameraStream) {
+          const tracks = cameraStream.getTracks();
+
+          for (const track of tracks) {
+            track.stop();
+          }
+
+          cameraStream = null;
+        }
+
+        if (videoEl) {
+          videoEl.srcObject = null;
+        }
+
+        resetMeasurementRunState(activeRevision, {
+          resetCapturedFrame: true,
+        });
+
+        setMainMeasurementButtonsState(false);
+        setMeasurementStatus(
+          "Measurement stopped.",
+          "Mobile measurement stopped, camera closed, and outputs cleared."
+        );
+        setMeasurementProgress(0.0, "Stopped");
+
+        if (statusEl) {
+          statusEl.innerText =
+            "Measurement stopped. Camera closed and measurement output cleared.";
+        }
+
+        updatePrimaryControlButtons();
+        return;
+      }
 
       if (roiSamplingTimer !== null) {
         stopRoiSampling();
@@ -2741,6 +3120,136 @@ function drawMainPulseWaveformFromAnalysis(data) {
       await renderRepeatabilityTableFromServer();
     }
 
+
+    function estimateRoiSamplesEffectiveFpsForModel(samples, windowSeconds = 12.0) {
+      const validSamples = samples
+        .filter(sample => {
+          const t = Number(sample?.t_s);
+          const hasAllRois = ROI_NAMES.every(roiName => sample?.rois?.[roiName] !== undefined);
+          return Number.isFinite(t) && hasAllRois;
+        })
+        .map(sample => ({
+          ...sample,
+          t_s: Number(sample.t_s)
+        }))
+        .sort((a, b) => a.t_s - b.t_s);
+
+      if (validSamples.length < 2) {
+        return null;
+      }
+
+      const latestTimeS = validSamples[validSamples.length - 1].t_s;
+      const cutoffS = latestTimeS - Number(windowSeconds);
+      const windowSamples = validSamples.filter(sample => sample.t_s >= cutoffS);
+
+      if (windowSamples.length < 2) {
+        return null;
+      }
+
+      const firstTimeS = windowSamples[0].t_s;
+      const lastTimeS = windowSamples[windowSamples.length - 1].t_s;
+      const durationS = lastTimeS - firstTimeS;
+
+      if (!Number.isFinite(durationS) || durationS <= 0) {
+        return null;
+      }
+
+      return (windowSamples.length - 1) / durationS;
+    }
+
+    async function renderLowFpsModelSkip({
+      effectiveFps,
+      minimumFpsHz,
+      expectedRevision = null,
+    } = {}) {
+      if (expectedRevision !== null && expectedRevision !== measurementRevision) {
+        return null;
+      }
+
+      const statusEl = document.getElementById("camera-status");
+      const fpsText = effectiveFps === null ? "unknown" : `${effectiveFps.toFixed(2)} Hz`;
+
+      const preservedAnalysis =
+        latestRoiAnalysisDisplayState !== null &&
+        latestRoiAnalysisDisplayState.revision === measurementRevision &&
+        latestRoiAnalysisDisplayState.sampleCount === roiSamples.length
+          ? latestRoiAnalysisDisplayState
+          : null;
+
+      const primarySpectralHrText =
+        preservedAnalysis !== null ? preservedAnalysis.spectralHr : "Not available";
+
+      const primarySpectralDetail =
+        preservedAnalysis !== null
+          ? preservedAnalysis.spectralDetail
+          : "Full-buffer spectral analysis should run before model prediction.";
+
+      const primaryQuality =
+        preservedAnalysis !== null ? preservedAnalysis.quality : "Not available";
+
+      const primaryQualityDetail =
+        preservedAnalysis !== null
+          ? preservedAnalysis.qualityDetail
+          : "Signal quality was not available before model skip.";
+
+      const skipDetail =
+        `Experimental model skipped because live ROI sampling was ${fpsText}. ` +
+        `Training-style 0.7-3.5 Hz bandpass preprocessing needs at least ` +
+        `${minimumFpsHz.toFixed(1)} Hz source sampling.`;
+
+      await renderMeasurementResultCardsFromServer({
+        spectralHr: primarySpectralHrText,
+        spectralDetail: primarySpectralDetail,
+        modelHr: "Skipped",
+        modelDetail: skipDetail,
+        modelDifference: "Not available",
+        modelDifferenceDetail: "Agreement diagnostic unavailable because model prediction was skipped.",
+        quality: primaryQuality,
+        qualityDetail: primaryQualityDetail,
+      });
+
+      await renderModelPredictionSummaryFromServer({
+        status: "Skipped",
+        modelHr: "Skipped",
+        spectralConsensus: primarySpectralHrText,
+        modelDifference: "Not available",
+        greenSummary: "Model-side spectral summary not computed",
+        posSummary: "Model-side spectral summary not computed",
+        chromSummary: "Model-side spectral summary not computed",
+        originalDurationS: "none",
+        usedDurationS: "none",
+        usedSamples: String(roiSamples.length),
+        sourceFps: fpsText,
+        rawResponse: JSON.stringify(
+          {
+            status: "skipped",
+            reason: "live_roi_sampling_fps_too_low",
+            effective_fps_hz: effectiveFps,
+            minimum_required_fps_hz: minimumFpsHz,
+            bandpass_high_hz: 3.5,
+            message: skipDetail,
+          },
+          null,
+          2
+        ),
+      });
+
+      if (statusEl) {
+        statusEl.innerText =
+          preservedAnalysis !== null
+            ? `Model skipped. Kept full-buffer spectral estimate (${preservedAnalysis.spectralHr}). ${skipDetail}`
+            : `Model skipped. ${skipDetail}`;
+      }
+
+      return {
+        summary: "Model skipped.",
+        detail:
+          preservedAnalysis !== null
+            ? `Kept full-buffer spectral estimate (${preservedAnalysis.spectralHr}). ${skipDetail}`
+            : skipDetail,
+      };
+    }
+
     async function runLiveModelPredictionInBackend(expectedRevision = null) {
       if (typeof expectedRevision !== "number") {
         expectedRevision = null;
@@ -2760,6 +3269,17 @@ function drawMainPulseWaveformFromAnalysis(data) {
           summary: "Prediction unavailable.",
           detail: detail,
         };
+      }
+
+      const minimumModelSourceFpsHz = 8.0;
+      const effectiveModelFps = estimateRoiSamplesEffectiveFpsForModel(roiSamples, 12.0);
+
+      if (effectiveModelFps === null || effectiveModelFps < minimumModelSourceFpsHz) {
+        return await renderLowFpsModelSkip({
+          effectiveFps: effectiveModelFps,
+          minimumFpsHz: minimumModelSourceFpsHz,
+          expectedRevision: expectedRevision,
+        });
       }
 
       if (runButton) {
