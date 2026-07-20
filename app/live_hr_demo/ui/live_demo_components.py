@@ -41,11 +41,14 @@ def demo_readiness_item(
 
 
 def demo_readiness_panel() -> FT:
-    """Render a desktop-only readiness checklist for live demo operation."""
-    return Div(
-        Div(
+    """Render a desktop-only collapsible readiness checklist for live demo operation."""
+    return Details(
+        Summary(
             "Demo readiness",
-            cls="text-xs font-semibold uppercase tracking-wide text-slate-500",
+            cls=(
+                "cursor-pointer rounded-xl border border-sky-100 bg-sky-50/80 "
+                "p-3 text-sm font-semibold text-slate-800 shadow-sm"
+            ),
         ),
         Div(
             demo_readiness_item(
@@ -93,7 +96,57 @@ def demo_readiness_panel() -> FT:
             cls="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3",
         ),
         id="demo-readiness-panel",
-        cls="mt-4 hidden rounded-xl border border-sky-100 bg-sky-50/60 p-4 shadow-sm md:block",
+        cls="mt-4 hidden md:block",
+    )
+
+
+def final_interpretation_panel() -> FT:
+    """Render the top-level final interpretation panel for the live demo."""
+    return Div(
+        Div(
+            "Final interpretation",
+            cls="text-xs font-semibold uppercase tracking-wide text-slate-500",
+        ),
+        Div(
+            "No final estimate yet",
+            id="final-interpretation-state",
+            cls="mt-2 text-2xl font-bold leading-tight text-slate-900",
+        ),
+        Div(
+            "Start a measurement. The app will use spectral HR as the primary estimate and treat model HR as experimental.",
+            id="final-interpretation-detail",
+            cls="mt-2 text-sm leading-relaxed text-slate-700",
+        ),
+        Div(
+            "Spectral HR remains primary.",
+            id="final-interpretation-footnote",
+            cls="mt-3 text-xs font-semibold text-slate-500",
+        ),
+        id="final-interpretation-panel",
+        cls=(
+            "mb-4 rounded-xl border border-slate-200 bg-white p-4 "
+            "shadow-sm transition-colors duration-200"
+        ),
+    )
+
+
+def measurement_details_disclosure() -> FT:
+    """Render collapsible detailed measurement cards below the final result."""
+    return Details(
+        Summary(
+            "Measurement details",
+            cls=(
+                "cursor-pointer rounded-xl border border-slate-200 bg-white "
+                "p-3 text-sm font-semibold text-slate-800 shadow-sm"
+            ),
+        ),
+        Div(
+            measurement_result_cards_placeholder(),
+            id="measurement-result-cards-container",
+            cls="pt-1",
+        ),
+        id="measurement-details-disclosure",
+        cls="mt-4",
     )
 
 
@@ -229,20 +282,18 @@ def camera_preview_card() -> FT:
             ),
 
             main_panel_card(
-                "Pulse waveform",
+                "Result and waveform",
                 "Live monitor-style waveform from facial ROI color changes. "
                 "The waveform is for signal visualization; HR is estimated after "
                 "backend analysis.",
+                final_interpretation_panel(),
                 Canvas(
                     id="main-pulse-wave-canvas",
                     width="900",
                     height="280",
                     cls="w-full rounded-xl border border-slate-200 bg-white shadow-sm",
                 ),
-                Div(
-                    measurement_result_cards_placeholder(),
-                    id="measurement-result-cards-container",
-                ),
+                measurement_details_disclosure(),
             ),
             cls="grid gap-5 lg:grid-cols-2",
         ),
@@ -426,6 +477,7 @@ def camera_preview_card() -> FT:
 
                 cls="mt-3 grid gap-5",
             ),
+            id="advanced-diagnostics-details",
         ),
 
         cls="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm",
@@ -454,7 +506,7 @@ def mobile_demo_style() -> FT:
           #start-camera-button,
           #stop-camera-button,
           #clear-roi-samples-button,
-          details {
+          #advanced-diagnostics-details {
             display: none !important;
           }
 
@@ -530,10 +582,9 @@ def mobile_demo_style() -> FT:
           }
 
           #start-measurement-button:disabled {
-            background: #d1fae5 !important;
-            color: #047857 !important;
-            border: 1px solid #a7f3d0 !important;
-            box-shadow: none !important;
+            background: #94a3b8 !important;
+            color: #ffffff !important;
+            box-shadow: none;
           }
 
           #stop-measurement-button {
@@ -543,53 +594,76 @@ def mobile_demo_style() -> FT:
           }
 
           #stop-measurement-button:disabled {
-            background: #f8fafc !important;
-            color: #475569 !important;
-            border: 1px solid #cbd5e1 !important;
-            box-shadow: none !important;
+            background: #cbd5e1 !important;
+            color: #64748b !important;
+            box-shadow: none;
           }
 
-          #measurement-status-summary {
-            font-size: 1.3rem !important;
-            line-height: 1.25 !important;
-            color: #0f172a !important;
+          #final-interpretation-panel {
+            margin-top: 1rem !important;
+            margin-bottom: 1rem !important;
+            border-radius: 1rem !important;
           }
 
-          #measurement-status-detail {
-            font-size: 0.98rem !important;
+          #final-interpretation-state {
+            font-size: 1.45rem !important;
+            line-height: 1.15 !important;
+          }
+
+          #final-interpretation-detail {
+            font-size: 0.95rem !important;
             line-height: 1.45 !important;
-            color: #334155 !important;
           }
 
-          #measurement-progress-text {
-            font-size: 1.05rem !important;
-            font-weight: 800 !important;
-            color: #047857 !important;
+          #measurement-details-disclosure {
+            display: block !important;
+            margin-top: 1rem !important;
           }
 
-          #measurement-progress-bar {
-            background: #10b981 !important;
-          }
-
-          #camera-status {
+          #measurement-details-disclosure > summary {
             background: #ffffff !important;
-            color: #334155 !important;
+            color: #0f172a !important;
             border-color: #cbd5e1 !important;
           }
 
-          #measurement-result-cards-container {
-            scroll-margin-top: 1rem;
+          #measurement-status-summary {
             color: #0f172a !important;
+            font-size: 1.05rem !important;
+            line-height: 1.3 !important;
+          }
+
+          #measurement-status-detail {
+            color: #334155 !important;
+            font-size: 0.95rem !important;
+            line-height: 1.45 !important;
+          }
+
+          #measurement-progress-text {
+            color: #334155 !important;
+            font-weight: 700 !important;
+          }
+
+          #measurement-progress-bar {
+            background: #059669 !important;
+          }
+
+          #camera-status {
+            display: none !important;
+          }
+
+          #measurement-result-cards-container {
+            display: block !important;
+            margin-top: 0.75rem !important;
           }
 
           #measurement-result-cards-container * {
-            color: #0f172a !important;
+            color: inherit;
           }
 
           #measurement-result-cards-container > div > * {
+            border-color: #cbd5e1 !important;
             background: #ffffff !important;
-            border: 1px solid #cbd5e1 !important;
-            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08) !important;
+            color: #0f172a !important;
           }
 
           #measurement-quality-detail {

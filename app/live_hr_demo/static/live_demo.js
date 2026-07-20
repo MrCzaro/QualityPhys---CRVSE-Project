@@ -89,7 +89,7 @@
       partials from overwriting newer UI state.
       */
 
-      const hasRevisionGuard = typeof expectedRevision === "number";
+      const hasRevisionGuard = Number.isFinite(expectedRevision);
 
       if (hasRevisionGuard && expectedRevision !== measurementRevision) {
         return false;
@@ -110,6 +110,7 @@
         }
 
         container.innerHTML = html;
+        updateFinalInterpretationFromCurrentDom();
         updateDemoReadinessPanel();
         return true;
       } catch (error) {
@@ -435,6 +436,210 @@
       element.innerText = text;
     }
 
+    function setFinalInterpretationPanel({
+      state = "idle",
+      title = "No final estimate yet",
+      detail = "Start a measurement. The app will use spectral HR as the primary estimate and treat model HR as experimental.",
+      footnote = "Spectral HR remains primary.",
+    } = {}) {
+      const panel = document.getElementById("final-interpretation-panel");
+      const stateEl = document.getElementById("final-interpretation-state");
+      const detailEl = document.getElementById("final-interpretation-detail");
+      const footnoteEl = document.getElementById("final-interpretation-footnote");
+
+      if (!panel || !stateEl || !detailEl || !footnoteEl) {
+        return;
+      }
+
+      const palette = {
+        ready: {
+          border: "#bbf7d0",
+          background: "#f0fdf4",
+          title: "#14532d",
+          detail: "#166534",
+          footnote: "#15803d",
+        },
+        warning: {
+          border: "#fde68a",
+          background: "#fffbeb",
+          title: "#78350f",
+          detail: "#92400e",
+          footnote: "#b45309",
+        },
+        blocked: {
+          border: "#fecaca",
+          background: "#fef2f2",
+          title: "#7f1d1d",
+          detail: "#991b1b",
+          footnote: "#b91c1c",
+        },
+        idle: {
+          border: "#e2e8f0",
+          background: "#ffffff",
+          title: "#0f172a",
+          detail: "#334155",
+          footnote: "#64748b",
+        },
+      };
+
+      const selected = palette[state] ?? palette.idle;
+
+      panel.style.borderColor = selected.border;
+      panel.style.background = selected.background;
+      stateEl.style.color = selected.title;
+      detailEl.style.color = selected.detail;
+      footnoteEl.style.color = selected.footnote;
+
+      stateEl.innerText = title;
+      detailEl.innerText = detail;
+      footnoteEl.innerText = footnote;
+    }
+
+    function updateFinalInterpretationFromCurrentDom() {
+      const spectralHr = getElementTextTrimmed("spectral-consensus-summary", "Not analyzed yet");
+      const modelHr = getElementTextTrimmed("live-model-hr-summary", "Not predicted yet");
+      const modelDifference = getElementTextTrimmed(
+        "model-spectral-difference-summary",
+        "Not available"
+      );
+      const quality = getElementTextTrimmed("measurement-quality-summary", "Not analyzed yet");
+
+      const spectralLower = spectralHr.toLowerCase();
+      const modelLower = modelHr.toLowerCase();
+      const qualityLower = quality.toLowerCase();
+
+      const spectralHasBpm = spectralLower.includes("bpm");
+      const signalAccepted = qualityLower.includes("accepted");
+      const signalRejected =
+        qualityLower.includes("rejected") ||
+        spectralLower.includes("rejected") ||
+        qualityLower.includes("failed") ||
+        spectralLower.includes("failed");
+
+      if (signalRejected) {
+        setFinalInterpretationPanel({
+          state: "blocked",
+          title: "Do not use this measurement",
+          detail:
+            "The signal-quality gate rejected this measurement. Repeat the measurement with steadier face position and better lighting.",
+          footnote: "Rejected measurements should not be interpreted as HR estimates.",
+        });
+        return;
+      }
+
+      if (!spectralHasBpm) {
+        setFinalInterpretationPanel({
+          state: "idle",
+          title: "No final estimate yet",
+          detail:
+            "Start a measurement. The app will use spectral HR as the primary estimate and treat model HR as experimental.",
+          footnote: "Spectral HR remains primary.",
+        });
+        return;
+      }
+
+      if (!signalAccepted) {
+        setFinalInterpretationPanel({
+          state: "warning",
+          title: `Spectral estimate pending: ${spectralHr}`,
+          detail:
+            "A spectral value is visible, but the signal-quality state is not accepted yet. Wait for the full measurement result.",
+          footnote: "Do not over-interpret partial results.",
+        });
+        return;
+      }
+
+      if (modelLower.includes("disagrees")) {
+        setFinalInterpretationPanel({
+          state: "warning",
+          title: `Use spectral estimate: ${spectralHr}`,
+          detail:
+            `Signal accepted. Experimental model disagreed by ${modelDifference}, ` +
+            "so model HR is not used as the primary estimate.",
+          footnote: "Spectral HR remains primary because model agreement failed.",
+        });
+        return;
+      }
+
+      if (modelLower.includes("skipped")) {
+        setFinalInterpretationPanel({
+          state: "ready",
+          title: `Use spectral estimate: ${spectralHr}`,
+          detail:
+            "Signal accepted. Experimental model was skipped by a guardrail, so spectral HR remains the app estimate.",
+          footnote: "Model skip is a safety state, not a failed spectral measurement.",
+        });
+        return;
+      }
+
+      if (modelLower.includes("not run")) {
+        setFinalInterpretationPanel({
+          state: "ready",
+          title: `Use spectral estimate: ${spectralHr}`,
+          detail:
+            "Signal accepted. Experimental model was not run for this measurement, so spectral HR remains the app estimate.",
+          footnote: "Spectral HR remains primary.",
+        });
+        return;
+      }
+
+      if (modelLower.includes("rejected")) {
+        setFinalInterpretationPanel({
+          state: "ready",
+          title: `Use spectral estimate: ${spectralHr}`,
+          detail:
+            "Signal accepted. Experimental model-window quality rejected the model input, so spectral HR remains primary.",
+          footnote: "Model rejection does not invalidate an accepted spectral estimate.",
+        });
+        return;
+      }
+
+      if (modelLower.includes("unavailable") || modelLower.includes("failed")) {
+        setFinalInterpretationPanel({
+          state: "ready",
+          title: `Use spectral estimate: ${spectralHr}`,
+          detail:
+            "Signal accepted. Experimental model output is unavailable for this run, so spectral HR remains primary.",
+          footnote: "Model availability is separate from spectral signal quality.",
+        });
+        return;
+      }
+
+      if (modelLower.includes("not predicted")) {
+        setFinalInterpretationPanel({
+          state: "ready",
+          title: `Use spectral estimate: ${spectralHr}`,
+          detail:
+            "Signal accepted. Experimental model has not been run yet; spectral HR is the current app estimate.",
+          footnote: "Spectral HR remains primary.",
+        });
+        return;
+      }
+
+      if (modelLower.includes("bpm")) {
+        setFinalInterpretationPanel({
+          state: "ready",
+          title: `Use spectral estimate: ${spectralHr}`,
+          detail:
+            `Signal accepted. Experimental model returned ${modelHr}; use it only as a secondary comparison.`,
+          footnote: "Spectral HR remains primary even when the model returns a value.",
+        });
+        return;
+      }
+
+      setFinalInterpretationPanel({
+        state: "ready",
+        title: `Use spectral estimate: ${spectralHr}`,
+        detail:
+          "Signal accepted. Spectral HR is the app estimate; model output remains experimental.",
+        footnote: "Spectral HR remains primary.",
+      });
+    }
+
+    function resetFinalInterpretationPanel() {
+      setFinalInterpretationPanel();
+    }
+
     function clearCanvasById(id) {
       const canvasEl = document.getElementById(id);
 
@@ -460,6 +665,15 @@
 
 
     function resetMeasurementOutputs(expectedRevision = null) {
+      latestRoiAnalysisDisplayState = null;
+
+      setElementText("spectral-consensus-summary", "Not analyzed yet");
+      setElementText("live-model-hr-summary", "Not predicted yet");
+      setElementText("model-spectral-difference-summary", "Not predicted yet");
+      setElementText("measurement-quality-summary", "Not analyzed yet");
+      setElementText("measurement-quality-detail", "Spectral signal-quality gate");
+      resetFinalInterpretationPanel();
+
       renderMeasurementResultCardsPlaceholderFromServer({
         expectedRevision: expectedRevision,
       });
@@ -481,6 +695,7 @@
       clearCanvasById("roi-green-trace-canvas");
       clearCanvasById("roi-green-normalized-trace-canvas");
       resetMeasurementProgress();
+      updateDemoReadinessPanel();
     }
 
     function setMeasurementProgress(progressFraction, progressText) {
@@ -716,9 +931,9 @@
         return fallback;
       }
 
-      const text = element.innerText?.trim();
+      const text = (element.textContent ?? element.innerText ?? "").trim();
 
-      return text && text.length > 0 ? text : fallback;
+      return text.length > 0 ? text : fallback;
     }
 
     function computeRoiSampleDurationS(samples) {
@@ -1094,10 +1309,12 @@
         return;
       }
 
-      const resultsEl = document.getElementById("measurement-result-cards-container");
+      const finalInterpretationEl = document.getElementById("final-interpretation-panel");
+      const fallbackResultsEl = document.getElementById("measurement-result-cards-container");
+      const scrollTarget = finalInterpretationEl ?? fallbackResultsEl;
 
-      if (resultsEl) {
-        resultsEl.scrollIntoView({
+      if (scrollTarget) {
+        scrollTarget.scrollIntoView({
           behavior: "smooth",
           block: "start",
         });
@@ -3889,6 +4106,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
       drawAllRoiPlots();
       drawMainPulseWaveformPlaceholder();
       resetMeasurementProgress();
+      resetFinalInterpretationPanel();
 
       if (startCameraButton) {
         startCameraButton.addEventListener("click", startCameraPreview);
