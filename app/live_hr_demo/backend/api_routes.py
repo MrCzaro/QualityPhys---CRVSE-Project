@@ -8,7 +8,7 @@ and experimental live model prediction from browser-collected ROI RGB samples.
 from __future__ import annotations
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from backend.face_debug import summarize_face_from_data_url_frame
+from backend.face_debug import summarize_face_from_data_url_frame, summarize_live_roi_sample_from_data_url_frame
 from backend.frame_debug import summarize_data_url_frame
 from backend.live_prediction import make_json_safe_for_api, make_live_roi_model_prediction_payload
 from rppg.live_methods import analyze_roi_series_payload
@@ -127,6 +127,44 @@ def register_api_routes(rt, model_bundle, model_status: dict | None = None) -> N
                 {
                     "status": "error",
                     "stage": "debug_frame_api",
+                    "exception_type": type(exc).__name__,
+                    "message": str(exc),
+                },
+                status_code=400,
+            )
+
+    @rt("/api/roi-sample", methods=["POST"])
+    async def roi_sample_api(request: Request):
+        """
+        Extract one compact live ROI sample from a browser-submitted frame.
+
+        This endpoint is used by the main measurement loop. It returns numeric
+        ROI summaries only and does not store the submitted frame.
+        """
+
+        try:
+            payload = await request.json()
+            image_data_url = payload.get("image_data_url")
+
+            if image_data_url is None:
+                return JSONResponse(
+                    {
+                        "status": "error",
+                        "stage": "request_validation",
+                        "message": "Missing required field: image_data_url",
+                    },
+                    status_code=400,
+                )
+
+            result = summarize_live_roi_sample_from_data_url_frame(image_data_url)
+
+            return JSONResponse(result)
+
+        except Exception as exc:
+            return JSONResponse(
+                {
+                    "status": "error",
+                    "stage": "roi_sample_api",
                     "exception_type": type(exc).__name__,
                     "message": str(exc),
                 },

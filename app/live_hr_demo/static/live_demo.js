@@ -1,6 +1,6 @@
   let cameraStream = null;
   let hasCapturedFrame = false;
-  let roiSamplingTimer = null;
+  let roiSamplingScheduleId = null;
   let roiSamples = [];
   let roiSamplingStartMs = null;
   let roiSamplingInFlight = false;
@@ -110,6 +110,7 @@
         }
 
         container.innerHTML = html;
+        updateDemoReadinessPanel();
         return true;
       } catch (error) {
         console.error(errorMessage, error);
@@ -457,13 +458,6 @@
       setElementText("backend-face-debug", "No face detection request sent yet.");
     }
 
-    function removeRepeatabilityTable() {
-      const repeatabilityContainer = document.getElementById("live-model-repeatability-container");
-
-      if (repeatabilityContainer) {
-        repeatabilityContainer.remove();
-      }
-    }
 
     function resetMeasurementOutputs(expectedRevision = null) {
       renderMeasurementResultCardsPlaceholderFromServer({
@@ -617,7 +611,7 @@
         hasCapturedFrame ||
         roiSamples.length > 0 ||
         predictionRunCount > 0 ||
-        roiSamplingTimer !== null ||
+        roiSamplingScheduleId !== null ||
         mainMeasurementInProgress
       );
     }
@@ -690,6 +684,203 @@
         );
       }
     }
+    
+    function setDemoReadinessItem(valueId, detailId, state, value, detail) {
+      const valueEl = document.getElementById(valueId);
+      const detailEl = document.getElementById(detailId);
+
+      if (!valueEl || !detailEl) {
+        return;
+      }
+
+      const palette = {
+        ready: { background: "#dcfce7", color: "#166534" },
+        busy: { background: "#dbeafe", color: "#1d4ed8" },
+        warning: { background: "#fef3c7", color: "#92400e" },
+        blocked: { background: "#fee2e2", color: "#991b1b" },
+        idle: { background: "#e2e8f0", color: "#334155" },
+      };
+
+      const selected = palette[state] ?? palette.idle;
+
+      valueEl.innerText = value;
+      valueEl.style.background = selected.background;
+      valueEl.style.color = selected.color;
+      detailEl.innerText = detail;
+    }
+
+    function getElementTextTrimmed(id, fallback = "") {
+      const element = document.getElementById(id);
+
+      if (!element) {
+        return fallback;
+      }
+
+      const text = element.innerText?.trim();
+
+      return text && text.length > 0 ? text : fallback;
+    }
+
+    function computeRoiSampleDurationS(samples) {
+      if (!Array.isArray(samples) || samples.length < 2) {
+        return null;
+      }
+
+      const firstTime = getValidNumber(samples[0]?.t_s);
+      const lastTime = getValidNumber(samples[samples.length - 1]?.t_s);
+
+      if (firstTime === null || lastTime === null || lastTime <= firstTime) {
+        return null;
+      }
+
+      return lastTime - firstTime;
+    }
+
+    function updateDemoReadinessPanel() {
+      const panel = document.getElementById("demo-readiness-panel");
+
+      if (!panel) {
+        return;
+      }
+
+      const cameraActive = Boolean(cameraStream);
+      const measurementActive = Boolean(mainMeasurementInProgress);
+      const samplingActive = roiSamplingScheduleId !== null;
+      const enoughSamples = roiSamples.length >= 20;
+      const secureContext = Boolean(window.isSecureContext);
+
+      setDemoReadinessItem(
+        "readiness-secure-context-value",
+        "readiness-secure-context-detail",
+        secureContext ? "ready" : "blocked",
+        secureContext ? "Secure" : "Blocked",
+        secureContext
+          ? "Camera APIs should be available in this browser context."
+          : "Browser security may block the camera. Use HTTPS or localhost."
+      );
+
+      setDemoReadinessItem(
+        "readiness-camera-value",
+        "readiness-camera-detail",
+        cameraActive ? (measurementActive ? "busy" : "ready") : "idle",
+        cameraActive ? (measurementActive ? "Measuring" : "Camera ready") : "Not started",
+        cameraActive
+          ? "Camera preview is open. Frames are processed only during requested actions."
+          : "Camera is closed."
+      );
+
+      const durationS = computeRoiSampleDurationS(roiSamples);
+      const sampleDetail =
+        durationS === null
+          ? "No measurement window has been collected yet."
+          : `${roiSamples.length} sample(s) over ${durationS.toFixed(2)} s.`;
+
+      setDemoReadinessItem(
+        "readiness-samples-value",
+        "readiness-samples-detail",
+        enoughSamples ? "ready" : samplingActive ? "busy" : roiSamples.length > 0 ? "warning" : "idle",
+        `${roiSamples.length} sample(s)`,
+        enoughSamples
+          ? `${sampleDetail} Backend analysis can run.`
+          : `${sampleDetail} At least 20 samples are needed before analysis.`
+      );
+
+      const effectiveModelFps = estimateRoiSamplesEffectiveFpsForModel(roiSamples, 12.0);
+
+      let fpsState = "idle";
+      let fpsValue = "Waiting";
+      let fpsDetail = "Experimental model preprocessing needs at least 8.0 Hz source sampling.";
+
+      if (effectiveModelFps !== null) {
+        fpsValue = `${effectiveModelFps.toFixed(2)} Hz`;
+
+        if (effectiveModelFps >= 12.0) {
+          fpsState = "ready";
+          fpsDetail = "Good live sampling margin for the experimental model path.";
+        } else if (effectiveModelFps >= 8.0) {
+          fpsState = "warning";
+          fpsDetail = "Usable for the model path, but with limited sampling margin.";
+        } else {
+          fpsState = "blocked";
+          fpsDetail = "Too low for training-style model preprocessing; model should be skipped.";
+        }
+      }
+
+      setDemoReadinessItem(
+        "readiness-model-fps-value",
+        "readiness-model-fps-detail",
+        fpsState,
+        fpsValue,
+        fpsDetail
+      );
+
+      const signalText = getElementTextTrimmed("measurement-quality-summary", "Not analyzed yet");
+      const signalDetail = getElementTextTrimmed(
+        "measurement-quality-detail",
+        "Full-buffer spectral quality has not been computed yet."
+      );
+
+      const signalState = signalText.toLowerCase().includes("accepted")
+        ? "ready"
+        : signalText.toLowerCase().includes("rejected")
+          ? "blocked"
+          : signalText.toLowerCase().includes("failed")
+            ? "blocked"
+            : "idle";
+
+      setDemoReadinessItem(
+        "readiness-signal-value",
+        "readiness-signal-detail",
+        signalState,
+        signalText,
+        signalDetail
+      );
+
+      const modelText = getElementTextTrimmed("live-model-hr-summary", "Not predicted yet");
+      const modelDifferenceText = getElementTextTrimmed(
+        "model-spectral-difference-summary",
+        "Not available"
+      );
+      const modelTextLower = modelText.toLowerCase();
+
+      let modelState = "idle";
+      let modelDetail = "Experimental only. Spectral HR remains the primary app estimate.";
+
+      if (modelTextLower.includes("bpm")) {
+        modelState = "ready";
+        modelDetail = `Model returned ${modelText}. Spectral HR remains the primary app estimate.`;
+      } else if (modelTextLower.includes("disagrees")) {
+        modelState = "warning";
+        modelDetail =
+          `Model differs from model-window spectral by ${modelDifferenceText}. ` +
+          "Keep spectral HR primary.";
+      } else if (modelTextLower.includes("rejected")) {
+        modelState = "warning";
+        modelDetail =
+          "Model-window quality gate rejected this input. Keep spectral HR primary.";
+      } else if (modelTextLower.includes("skipped")) {
+        modelState = "warning";
+        modelDetail =
+          "Model was skipped by a guardrail. Keep spectral HR primary.";
+      } else if (modelTextLower.includes("unavailable") || modelTextLower.includes("not run")) {
+        modelState = "warning";
+        modelDetail =
+          "Model output is unavailable for this run. Keep spectral HR primary.";
+      } else if (modelTextLower.includes("failed")) {
+        modelState = "blocked";
+        modelDetail =
+          "Model prediction failed. Keep spectral HR primary and inspect diagnostics if needed.";
+      }
+
+      setDemoReadinessItem(
+        "readiness-model-value",
+        "readiness-model-detail",
+        modelState,
+        modelText,
+        modelDetail
+      );
+    }
+
 
     function isMobileDemoViewport() {
       return window.matchMedia("(max-width: 767px)").matches;
@@ -916,7 +1107,7 @@
     function updatePrimaryControlButtons() {
       const cameraActive = Boolean(cameraStream);
       const measurementActive = Boolean(mainMeasurementInProgress);
-      const samplingActive = roiSamplingTimer !== null;
+      const samplingActive = roiSamplingScheduleId !== null;
       const clearable = hasPrimaryStateToClear();
       const enoughRoiSamples = hasEnoughRoiSamplesForBackend();
 
@@ -991,7 +1182,10 @@
         samplingActive,
         enoughRoiSamples,
       });
+
+      updateDemoReadinessPanel();
     }
+
 
     function setMainMeasurementButtonsState(isRunning) {
       mainMeasurementInProgress = Boolean(isRunning);
@@ -2165,9 +2359,9 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
 
     function clearRoiSamplingSchedule() {
-      if (roiSamplingTimer !== null) {
-        clearTimeout(roiSamplingTimer);
-        roiSamplingTimer = null;
+      if (roiSamplingScheduleId !== null) {
+        clearTimeout(roiSamplingScheduleId);
+        roiSamplingScheduleId = null;
       }
     }
 
@@ -2175,7 +2369,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
       if (
         expectedSamplingRunId !== roiSamplingRunId ||
         expectedRevision !== measurementRevision ||
-        roiSamplingTimer === null ||
+        roiSamplingScheduleId === null ||
         !cameraStream
       ) {
         return;
@@ -2183,7 +2377,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
       const safeDelayMs = Math.max(0, Number(delayMs) || 0);
 
-      roiSamplingTimer = setTimeout(() => {
+      roiSamplingScheduleId = setTimeout(() => {
         collectOneRoiSample(expectedSamplingRunId, expectedRevision);
       }, safeDelayMs);
     }
@@ -2221,7 +2415,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
         const requestStartMs = performance.now();
 
-        const response = await fetch("/api/debug-face", {
+        const response = await fetch("/api/roi-sample", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -2238,7 +2432,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
         if (
           expectedSamplingRunId !== roiSamplingRunId ||
           expectedRevision !== measurementRevision ||
-          roiSamplingTimer === null
+          roiSamplingScheduleId === null
         ) {
           return;
         }
@@ -2266,7 +2460,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
         if (
           expectedSamplingRunId === roiSamplingRunId &&
           expectedRevision === measurementRevision &&
-          roiSamplingTimer !== null &&
+          roiSamplingScheduleId !== null &&
           statusEl
         ) {
           statusEl.innerText = `ROI sampling error: ${error}`;
@@ -2284,6 +2478,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
       }
     }
 
+
     function startRoiSampling({ resetOutputs = true } = {}) {
       const statusEl = document.getElementById("camera-status");
       const startButton = document.getElementById("start-roi-sampling-button");
@@ -2294,7 +2489,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
         return false;
       }
 
-      if (roiSamplingTimer !== null) {
+      if (roiSamplingScheduleId !== null) {
         statusEl.innerText = "ROI sampling is already running.";
         updatePrimaryControlButtons();
         return false;
@@ -2322,7 +2517,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
 
       summarizeCollectedRoiSamples();
 
-      roiSamplingTimer = 0;
+      roiSamplingScheduleId = 0;
       scheduleNextRoiSample(activeSamplingRunId, activeRevision, 0);
       updatePrimaryControlButtons();
 
@@ -2466,7 +2661,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
         resetOutputs: false,
       });
 
-      if (!samplingStarted || roiSamplingTimer === null) {
+      if (!samplingStarted || roiSamplingScheduleId === null) {
         mainMeasurementInProgress = false;
         stopMeasurementProgressTimer();
         setMainMeasurementButtonsState(false);
@@ -2595,7 +2790,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
         return;
       }
 
-      if (roiSamplingTimer !== null) {
+      if (roiSamplingScheduleId !== null) {
         stopRoiSampling();
       }
 
@@ -3250,6 +3445,76 @@ function drawMainPulseWaveformFromAnalysis(data) {
       };
     }
 
+    
+    async function renderRejectedSignalModelSkip({ expectedRevision = null } = {}) {
+      if (expectedRevision !== null && expectedRevision !== measurementRevision) {
+        return null;
+      }
+
+      const statusEl = document.getElementById("camera-status");
+
+      const preservedAnalysis =
+        latestRoiAnalysisDisplayState !== null &&
+        latestRoiAnalysisDisplayState.revision === measurementRevision &&
+        latestRoiAnalysisDisplayState.sampleCount === roiSamples.length
+          ? latestRoiAnalysisDisplayState
+          : null;
+
+      const skipDetail =
+        "Experimental model not run because the full-buffer spectral quality gate rejected this measurement.";
+
+      await renderMeasurementResultCardsFromServer({
+        spectralHr: preservedAnalysis?.spectralHr ?? "Rejected",
+        spectralDetail:
+          preservedAnalysis?.spectralDetail ??
+          "Full-buffer spectral quality gate rejected this measurement.",
+        modelHr: "Not run",
+        modelDetail: skipDetail,
+        modelDifference: "Not available",
+        modelDifferenceDetail: "Agreement diagnostic unavailable because model prediction was not run.",
+        quality: preservedAnalysis?.quality ?? "Rejected",
+        qualityDetail:
+          preservedAnalysis?.qualityDetail ??
+          "Full-buffer spectral quality gate rejected this measurement.",
+      });
+
+      await renderModelPredictionSummaryFromServer({
+        status: "Not run",
+        modelHr: "Not run",
+        spectralConsensus: preservedAnalysis?.diagnosticSpectralHr ?? "Rejected",
+        modelDifference: "Not available",
+        greenSummary: "Model-side spectral summary not computed",
+        posSummary: "Model-side spectral summary not computed",
+        chromSummary: "Model-side spectral summary not computed",
+        originalDurationS: "none",
+        usedDurationS: "none",
+        usedSamples: String(roiSamples.length),
+        sourceFps: "none",
+        rawResponse: JSON.stringify(
+          {
+            status: "not_run",
+            reason: "full_buffer_spectral_quality_rejected",
+            message: skipDetail,
+          },
+          null,
+          2
+        ),
+      });
+
+      if (statusEl) {
+        statusEl.innerText =
+          preservedAnalysis !== null
+            ? `Model not run. Kept rejected full-buffer spectral state. ${skipDetail}`
+            : `Model not run. ${skipDetail}`;
+      }
+
+      return {
+        summary: "Model not run.",
+        detail: skipDetail,
+      };
+    }
+
+
     async function runLiveModelPredictionInBackend(expectedRevision = null) {
       if (typeof expectedRevision !== "number") {
         expectedRevision = null;
@@ -3278,6 +3543,23 @@ function drawMainPulseWaveformFromAnalysis(data) {
         return await renderLowFpsModelSkip({
           effectiveFps: effectiveModelFps,
           minimumFpsHz: minimumModelSourceFpsHz,
+          expectedRevision: expectedRevision,
+        });
+      }
+
+      const shouldRespectFullBufferRejection = expectedRevision !== null;
+      const preservedAnalysisForModelGate =
+        latestRoiAnalysisDisplayState !== null &&
+        latestRoiAnalysisDisplayState.revision === measurementRevision &&
+        latestRoiAnalysisDisplayState.sampleCount === roiSamples.length
+          ? latestRoiAnalysisDisplayState
+          : null;
+
+      if (
+        shouldRespectFullBufferRejection &&
+        preservedAnalysisForModelGate?.quality === "Rejected"
+      ) {
+        return await renderRejectedSignalModelSkip({
           expectedRevision: expectedRevision,
         });
       }
@@ -3316,17 +3598,19 @@ function drawMainPulseWaveformFromAnalysis(data) {
             ? latestRoiAnalysisDisplayState
             : null;
 
-        const modelHrText = modelUnavailable
+        let modelHrText = modelUnavailable
           ? "Unavailable"
           : modelRejected
             ? "Rejected"
             : formatBpm(summary.modelHr);
 
-        const modelDetail = modelUnavailable
+        let modelDetail = modelUnavailable
           ? modelUnavailableDetail(data)
           : modelRejected
             ? "Experimental model did not return HR because the model-window quality gate rejected this input."
             : "Experimental CRVSE PhysFormer output";
+
+        let modelSummaryHrText = modelHrText;
 
         const modelWindowSpectralText = modelRejected
           ? "Unavailable"
@@ -3356,16 +3640,36 @@ function drawMainPulseWaveformFromAnalysis(data) {
             ? preservedAnalysis.qualityDetail
             : quality.detail;
 
-        const modelDifferenceText = modelUnavailable || modelRejected
+        const modelVsWindowDifferenceForDisplay =
+          modelUnavailable || modelRejected
+            ? null
+            : getValidNumber(summary.difference);
+
+        let modelDifferenceText = modelUnavailable || modelRejected
           ? "Not available"
           : formatSignedBpm(summary.difference);
 
-        const modelDifferenceDetail = modelUnavailable
+        let modelDifferenceDetail = modelUnavailable
           ? "Agreement diagnostic unavailable because model prediction is unavailable."
           : modelRejected
             ? "Agreement diagnostic unavailable because the model-window spectral gate rejected the input."
             : modelSpectralAgreementDetail(summary.difference);
 
+        if (
+          modelVsWindowDifferenceForDisplay !== null &&
+          Math.abs(modelVsWindowDifferenceForDisplay) >= 10.0
+        ) {
+          const rawModelHrText = formatBpm(summary.modelHr);
+          const modelWindowText = formatBpm(summary.consensus);
+
+          modelHrText = "Disagrees";
+          modelSummaryHrText = rawModelHrText;
+          modelDetail =
+            `Raw model HR ${rawModelHrText}; model-window spectral ${modelWindowText}; ` +
+            `difference ${formatSignedBpm(modelVsWindowDifferenceForDisplay)}. Treat model HR as experimental.`;
+          modelDifferenceDetail =
+            "Large model-vs-spectral disagreement. Spectral HR remains the primary estimate.";
+        }
         await renderMeasurementResultCardsFromServer({
           spectralHr: primarySpectralHrText,
           spectralDetail: primarySpectralDetail,
@@ -3383,7 +3687,7 @@ function drawMainPulseWaveformFromAnalysis(data) {
             : modelRejected
               ? "Rejected"
               : data.status ?? "unknown",
-          modelHr: modelHrText,
+          modelHr: modelSummaryHrText,
           spectralConsensus: modelWindowSpectralText,
           modelDifference: modelDifferenceText,
           greenSummary: `${formatBpm(summary.greenBpm)} / SQI ${formatNumber(summary.greenSqi, 3)} / ${summary.greenStatus}`,

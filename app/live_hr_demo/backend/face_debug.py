@@ -986,3 +986,91 @@ def summarize_face_from_data_url_frame(
             "total_request_processing_ms": float(total_ms),
         },
     }
+
+
+def _compact_roi_debug_for_live_sample(face_summary: dict[str, Any]) -> dict[str, Any] | None:
+    """Return only ROI fields needed by the live sampling loop."""
+    roi_debug = face_summary.get("roi_debug")
+
+    if not isinstance(roi_debug, dict):
+        return None
+
+    compact_rois = []
+
+    for roi in roi_debug.get("rois", []):
+        rgb_summary = roi.get("rgb_summary")
+        quality = roi.get("quality") if isinstance(roi.get("quality"), dict) else {}
+
+        compact_rgb_summary = None
+
+        if isinstance(rgb_summary, dict):
+            compact_rgb_summary = {
+                "mean_rgb": rgb_summary.get("mean_rgb"),
+            }
+
+        compact_rois.append(
+            {
+                "name": roi.get("name"),
+                "usable": bool(roi.get("usable", False)),
+                "rgb_summary": compact_rgb_summary,
+                "quality": {
+                    "status": quality.get("status", "unknown"),
+                },
+            }
+        )
+
+    return {
+        "method": roi_debug.get("method"),
+        "roi_count": roi_debug.get("roi_count"),
+        "usable_roi_count": roi_debug.get("usable_roi_count"),
+        "quality_summary": roi_debug.get("quality_summary"),
+        "rois": compact_rois,
+    }
+
+
+def summarize_live_roi_sample_from_data_url_frame(
+    image_data_url: str,
+    model_path: Path | None = None,
+) -> dict[str, Any]:
+    """
+    Decode one browser frame and return a compact live ROI sample response.
+
+    This is the production measurement path counterpart to the fuller
+    debug-face route. The frame is processed in memory only and is not stored.
+    """
+
+    from time import perf_counter
+
+    total_start = perf_counter()
+
+    if model_path is None:
+        model_path = DEFAULT_FACE_LANDMARKER_MODEL_PATH
+
+    decode_start = perf_counter()
+    rgb_array, _decode_metadata = decode_image_data_url_to_rgb_array(image_data_url)
+    decode_ms = (perf_counter() - decode_start) * 1000.0
+
+    face_start = perf_counter()
+    face_summary = detect_face_landmarks_in_rgb_frame(
+        rgb_array=rgb_array,
+        model_path=model_path,
+    )
+    face_debug_total_ms = (perf_counter() - face_start) * 1000.0
+
+    total_ms = (perf_counter() - total_start) * 1000.0
+
+    return {
+        "status": "processed",
+        "message": "Live ROI sample extracted. Frame was not stored.",
+        "face_debug": {
+            "face_detected": bool(face_summary.get("face_detected", False)),
+            "message": face_summary.get("message"),
+            "roi_debug": _compact_roi_debug_for_live_sample(face_summary),
+        },
+        "timing_ms": {
+            "decode_ms": float(decode_ms),
+            "face_debug_total_ms": float(face_debug_total_ms),
+            "total_request_processing_ms": float(total_ms),
+        },
+    }
+

@@ -10,6 +10,93 @@ from ui.result_components import (
     signal_summary_cards_placeholder,
 )
 
+
+
+def demo_readiness_item(
+    label: str,
+    value_id: str,
+    detail_id: str,
+    value: str,
+    detail: str,
+) -> FT:
+    """Render one desktop demo-readiness status row."""
+    return Div(
+        Div(label, cls="text-[11px] font-semibold uppercase tracking-wide text-slate-500"),
+        Div(
+            value,
+            id=value_id,
+            cls=(
+                "mt-1 inline-flex rounded-full px-2.5 py-1 text-xs "
+                "font-semibold text-slate-700"
+            ),
+            style="background: #e2e8f0; color: #334155;",
+        ),
+        Div(
+            detail,
+            id=detail_id,
+            cls="mt-1 text-xs leading-snug text-slate-600",
+        ),
+        cls="rounded-lg border border-slate-200 bg-white p-3 shadow-sm",
+    )
+
+
+def demo_readiness_panel() -> FT:
+    """Render a desktop-only readiness checklist for live demo operation."""
+    return Div(
+        Div(
+            "Demo readiness",
+            cls="text-xs font-semibold uppercase tracking-wide text-slate-500",
+        ),
+        Div(
+            demo_readiness_item(
+                "Browser",
+                "readiness-secure-context-value",
+                "readiness-secure-context-detail",
+                "Checking",
+                "Camera access requires HTTPS, localhost, or another secure context.",
+            ),
+            demo_readiness_item(
+                "Camera",
+                "readiness-camera-value",
+                "readiness-camera-detail",
+                "Not started",
+                "Start the camera before measuring.",
+            ),
+            demo_readiness_item(
+                "Samples",
+                "readiness-samples-value",
+                "readiness-samples-detail",
+                "0 samples",
+                "Collect at least 20 ROI samples before backend analysis.",
+            ),
+            demo_readiness_item(
+                "Model FPS",
+                "readiness-model-fps-value",
+                "readiness-model-fps-detail",
+                "Waiting",
+                "Experimental model preprocessing needs at least 8 Hz source sampling.",
+            ),
+            demo_readiness_item(
+                "Signal",
+                "readiness-signal-value",
+                "readiness-signal-detail",
+                "Not analyzed",
+                "Full-buffer spectral quality has not been computed yet.",
+            ),
+            demo_readiness_item(
+                "Experimental model",
+                "readiness-model-value",
+                "readiness-model-detail",
+                "Not predicted",
+                "Model output is secondary; spectral HR remains primary.",
+            ),
+            cls="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3",
+        ),
+        id="demo-readiness-panel",
+        cls="mt-4 hidden rounded-xl border border-sky-100 bg-sky-50/60 p-4 shadow-sm md:block",
+    )
+
+
 def camera_preview_card() -> FT:
     """
     Render the live camera-based HR estimation interface.
@@ -122,6 +209,7 @@ def camera_preview_card() -> FT:
                         "text-sm text-slate-700 shadow-sm"
                     ),
                 ),
+                demo_readiness_panel(),
                 Div(
                     Div(
                         "Measurement guidance",

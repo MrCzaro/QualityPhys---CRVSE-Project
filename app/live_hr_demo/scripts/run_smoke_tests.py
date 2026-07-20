@@ -30,6 +30,7 @@ SMOKE_TESTS = [
     "check_model_contract.py",
     "check_model_runtime_fallback.py",
     "check_model_prediction_fallback_payload.py",
+    "check_roi_sample_api_contract.py",
     "check_synthetic_window_prediction.py",
     "check_sqi.py",
     "check_window_quality.py",
