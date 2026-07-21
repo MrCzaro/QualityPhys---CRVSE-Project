@@ -1,0 +1,13 @@
+# Runtime dependencies for the QualityPhys live HR demo app.
+# This file intentionally excludes notebook, Kaggle training, HDF5 audit,
+# and dataset-preprocessing dependencies that are not required by the live app.
+
+python-fasthtml==0.14.3
+monsterui==1.0.46
+starlette==1.3.1
+numpy==2.5.0
+scipy==1.18.0
+Pillow==12.2.0
+mediapipe==0.10.35
+torch==2.12.1
+PyYAML==6.0.3

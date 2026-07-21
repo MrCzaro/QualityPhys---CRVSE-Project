@@ -21,7 +21,6 @@ app/live_hr_demo/models/mediapipe/*.task
 
 # Local Codex / AI collaboration instructions
 AGENTS.md
-README.md
 
 CRVSE_training_preprocessing_audit_2026-07-11.md
 CRVSE_optuna_scratch_audit_2026-07-17.md
