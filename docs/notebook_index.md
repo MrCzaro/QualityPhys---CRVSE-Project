@@ -25,7 +25,7 @@ live preprocessing and app-scope issues became clearer.
 | `NB_P2_02_UBFC-rPPG.ipynb` | UBFC-rPPG preprocessing | Prepared the clean controlled UBFC-rPPG dataset. |
 | `NB_P2_03_UBFC-Phys.ipynb` | UBFC-Phys preprocessing | Prepared UBFC-Phys facial video and physiological reference signals. |
 | `NB_P2_04_MCD-rPPG.ipynb` | MCD-rPPG preprocessing | Prepared MCD-rPPG recordings and metadata for later model work. |
-| `NB_P2_05_MCD-rPPG_MultiCam.ipynb` | MCD multi-camera preprocessing | Extended MCD work to multiple camera views. |
+| `NB_P2_05_MCD-rPPG_MultiCam.ipynb` | MCD multi-camera preprocessing | Extended MCD work to multiple camera views. The rRESP and rBCG paths produced near-null SQI, which is an important negative finding for later reference. |
 | `NB_P2_06_MCD-rPPG_FrontalCam_Ensemble.ipynb` | MCD frontal-camera ensemble | Created frontal-camera ensemble rPPG artifacts. |
 | `NB_P2_07_UBFC-rPPG_Ensemble.ipynb` | UBFC-rPPG ensemble | Built POS, CHROM, and GREEN ensemble-style artifacts for UBFC-rPPG. |
 | `NB_P2_08_UBFC-Phys_Ensemble.ipynb` | UBFC-Phys ensemble | Built POS, CHROM, and GREEN ensemble-style artifacts for UBFC-Phys. |

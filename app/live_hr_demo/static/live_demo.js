@@ -1867,18 +1867,30 @@
         return null;
       }
 
-      const width = videoEl.videoWidth;
-      const height = videoEl.videoHeight;
+      const sourceWidth = videoEl.videoWidth;
+      const sourceHeight = videoEl.videoHeight;
 
-      if (width === 0 || height === 0) {
+      if (sourceWidth === 0 || sourceHeight === 0) {
         statusEl.innerText = "Cannot capture sampling frame yet: video dimensions are not ready.";
         return null;
       }
+
+      const SAMPLING_TARGET_WIDTH = 640;
+
+      const scale =
+        SAMPLING_TARGET_WIDTH && sourceWidth > SAMPLING_TARGET_WIDTH
+          ? SAMPLING_TARGET_WIDTH / sourceWidth
+          : 1.0;
+
+      const width = Math.round(sourceWidth * scale);
+      const height = Math.round(sourceHeight * scale);
 
       canvasEl.width = width;
       canvasEl.height = height;
 
       const context = canvasEl.getContext("2d");
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = "high";
       context.drawImage(videoEl, 0, 0, width, height);
 
       return canvasEl.toDataURL("image/jpeg", 0.85);

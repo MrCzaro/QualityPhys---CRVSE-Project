@@ -133,6 +133,66 @@ Interpretation:
 - live app behavior cannot be treated as equivalent to offline test behavior
 - the model remains experimental in the product UI
 
+## Tracking Evidence 
+
+MAE alone does not show whether a regression model is responding to its input. A
+later audit pass added tracking statistics: the OLS slope of predicted HR on
+reference HR, and the correlation between them. A slope near 1.0 means the model
+follows the reference; a slope near 0 means it emits a near-constant value.
+
+Measured on held-out test subjects with training-style preprocessing
+(`stored_reference` mode), using `audit_model_prediction_variance.py`:
+
+| Dataset scope | Windows | Slope | Pearson r | MAE |
+| --- | ---: | ---: | ---: | ---: |
+| All four datasets | 96 | 0.419 | 0.506 | 12.91 bpm |
+| App-relevant three | 48 | 0.904 | 0.906 | 5.05 bpm |
+
+App-relevant means MCD-rPPG, UBFC-rPPG, and UBFC-Phys, which is the still/seated
+scope the live demo actually targets.
+
+Interpretation:
+
+- on its intended domain, with its intended preprocessing, the checkpoint tracks
+  reference HR closely
+- the weaker aggregate figures reported earlier are consistent with ECG-Fitness
+  contamination of the evaluation scope rather than with a weak checkpoint
+- this is independent support for the NB13 decision to exclude ECG-Fitness from
+  app-relevant model selection
+- it does not change the product decision: spectral consensus remains the primary
+  app estimate and model HR remains experimental
+
+Caveats on this evidence:
+
+- the app-relevant test split here is 48 windows, so the slope estimate carries a
+  standard error of roughly 0.06
+- a larger all-splits run of 360 windows reproduces the same pattern with tighter
+  estimates, which is what makes the result credible
+- these are offline HDF5 windows, not live camera measurements
+- no result here has been validated against a reference device in the live app
+
+## Acquisition Rate Sensitivity
+
+The same audit measured tracking against simulated acquisition rates, using
+app-relevant datasets and training-style local-buffer preprocessing:
+
+| Simulated rate | Slope | Pearson r | MAE |
+| --- | ---: | ---: | ---: |
+| Source FPS (~30 Hz) | 0.870 | 0.900 | 5.25 bpm |
+| 30 Hz | 0.868 | 0.899 | 5.13 bpm |
+| 20 Hz | 0.635 | 0.749 | 8.40 bpm |
+| 15 Hz | 0.629 | 0.747 | 8.77 bpm |
+| 10 Hz | 0.681 | 0.794 | 7.74 bpm |
+| 7.5 Hz | 0.589 | 0.389 | 17.37 bpm |
+
+Two practical points:
+
+- the degradation is a **step** between 30 Hz and 20 Hz, then roughly flat from
+  20 Hz down to 10 Hz; acquisition work below 30 Hz buys little
+- 7.5 Hz fails by noise amplification rather than by flattening, because the
+  3.5 Hz bandpass cutoff reaches 0.933 of the Nyquist frequency there and the
+  order-4 Butterworth becomes close to degenerate
+
 ## Later Checkpoint Adoption Work
 
 NB10-NB13 tested whether the frozen source-FPS checkpoint should be replaced.
@@ -177,9 +237,66 @@ Known limitations:
 - lighting, movement, face position, skin reflection, and ROI quality can
   distort rPPG signals
 - model performance is weaker on ECG-Fitness and exercise-like conditions
-- the model can show bias relative to pulse-oximeter spot checks
 - output clamping to 40-180 bpm does not make the model clinically safe
 - single-user manual tests are not validation
+
+### Shrinkage Toward The Training Corpus Mean
+
+This limitation was characterized on 2026-07-21 and replaces the earlier, vaguer note that the model "can show bias relative to pulse-oximeter spot checks".
+
+The training corpus has a mean HR of roughly 88 bpm, because it includes
+post-exercise and exercise recordings. The model behaves like a shrinking
+regressor, so predictions are pulled toward that corpus mean:
+
+```text
+prediction is approximately:
+    corpus_mean + slope * (reference_hr - corpus_mean)
+```
+
+At an acquisition rate near 20 Hz the measured slope is about 0.635. For a seated
+user with a true HR near 63 bpm this predicts roughly 72 bpm. Four live runs in
+one session produced 78.0 to 78.9 bpm while spectral consensus reported 60 to
+67.5 bpm, which is consistent in direction and approximate magnitude.
+
+Practical consequences:
+
+- the model shows a **positive bias for users whose HR is below the corpus mean**,
+  which includes most resting seated adults
+- the bias grows as the user's HR moves further below roughly 88 bpm
+- because shrinkage compresses variation, model HR can appear nearly constant
+  across repeated measurements of the same resting subject
+- this is a calibration property, not evidence that the model ignores its input;
+  measured slope at 20 Hz is 0.635, not 0
+
+### Calibration Was Tested And Rejected
+
+Linear and offset corrections were fitted on train subjects and evaluated on
+held-out test subjects on 2026-07-21. Neither should be adopted.
+
+At an acquisition rate near 20 Hz, on held-out test subjects:
+
+| Correction | MAE | Bias | p90 | Slope |
+| --- | ---: | ---: | ---: | ---: |
+| none | 8.40 | +4.38 | 19.05 | 0.635 |
+| offset | 8.21 | -0.02 | 16.33 | 0.635 |
+| linear | 11.57 | -0.52 | 26.61 | 1.080 |
+
+Linear de-shrinkage reaches a calibrated slope but costs roughly 38 percent more
+MAE and 40 percent worse p90. This is expected: shrinkage is close to MSE-optimal
+for a noisy predictor, so removing it trades bias for variance.
+
+The deeper issue is that the model is unbiased near 92 to 98 bpm, while the live
+demo serves seated resting adults near 60 to 75 bpm. For a user with a true HR of
+65 bpm the systematic error is about +5.9 bpm at source FPS and +13.6 bpm at
+20 Hz. An offset correction removes the average bias measured across a corpus
+centred near 88 bpm, which does not help a user at 65 bpm.
+
+The lever for a genuinely better model here would be the **training
+distribution**, reweighted toward resting HR, rather than architecture, transfer
+learning, or post-hoc calibration. No such work has been done.
+
+Until it is, model HR remains experimental and subordinate to spectral consensus
+HR, which performs well in this domain.
 
 ## Safety Statement
 

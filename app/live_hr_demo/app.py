@@ -17,6 +17,7 @@ Synthetic inference checks are kept outside the app in
 from __future__ import annotations
 
 from pathlib import Path
+import socket
 import sys, os
 
 from fasthtml.common import *
@@ -24,6 +25,21 @@ from monsterui.all import *
 
 
 APP_DIR = Path(__file__).resolve().parent
+
+
+def get_local_ip_address() -> str:
+    """
+    Return the most likely LAN IP address for this machine.
+
+    Falls back to 127.0.0.1 if the address cannot be determined.
+    """
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            return sock.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
 
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
@@ -130,8 +146,9 @@ serve_kwargs = {
 if ssl_certfile and ssl_keyfile:
     serve_kwargs["ssl_certfile"] = ssl_certfile
     serve_kwargs["ssl_keyfile"] = ssl_keyfile
+    local_ip = get_local_ip_address()
     print("HTTPS enabled for local network testing.")
-    print("Open on mobile with: https://YOUR_LAPTOP_IP:5001/")
+    print(f"Open on mobile with: https://{local_ip}:5001/")
 else:
     print("HTTP enabled for local desktop testing.")
     print("Open locally with: http://localhost:5001/")

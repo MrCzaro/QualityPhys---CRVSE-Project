@@ -106,7 +106,23 @@ The strongest app checkpoint remains the frozen source-FPS multichannel
 CRVSE PhysFormer checkpoint. Later NB10-NB13 experiments tested transfer
 learning and scratch retraining, but no candidate was adopted as a replacement.
 
-See `docs/notebook_index.md` for a concise chronology.
+A 2026-07-21 audit pass added tracking statistics rather than error magnitudes
+alone. On held-out test subjects from the three app-relevant datasets, with
+training-style preprocessing, the frozen checkpoint tracks reference HR with an
+OLS slope of 0.904 and a correlation of 0.906. Across all four datasets the same
+statistics fall to 0.419 and 0.506.
+
+The practical reading is that the earlier weak aggregate figures reflected
+ECG-Fitness contamination of the evaluation scope and live acquisition mismatch,
+rather than a weak checkpoint. This is independent support for the NB13 decision
+to exclude ECG-Fitness from app-relevant model selection.
+
+It does not change the product decision. Spectral consensus remains the primary
+app estimate, model HR remains experimental, and the shrinkage bias described in
+`docs/model_card.md` is unresolved.
+
+See `docs/notebook_index.md` for a concise chronology and
+`CRVSE_phase3_direction_audit_2026-07-21.md` for the current findings.
 
 ## Current Model
 
@@ -219,8 +235,10 @@ Known limits:
 - live camera acquisition quality depends on lighting, face position, motion,
   browser behavior, and sampling rate
 - spectral estimates can fail when channel SQI is weak or inconsistent
-- the model can disagree with spectral HR and shows positive bias in some manual
-  spot checks
+- the model shows a characterized positive bias for resting subjects, because it
+  shrinks predictions toward a training corpus mean near 88 bpm; see
+  `docs/model_card.md`
+- model tracking degrades in a step below roughly 30 Hz acquisition
 - ECG-Fitness and exercise-like conditions remain outside the app claim
 - notebook results are saved research evidence unless explicitly rerun
 - pulse oximeter spot checks are useful sanity checks, not formal validation

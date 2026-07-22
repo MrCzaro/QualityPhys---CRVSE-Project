@@ -24,6 +24,7 @@ AGENTS.md
 
 CRVSE_training_preprocessing_audit_2026-07-11.md
 CRVSE_optuna_scratch_audit_2026-07-17.md
+CRVSE_phase3_direction_audit_2026-07-21.md
 
 # CRVSE generated audit / fine-tuning artifacts
 Data/audit_live_compatible_window_*.csv

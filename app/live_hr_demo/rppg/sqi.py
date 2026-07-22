@@ -98,6 +98,69 @@ def compute_power_spectrum(signal: np.ndarray, fps: float) -> tuple[np.ndarray, 
 
     return freqs_hz.astype(np.float32), power.astype(np.float32)
 
+def _refine_peak_bin_by_parabolic_interpolation(
+    power: np.ndarray,
+    peak_idx: int,
+    lower_idx: int,
+    upper_idx: int,
+    eps: float = 1e-20,
+) -> float:
+    """
+    Refine a spectral peak location to sub-bin resolution.
+
+    Parameters
+    ----------
+    power:
+        Power spectrum values.
+
+    peak_idx:
+        Index of the maximum-power bin.
+
+    lower_idx:
+        Lowest bin index allowed by the analysis band.
+
+    upper_idx:
+        Highest bin index allowed by the analysis band.
+
+    eps:
+        Small constant preventing log(0).
+
+    Returns
+    -------
+    float
+        Fractional bin position. Returns peak_idx unchanged when refinement is
+        not possible.
+
+    Notes
+    -----
+    Fits a parabola through the log-power values at peak_idx - 1, peak_idx, and
+    peak_idx + 1. For a Hann-windowed spectrum this recovers the true peak
+    frequency far more accurately than taking the bin centre.
+
+    Refinement is skipped when the peak sits on a band edge, when the curvature
+    is degenerate, or when the computed offset falls outside the +/- 0.5 bin
+    range that a genuine local maximum must satisfy.
+    """
+
+    if peak_idx <= lower_idx or peak_idx >= upper_idx:
+        return float(peak_idx)
+
+    left = float(np.log(float(power[peak_idx - 1]) + eps))
+    centre = float(np.log(float(power[peak_idx]) + eps))
+    right = float(np.log(float(power[peak_idx + 1]) + eps))
+
+    denominator = left - 2.0 * centre + right
+
+    if abs(denominator) < 1e-12:
+        return float(peak_idx)
+
+    offset = 0.5 * (left - right) / denominator
+
+    if not np.isfinite(offset) or abs(offset) > 0.5:
+        return float(peak_idx)
+
+    return float(peak_idx) + offset
+
 
 def estimate_spectral_sqi(
     signal: np.ndarray,
@@ -133,6 +196,12 @@ def estimate_spectral_sqi(
     -------
     SpectrumResult
         Spectrum and quality summary.
+
+    Notes
+    -----
+    The dominant frequency is refined to sub-bin resolution by parabolic
+    interpolation. SQI itself is computed from whole bins and is unchanged by
+    that refinement, so existing SQI thresholds remain calibrated.
     """
     freqs_hz, power = compute_power_spectrum(signal=signal, fps=fps)
     cardiac_mask = (freqs_hz >= low_hz) & (freqs_hz <= high_hz)
@@ -171,7 +240,16 @@ def estimate_spectral_sqi(
     right_idx = min(cardiac_indices[-1], peak_idx + peak_neighborhood_bins)
     peak_power = float(np.sum(power[left_idx : right_idx + 1]))
     sqi = peak_power / total_cardiac_power
-    dominant_freq_hz = float(freqs_hz[peak_idx])
+
+    refined_peak_bin = _refine_peak_bin_by_parabolic_interpolation(
+        power=power,
+        peak_idx=peak_idx,
+        lower_idx=int(cardiac_indices[0]),
+        upper_idx=int(cardiac_indices[-1]),
+    )
+
+    bin_width_hz = float(freqs_hz[1] - freqs_hz[0]) if len(freqs_hz) > 1 else 0.0
+    dominant_freq_hz = float(refined_peak_bin * bin_width_hz)
     dominant_bpm = dominant_freq_hz * 60.0
 
     if sqi >= 0.50:
