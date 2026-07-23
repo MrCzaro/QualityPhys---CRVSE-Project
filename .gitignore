@@ -20,13 +20,11 @@ app/live_hr_demo/models/mediapipe/*.task
 
 
 # Local Codex / AI collaboration instructions
-AGENTS.md
-
-CRVSE_training_preprocessing_audit_2026-07-11.md
-CRVSE_optuna_scratch_audit_2026-07-17.md
-CRVSE_phase3_direction_audit_2026-07-21.md
+CRVSE_PLAN.md
+CRVSE_RR_exploration_plan.md
 
 # CRVSE generated audit / fine-tuning artifacts
 Data/audit_live_compatible_window_*.csv
 Data/live_finetune_manifest.csv
 Data/live_finetune_frozen_baseline_*.csv
+Data/rr_explore
