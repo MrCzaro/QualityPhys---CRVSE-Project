@@ -8,6 +8,27 @@ estimation from facial remote photoplethysmography (rPPG).
 The project is not a medical device, not a diagnostic tool, and not validated
 for clinical decision-making.
 
+## Evidence at a Glance
+
+Held-out test subjects, training-style preprocessing, frozen
+`crvse_physformer_multichannel_v1` checkpoint. Tracking statistics
+against reference HR:
+
+| Evaluation scope | OLS slope | Correlation |
+|---|---|---|
+| App-relevant datasets (UBFC-rPPG, UBFC-Phys, MCD-rPPG) — still/seated | 0.904 | 0.906 |
+| All four datasets (adds ECG-Fitness — exercise, high motion, high HR) | 0.419 | 0.506 |
+
+The gap is the honest boundary of what the current training data supports.
+Still/seated tracking is good; exercise and elevated-HR conditions are not
+covered, which is why ECG-Fitness is excluded from app-relevant model
+selection and why the app claim stops at seated measurement.
+
+Tracking slope and correlation are reported alongside error magnitude
+because a low MAE can still hide regression toward the training-corpus
+mean. That failure mode is present in this checkpoint and is documented
+in `docs/model_card.md` rather than omitted.
+
 ## Current State
 
 The live demo estimates heart rate from webcam-derived facial ROI color signals.
@@ -121,8 +142,7 @@ It does not change the product decision. Spectral consensus remains the primary
 app estimate, model HR remains experimental, and the shrinkage bias described in
 `docs/model_card.md` is unresolved.
 
-See `docs/notebook_index.md` for a concise chronology and
-`CRVSE_phase3_direction_audit_2026-07-21.md` for the current findings.
+See `docs/notebook_index.md` for a concise chronology.
 
 ## Current Model
 
