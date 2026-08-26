@@ -29,3 +29,15 @@ Data/audit_live_compatible_window_*.csv
 Data/live_finetune_manifest.csv
 Data/live_finetune_frozen_baseline_*.csv
 Data/rr_explore
+
+# Python virtual environments (never commit — recreate from requirements.txt)
+venv/
+.venv/
+env/
+ENV/
+
+# Python build / packaging artifacts
+*.egg-info/
+build/
+dist/
+.pytest_cache/
