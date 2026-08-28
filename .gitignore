@@ -41,3 +41,12 @@ ENV/
 build/
 dist/
 .pytest_cache/
+
+# Phase-3 model checkpoints (Kaggle training outputs, torch archives named .zip)
+Data/Phase3/*.zip
+
+# Local test media — licensed dataset clips, never redistributable
+Data/test_media/
+*.mov
+*.mp4
+*.avi
