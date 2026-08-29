@@ -302,3 +302,20 @@ HR, which performs well in this domain.
 
 This model is for research demonstration only. It is not a medical device and
 must not be used for diagnosis, treatment, triage, or monitoring decisions.
+
+## Attribution
+
+The CRVSE PhysFormer architecture is an original implementation derived from the
+published PhysFormer design:
+
+> Z. Yu, Y. Shen, J. Shi, H. Zhao, P. Torr, G. Zhao. "PhysFormer: Facial
+> Video-based Physiological Measurement with Temporal Difference Transformer."
+> *CVPR*, 2022.
+
+No third-party model code is redistributed in this repository. Architecture,
+reference-implementation and dataset attributions for the whole project are
+collected in `docs/citations.md`; dataset terms are in `docs/data_sources.md`.
+
+The Phase-3 frame-based model used by `app/live_vitals/` (PhysNet, Yu et al.,
+BMVC 2019) is a separate model and is not covered by this card. It requires its
+own model card before that app is presented as a deliverable.

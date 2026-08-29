@@ -83,6 +83,7 @@ app/live_hr_demo/README.md         App-specific run, HTTPS, route, and UI notes
 docs/notebook_index.md             Notebook chronology and research conclusions
 docs/data_sources.md               Dataset provenance and licensing boundaries
 docs/model_card.md                 Current model scope, inputs, limits, and evidence
+docs/citations.md                  Third-party attribution, licences, and citations
 LICENSE                            Apache-2.0 license for project code and docs
 AGENTS.md                          Local collaboration rules; may remain ignored
 ```
@@ -244,6 +245,14 @@ redistribution limits. A `NOTICE` file is not included at this stage because no
 required bundled third-party NOTICE attribution was identified during this
 documentation pass. Add one before distribution if a dependency, model asset, or
 redistributed third-party artifact requires it.
+
+Third-party attribution, reference-implementation licences, and required citations
+are collected in `docs/citations.md`. Two points there affect distribution: the
+rPPG-Toolbox reference implementation is under a Responsible AI Source Code License
+whose behavioural use restrictions include diagnosing medical conditions without
+human oversight, and the PhaseNet reference implementation states no licence at all.
+The project's research-demo, non-diagnostic scope is what keeps the first of these
+satisfied.
 
 ## Limitations
 

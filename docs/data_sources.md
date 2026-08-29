@@ -74,6 +74,40 @@ Author order follows the citation requested on the dataset distribution page at
 the Center for Machine Perception, Czech Technical University in Prague. Other
 orderings appear in third-party reference lists; use the order above.
 
+### DLCN
+
+> Z. Li, K. Wang, H. Xiao, X. Liu, F. Zhou, J. Jiang, T. Liu.
+> "Exploring Remote Physiological Signal Measurement under Dynamic Lighting
+> Conditions at Night: Dataset, Experiment, and Analysis." arXiv:2507.04306, 2025.
+
+DLCN (Dynamic Lighting Conditions at Night): 98 participants, 784 videos, four
+nighttime lighting scenarios, resting and post-exercise states.
+
+Distribution and reference code: https://github.com/dalaoplan/Happp-rPPG-Toolkit
+
+### PhysDrive
+
+> J. Wang, X. Yang, Q. Hu, J. Tang, C. Liu, D. He, Y. Wang, Y. Chen, K. Wu.
+> "PhysDrive: A Multimodal Remote Physiological Measurement Dataset for
+> In-vehicle Driver Monitoring." *NeurIPS*, 2025. arXiv:2507.19172
+
+48 drivers with synchronised RGB, near-infrared and mmWave radar, and six ground
+truths (ECG, BVP, respiration, HR, RR, SpO2) under naturalistic driving.
+
+### VitalVideos-Worldwide
+
+> P.-J. Toye. "VitalVideos-Worldwide: A large and diverse rPPG dataset with rich
+> ground truths." *Proceedings of the IEEE/CVF International Conference on
+> Computer Vision (ICCV) Workshops*, 2025, pp. 557-562.
+
+7000 participants across Western Europe, South Asia and West Africa, with PPG,
+respiration, 3-lead ECG, HR, SpO2 and blood pressure ground truths. Not publicly
+downloadable: identifiable faces place it under privacy regulation, and access is
+granted per request under separate academic and commercial licences. A related
+earlier release, VitalVideos-Europe (arXiv:2306.11891), is a distinct dataset.
+
+Distribution: https://vitalvideos.org/
+
 ## Dataset Roles
 
 ### UBFC-rPPG
@@ -188,6 +222,9 @@ It does not automatically license:
 - raw UBFC-Phys data
 - raw MCD-rPPG data
 - raw ECG-Fitness data
+- raw DLCN data
+- raw PhysDrive data
+- raw VitalVideos data
 - HDF5 corpora derived from restricted datasets
 - pretrained checkpoints from third parties
 - MediaPipe model assets
@@ -201,6 +238,12 @@ ECG-Fitness were obtained under their respective request or registration
 procedures and are not redistributable. MCD-rPPG is the most permissively
 licensed source in the project; confirm the current terms on its distribution
 page before relying on that status for any derived release.
+
+DLCN, PhysDrive and VitalVideos entered the project during Phase 3. VitalVideos is
+the most restricted: it is licensed per request, separately for academic and
+commercial use, and its academic terms must stay walled off from any commercial
+version of this project. The same caution applies to PhysDrive. Confirm current
+terms with each provider before any release.
 
 ## Current App Data Claim
 
