@@ -4,7 +4,7 @@ import mediapipe as mp
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision as mp_vision
 
-from ..config import MP_MODEL, CROP_PADDING
+from ..config import MP_MODEL, CROP_PADDING, TRAIN_ASPECT_RANGE
 
 
 def make_landmarker(model_path=MP_MODEL):
@@ -59,4 +59,6 @@ def box_clamp_report(box, width, height):
                 expected_aspect=expected_aspect,
                 kept_aspect=kept_aspect,
                 distortion=float(kept_aspect / max(expected_aspect, 1e-9)),
+                aspect_in_training_range=bool(
+                    TRAIN_ASPECT_RANGE[0] <= expected_aspect <= TRAIN_ASPECT_RANGE[1]),
                 frac_side_lost=float(over.sum() / max(full_w, 1e-9)))

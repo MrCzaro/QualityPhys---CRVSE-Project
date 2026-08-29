@@ -133,6 +133,16 @@ def main():
     fps = cap.get(cv2.CAP_PROP_FPS)
     n_total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
+    if n_total <= 0:
+        # Some AVI containers report no frame count, which would collapse the
+        # sampling below to a single frame. Counting with grab() skips decoding
+        # and costs about a second for a three-minute clip.
+        probe = cv2.VideoCapture(str(video))
+        n_total = 0
+        while probe.grab():
+            n_total += 1
+        probe.release()
+    
     print("=" * 66)
     print(f"target   : {video}")
     print(f"format   : {width}x{height} @ {fps:.3f} fps, {n_total} frames, "
@@ -170,14 +180,21 @@ def main():
     report = box_clamp_report(app_box, width, height)
     print("\n-- capture quality --")
     print(f"clamped : {report['clamped']}")
-    print(f"overflow px : {np.round(report['overflow_px'], 1)}")
+    print(f"overflow px  : {np.round(report['overflow_px'], 1)}")
     print(f"crop aspect : {report['kept_aspect']:.3f} "
           f"(expected {report['expected_aspect']:.3f} for this frame shape)")
     print(f"distortion : {report['distortion']:.3f}  (1.000 = undistorted)")
     print(f"frac side lost : {report['frac_side_lost']:.3f}  "
           f"(gate {config.MAX_BOX_SIDE_LOST})")
     accepted = report["frac_side_lost"] <= config.MAX_BOX_SIDE_LOST
-    print(f"framing : {'ACCEPT' if accepted else 'REJECT'}")
+    if not accepted:
+        verdict = "REJECT (box clamped)"
+    elif not report["aspect_in_training_range"]:
+        verdict = (f"WARN (aspect {report['expected_aspect']:.3f} outside training range "
+                   f"{config.TRAIN_ASPECT_RANGE[0]:.2f}-{config.TRAIN_ASPECT_RANGE[1]:.2f})")
+    else:
+        verdict = "ACCEPT"
+    print(f"framing : {verdict}")
 
     # --- crop every kept frame, comparing app against reference ---
     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)

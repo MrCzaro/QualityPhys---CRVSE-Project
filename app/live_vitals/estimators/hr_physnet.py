@@ -3,7 +3,9 @@ import numpy as np
 import torch
 
 from ..config import (CLIP_LEN, WINDOW_STRIDE, PHYSNET_CKPT,
-                      MIN_CONFIDENCE, MAX_HR_SPREAD_BPM)
+                      MIN_CONFIDENCE, MIN_USABLE_WINDOWS, MIN_USABLE_FRACTION,
+                      MAX_HR_SPREAD_BPM, MAD_OUTLIER_K, MAD_FLOOR_BPM)
+
 from ..preprocess.frames import clip_to_tensor
 from ..models.architectures.physnet import PhysNet
 from ..signal.hr import hr_from_bvp
@@ -63,16 +65,30 @@ class HRPhysNet(Estimator):
             return EstimatorResult(self.vital, float("nan"), self.unit, 0.0, "no_estimate")
 
         rates = np.asarray(rates)
-        spread = float(np.percentile(rates, 75) - np.percentile(rates, 25))
-        confidence = float(np.median(confidences))
+        confidences = np.asarray(confidences)
 
-        status = "ok"
-        if spread > MAX_HR_SPREAD_BPM:
+        # Two independent filters. Confidence removes motion-corrupted windows;
+        # MAD removes gross outliers such as octave errors, which can carry a
+        # respectable confidence and which no confidence threshold reliably catches.
+        median_hr = float(np.median(rates))
+        mad = max(float(np.median(np.abs(rates - median_hr))) * 1.4826, MAD_FLOOR_BPM)
+        keep = (confidences >= MIN_CONFIDENCE) & (np.abs(rates - median_hr) <= MAD_OUTLIER_K * mad)
+        usable_fraction = float(keep.sum() / len(rates))
+
+        if keep.sum() < MIN_USABLE_WINDOWS:
+            used, status = np.ones_like(keep, dtype=bool), "low_confidence"
+        else:
+            used = keep
+            status = "ok" if usable_fraction >= MIN_USABLE_FRACTION else "degraded_capture"
+
+        spread = float(np.percentile(rates[used], 75) - np.percentile(rates[used], 25))
+        confidence = float(np.median(confidences[used]))
+        if status == "ok" and spread > MAX_HR_SPREAD_BPM:
             status = "unstable"
-        elif confidence < MIN_CONFIDENCE:
-            status = "low_confidence"
 
         return EstimatorResult(
-            self.vital, float(np.median(rates)), self.unit, confidence, status,
-            waveform=np.concatenate(waves),
-            detail=dict(n_windows=len(rates), spread_bpm=spread, fps=float(fps)))
+            self.vital, float(np.median(rates[used])), self.unit, confidence, status,
+            waveform=np.concatenate([w for w, k in zip(waves, used) if k]),
+            detail=dict(n_windows=int(used.sum()), n_total=len(rates),
+                        usable_fraction=usable_fraction,
+                        spread_bpm=spread, fps=float(fps)))
