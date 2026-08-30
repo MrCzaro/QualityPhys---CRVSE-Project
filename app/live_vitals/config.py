@@ -58,3 +58,14 @@ MIN_USABLE_FRACTION = 0.50  # a low surviving fraction is itself a motion signal
 # the reliable instability signal.
 MAX_HR_SPREAD_BPM = 25.0
 
+# Acquisition rate gates. The 2026-07-21 sweep found good tracking needs 28-30 Hz
+# and that 22-26 Hz is an unreliable dead zone; a 10 fps webcam capture produced a
+# confident reading ~7 bpm below a known resting HR. Rate is a hard contract, not
+# a note: confidence cannot detect a wrong time base.
+MIN_FPS_ACCEPT = 27.0   # at or above this, rate is not a concern
+MIN_FPS_WARN = 20.0     # below this the reading is refused outright
+
+# Below this surviving fraction the median is dominated by noise, so no value is
+# reported at all. A qualified wrong number is worse than a refusal: a capture that
+# loses 86% of its windows has not measured anything.
+MIN_REPORTABLE_FRACTION = 0.25

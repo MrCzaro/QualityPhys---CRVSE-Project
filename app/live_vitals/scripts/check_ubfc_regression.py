@@ -101,13 +101,15 @@ def evaluate_subject(subject_dir, estimator, cache_path=None):
 
     result = estimator.estimate(clip, fps)
 
-    # Per-window agreement is measured by running the estimator on one window at a
-    # time, so this stays on the public interface and works for any registered model.
-    predicted, reference = [], []
-    for start in window_starts(len(clip)):
-        window = slice(start, start + config.CLIP_LEN)
-        predicted.append(estimator.estimate(clip[window], fps).value)
-        reference.append(hr_from_bvp(reference_bvp[window], fps)["hr_bpm"])
+    # Per-window values come from the estimator's own report, so this stays on the
+    # public interface, works for any registered model, and does not re-run the
+    # model once per window.
+    predicted = result.detail.get("window_hr")
+    if predicted is None:
+        raise RuntimeError(f"{estimator.name} does not report per-window values")
+    reference = [hr_from_bvp(reference_bvp[start:start + config.CLIP_LEN],
+                             fps)["hr_bpm"]
+                 for start in window_starts(len(clip))]
 
     predicted = np.asarray(predicted, dtype=float)
     reference = np.asarray(reference, dtype=float)
@@ -203,7 +205,9 @@ def main():
                                  ("value", TOLERANCE_BPM),
                                  ("usable_fraction", TOLERANCE_FRACTION)):
             delta = row[field] - want[field]
-            if abs(delta) > tolerance:
+            # NaN compares false against any tolerance, so a value that became
+            # NaN would otherwise pass silently. Treat it as drift explicitly.
+            if delta != delta or abs(delta) > tolerance:
                 drifted.append((subject, field, want[field], row[field], delta))
         if row["status"] != want["status"]:
             drifted.append((subject, "status", want["status"], row["status"], None))

@@ -3,7 +3,7 @@ import numpy as np
 import torch
 
 from ..config import (CLIP_LEN, WINDOW_STRIDE, PHYSNET_CKPT,
-                      MIN_CONFIDENCE, MIN_USABLE_WINDOWS, MIN_USABLE_FRACTION,
+                      MIN_CONFIDENCE, MIN_USABLE_WINDOWS, MIN_USABLE_FRACTION, MIN_REPORTABLE_FRACTION,
                       MAX_HR_SPREAD_BPM, MAD_OUTLIER_K, MAD_FLOOR_BPM)
 
 from ..preprocess.frames import clip_to_tensor
@@ -75,11 +75,27 @@ class HRPhysNet(Estimator):
         keep = (confidences >= MIN_CONFIDENCE) & (np.abs(rates - median_hr) <= MAD_OUTLIER_K * mad)
         usable_fraction = float(keep.sum() / len(rates))
 
-        if keep.sum() < MIN_USABLE_WINDOWS:
-            used, status = np.ones_like(keep, dtype=bool), "low_confidence"
-        else:
-            used = keep
-            status = "ok" if usable_fraction >= MIN_USABLE_FRACTION else "degraded_capture"
+        # A capture that loses most of its windows has not measured anything.
+        # Reporting a qualified value from one or two survivors is worse than
+        # refusing: the median of a handful of noisy windows is itself noise.
+        # Per-window values are always reported so callers can inspect or plot the
+        # windows without re-running the model, and without reaching past this
+        # interface into a particular model's internals.
+        windows = dict(window_hr=[float(x) for x in rates],
+                       window_confidence=[float(x) for x in confidences],
+                       window_kept=[bool(x) for x in keep])
+
+        if keep.sum() < MIN_USABLE_WINDOWS or usable_fraction < MIN_REPORTABLE_FRACTION:
+            return EstimatorResult(
+                self.vital, float("nan"), self.unit,
+                float(np.median(confidences[keep])) if keep.any() else 0.0,
+                "insufficient_quality",
+                detail=dict(n_windows=int(keep.sum()), n_total=len(rates),
+                            usable_fraction=usable_fraction, fps=float(fps),
+                            **windows))
+
+        used = keep
+        status = "ok" if usable_fraction >= MIN_USABLE_FRACTION else "degraded_capture"
 
         spread = float(np.percentile(rates[used], 75) - np.percentile(rates[used], 25))
         confidence = float(np.median(confidences[used]))
@@ -91,4 +107,4 @@ class HRPhysNet(Estimator):
             waveform=np.concatenate([w for w, k in zip(waves, used) if k]),
             detail=dict(n_windows=int(used.sum()), n_total=len(rates),
                         usable_fraction=usable_fraction,
-                        spread_bpm=spread, fps=float(fps)))
+                        spread_bpm=spread, fps=float(fps), **windows))
