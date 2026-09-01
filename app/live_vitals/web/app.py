@@ -36,7 +36,7 @@ from app.live_vitals.preprocess.face_box import make_landmarker
 CERT_DIR = _REPO_ROOT / "app" / "live_hr_demo" / "certs"
 DISCLAIMER = ("Research demo, not a medical device. Not validated for diagnosis "
               "or treatment decisions.")
-
+SPECTRAL_NAME = "hr_spectral"
 # MediaPipe detectors are not safe to call concurrently, and FastHTML runs sync
 # handlers in a threadpool, so one shared detector is guarded by a lock. Loading
 # a checkpoint costs a few hundred milliseconds, so estimators are cached too.
@@ -95,9 +95,61 @@ def announce(scheme, port):
         print(f"LAN : {scheme}://{lan}:{port}   (for phone testing)\n")
 
 app, rt = fast_app(
-    hdrs=(*Theme.blue.headers(),
+    hdrs=(*Theme.blue.headers(apex_charts=True),
           Link(rel="icon", type="image/x-icon", href="/static/favicon.ico")),
     live=False, static_path=str(Path(__file__).parent))
+
+# These are deliberately MonsterUI/Tailwind utility classes, not a second CSS
+# system.  They make the dashboard feel like one clinical instrument in both
+# the light and dark variants that Theme.blue supplies.
+PANEL = (CardT.default, "rounded-2xl border border-border shadow-sm")
+
+def chip(chip_id, text="—", tone=LabelT.secondary):
+    """Renders a status pill that the client recolours in place."""
+    return Label(text, id=chip_id, cls=tone)
+
+
+def card_heading(title, subtitle, chip_element):
+    """Card header: stacked title and subtitle on the left, a status pill right.
+
+    A plain Div is used rather than DivVStacked because the latter centres its
+    children, and a centred title reads as misaligned beside a left-aligned body.
+    """
+    return DivFullySpaced(
+        Div(CardTitle(title), Subtitle(subtitle)),
+        chip_element)
+
+
+def vital_tile(title, value_id, unit, footnote, icon, chip_element=None):
+    """A vitals tile: title and status on top, a large value, a muted footnote.
+
+    The value starts muted; the client clears that class when a real reading
+    arrives, so an empty tile never reads as a rendering fault.
+    """
+    return Card(
+        DivFullySpaced(
+            DivLAligned(
+                Div(UkIcon(icon, cls="h-5 w-5"),
+                    cls="rounded-xl bg-primary/10 p-2 text-primary"),
+                H4(title, cls="text-base font-semibold"),
+                cls="space-x-3"),
+            chip_element or Label("pending", cls=LabelT.secondary)),
+        DivLAligned(
+            Span("-", id=value_id,
+                 cls="text-5xl font-semibold tracking-tight tabular-nums text-muted-foreground"),
+            Span(unit, cls=TextPresets.muted_sm),
+            cls="items-baseline space-x-2"),
+        P(footnote, id=f"{value_id}-note", cls=(TextPresets.muted_sm, "pt-1")),
+        cls=PANEL)
+
+
+def confidence(prefix):
+    """A confidence bar with a numeric caption, driven by the client."""
+    return Div(
+        DivFullySpaced(P("confidence", cls=TextPresets.muted_sm),
+                       P("—", id=f"{prefix}-conf-text", cls=TextPresets.muted_sm)),
+        Progress(value="0", max="100", id=f"{prefix}-conf", cls="w-full"),
+        cls="pt-2 space-y-1")
 
 @rt("/api/models")
 def api_models():
@@ -202,35 +254,132 @@ async def api_analyze(video: UploadFile, model: str = None):
 
 @rt("/")
 def index():
-    """Placeholder capture page; the real interface follows the UI design pass.
-
-    Model options are rendered server-side: MonsterUI's Select is a web component
-    wrapping a hidden native select, so options injected by client script are not
-    read back as a value.
-    """
+    """Main capture and results view, with a collapsible diagnostics panel."""
     options = [
         fh.Option(f"{name} ({registry.get_estimator(name).vital})",
                   value=name, selected=(name == registry.DEFAULT_ESTIMATOR))
         for name in registry.available()]
-    return Titled(
-        "CRVSE live vitals",
-        Card(
-            DivVStacked(
-                Video(id="preview", playsinline=True, muted=True, autoplay=True,
-                      style="width:100%;max-width:640px;transform:scaleX(-1);"
-                            "background:#111;border-radius:6px"),
-                DivHStacked(
-                    fh.Select(*options, id="model", cls="uk-select",
-                              style="max-width:20rem"),
-                    fh.Button("start camera", id="start", type="button",
-                              cls="uk-btn uk-btn-secondary"),
-                    fh.Button("capture 60 s", id="record", type="button",
-                              disabled=True, cls="uk-btn uk-btn-primary"),
-                    cls="space-x-2"),
-                P("idle", id="state", cls=TextPresets.bold_lg),
-                Pre("", id="out", cls="text-xs bg-gray-100 p-3 rounded"),
-                P(DISCLAIMER, cls=TextPresets.muted_sm))),
-        Script(src="/static/capture.js"))
+    spectral_installed = SPECTRAL_NAME in registry.available()
+
+    # A vitals row gives the readings at a glance; the two unavailable vitals are
+    # shown rather than hidden so the intended scope of the app is visible.
+    vitals = Grid(
+        vital_tile("Heart rate", "model-hr", "bpm", "awaiting capture",
+                   "heart-pulse", chip("model-status", "idle")),
+        vital_tile("HRV", "model-hrv", "ms", "under evaluation", "activity"),
+        vital_tile("Respiratory rate", "model-rr", "br/min", "requires model",
+                   "wind"),
+        cols_md=3, cols_sm=1, cls="gap-5")
+
+    capture = Card(
+        Video(id="preview", playsinline=True, muted=True, autoplay=True,
+              cls="w-full rounded-xl border border-border bg-black block",
+              style="transform:scaleX(-1)"),
+        Div(
+            DivFullySpaced(
+                DivLAligned(chip("framing-chip", "no camera"),
+                            P("-", id="fps-chip", cls=TextPresets.muted_sm),
+                            cls="space-x-3"),
+                fh.Select(*options, id="model", cls="uk-select",
+                          style="max-width:14rem")),
+            Div(
+                Button(UkIcon("video", cls="mr-2 h-4 w-4"), "Start camera",
+                       id="start", type="button",
+                       cls=(ButtonT.primary, ButtonT.lg,
+                            "flex-1 rounded-full px-5 font-semibold whitespace-nowrap")),
+                Button(UkIcon("circle", cls="mr-2 h-3.5 w-3.5"), "Capture 60 s",
+                       id="record", type="button", disabled=True,
+                       cls=(ButtonT.default, ButtonT.lg,
+                            "flex-1 rounded-full border border-primary/60 px-5 text-primary "
+                            "font-semibold whitespace-nowrap disabled:opacity-60")),
+                cls="flex items-center gap-2"),
+            cls="space-y-3 border-t border-border pt-4"),
+        P("Press start, wait for the framing chip to read ACCEPT, then capture.",
+          id="state", cls=(TextPresets.muted_sm, "pt-1")),
+        header=card_heading(
+            "Camera capture",
+            "face a window or lamp — not with one behind you",
+            chip("privacy-chip", "analysed, never stored", LabelT.primary)),
+        cls=(*PANEL, "col-span-4"))
+
+    detail = Card(
+        Div(confidence("model"),
+            DividerLine(),
+            DivFullySpaced(P("windows used", cls=TextPresets.muted_sm),
+                           P("—", id="stat-windows", cls=(TextT.sm, "tabular-nums"))),
+            DivFullySpaced(P("spread", cls=TextPresets.muted_sm),
+                           P("—", id="stat-spread", cls=(TextT.sm, "tabular-nums"))),
+            DivFullySpaced(P("capture rate", cls=TextPresets.muted_sm),
+                           P("—", id="stat-rate", cls=(TextT.sm, "tabular-nums"))),
+            cls="space-y-3 rounded-xl bg-muted/30 p-4"),
+        DividerLine(),
+        DivFullySpaced(Div(Strong("Spectral", cls=TextT.sm),
+                           P("classical cross-check", cls=TextPresets.muted_sm)),
+                       chip("spec-status", "not installed")),
+        DivLAligned(Span("—", id="spec-hr",
+                         cls="text-2xl tabular-nums text-muted-foreground"),
+                    Span("bpm", cls=TextPresets.muted_sm),
+                    cls="items-baseline space-x-2"),
+        None if spectral_installed else
+        P("Not yet ported from the Phase-2 app, so there is no independent "
+          "estimate to compare against.", cls=TextPresets.muted_sm),
+        header=card_heading("Measurement quality", "how far to trust this reading",
+                            chip("quality-chip", "idle")),
+        cls=(*PANEL, "col-span-3"))
+
+    # Every panel the client fills carries a placeholder, so an app that has not
+    # measured anything yet reads as waiting rather than as broken.
+    waiting = lambda: P("No capture yet.", cls=TextPresets.muted_sm)
+
+    trend = Card(
+        Div(waiting(), id="trend", cls="w-full"),
+        P("Per-window heart rate. Hollow points were discarded by the quality "
+          "gates; the dashed line is the reported median.",
+          cls=TextPresets.muted_sm),
+        header=card_heading("Trend", "stability across the capture",
+                            chip("trend-chip", "idle")),
+        cls=PANEL)
+
+    diagnostics = Card(
+        Grid(Div(H4("Capture quality"),
+                 Div(waiting(), id="diag-quality", cls="font-mono text-xs pt-1")),
+             Div(H4("Gates"),
+                 Div(waiting(), id="diag-gates", cls="font-mono text-xs pt-1")),
+             cols_md=2, cols_sm=1, cls="gap-8"),
+        DividerLine(),
+        H4("Windows"),
+        Div(waiting(), id="diag-windows", cls="overflow-x-auto pt-1"),
+        DividerLine(),
+        H4("Reconstructed BVP waveform"),
+        P("Drawn at about 100 px per second so individual beats are legible — "
+          "scroll sideways to read the whole strip. Windows are inferred "
+          "independently and concatenated; pale red stretches were rejected by "
+          "the quality gates.", id="diag-wave-note",
+          cls=TextPresets.muted_sm),
+        Div(waiting(), id="diag-wave", cls="w-full pt-2 overflow-x-auto"),
+        header=card_heading("Diagnostics", "every number behind the reading",
+                            chip("diag-chip", "idle")),
+        cls=PANEL)
+
+    # `cols` is omitted deliberately: passing it propagates to every breakpoint
+    # and defeats the per-breakpoint values that make col-span layouts work.
+    return Container(
+        Title("CRVSE live vitals"),
+        NavBar(chip("build-chip", "research only · not a medical device",
+                    LabelT.secondary),
+               brand=Div(H3("CRVSE live vitals"),
+                         Subtitle("camera heart-rate research demo")),
+               cls="rounded-2xl border border-border bg-card/80 px-3 shadow-sm"),
+        Div(vitals,
+            Grid(capture, detail, cols_xl=7, cols_lg=7, cols_md=1, cols_sm=1),
+            trend,
+            Accordion(AccordionItem("Diagnostics", diagnostics, open=False),
+                      multiple=False),
+            cls="space-y-6 pt-2"),
+        P(DISCLAIMER, cls=(TextPresets.muted_sm, "pt-8 pb-4")),
+        Script(src="/static/capture.js?v=20260901-2"),
+        cls=("space-y-4", ContainerT.xl))
+
 def main():
     """Runs the server, over HTTPS when certificates are available and requested."""
     import uvicorn

@@ -85,11 +85,16 @@ class HRPhysNet(Estimator):
                        window_confidence=[float(x) for x in confidences],
                        window_kept=[bool(x) for x in keep])
 
+        # Every window is returned in the waveform, kept or not. A refused capture
+        # is exactly when someone needs to see what the model actually produced,
+        # and the per-window flags let a caller mark the rejected stretches.
+        full_waveform = np.concatenate(waves) if waves else None
+
         if keep.sum() < MIN_USABLE_WINDOWS or usable_fraction < MIN_REPORTABLE_FRACTION:
             return EstimatorResult(
                 self.vital, float("nan"), self.unit,
                 float(np.median(confidences[keep])) if keep.any() else 0.0,
-                "insufficient_quality",
+                "insufficient_quality", waveform=full_waveform,
                 detail=dict(n_windows=int(keep.sum()), n_total=len(rates),
                             usable_fraction=usable_fraction, fps=float(fps),
                             **windows))
@@ -104,7 +109,7 @@ class HRPhysNet(Estimator):
 
         return EstimatorResult(
             self.vital, float(np.median(rates[used])), self.unit, confidence, status,
-            waveform=np.concatenate([w for w, k in zip(waves, used) if k]),
+            waveform=full_waveform,
             detail=dict(n_windows=int(used.sum()), n_total=len(rates),
                         usable_fraction=usable_fraction,
                         spread_bpm=spread, fps=float(fps), **windows))
