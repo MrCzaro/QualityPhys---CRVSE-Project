@@ -2,7 +2,7 @@
 import numpy as np
 
 from ..config import (HR_LOW_HZ, HR_HIGH_HZ, FFT_PAD_FACTOR, SUBHARMONIC_RATIO,
-                      HARMONIC_GUARD_ENABLED)
+                      HARMONIC_GUARD_ENABLED, CONFIDENCE_FLOOR_HZ)
 
 
 def _refine_peak_parabolic(power, peak_idx, lower_idx, upper_idx, eps=1e-20):
@@ -75,11 +75,12 @@ def hr_from_bvp(bvp, fps, low_hz=HR_LOW_HZ, high_hz=HR_HIGH_HZ,
     refined = _refine_peak_parabolic(power, chosen, lower_idx, upper_idx)
     f_hz = float(np.interp(refined, np.arange(power.size), freqs))
 
-    # Power within one unpadded-bin width of the peak, over total in-band power.
-    # Integrating a neighbourhood keeps this meaningful under zero-padding.
+    # Power within one peak width of the peak, over total in-band power.
+    # Integrating a neighbourhood keeps this meaningful under zero-padding, and
+    # flooring the width keeps it comparable between window lengths: the Rayleigh
+    # term alone would narrow with a longer window while the peak itself does not.
     bin_hz = float(freqs[1] - freqs[0])
-    lobe = max(1, int(round((float(fps) / x.size) / max(bin_hz, 1e-12))))
-    c0, c1 = max(lower_idx, chosen - lobe), min(upper_idx, chosen + lobe)
-    confidence = float(power[c0:c1 + 1].sum() / power[band].sum())
+    half_width_hz = max(float(fps) / x.size, CONFIDENCE_FLOOR_HZ)
+    lobe = max(1, int(round(half_width_hz / max(bin_hz, 1e-12))))
 
     return dict(hr_bpm=f_hz * 60.0, confidence=confidence, status=status)

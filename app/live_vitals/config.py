@@ -58,6 +58,19 @@ MIN_USABLE_FRACTION = 0.50  # a low surviving fraction is itself a motion signal
 # the reliable instability signal.
 MAX_HR_SPREAD_BPM = 25.0
 
+# Confidence lobe half-width floor. The lobe is otherwise fps/N Hz -- the Rayleigh
+# resolution -- which shrinks as the window lengthens while the spectral peak does
+# not, because a real heart rate wanders within a long window. Concentration then
+# falls purely because the window grew, and MIN_CONFIDENCE silently means something
+# different at every window length: measured on the MCD subset, POS median
+# confidence fell 0.630 -> 0.469 and the kept fraction 0.51 -> 0.39 going from 5.3 s
+# to 30 s windows. Flooring the lobe at a bandwidth the heart rate genuinely occupies
+# holds the kept fraction at 0.51 across all five lengths. 0.15 Hz is about 9 bpm,
+# and sits below fps/N for any capture the rate gate accepts at CLIP_LEN, so it does
+# not engage at the production window: per-window confidence over the eight held-out
+# UBFC subjects is unchanged to the last bit.
+CONFIDENCE_FLOOR_HZ = 0.15
+
 # Acquisition rate gates. The 2026-07-21 sweep found good tracking needs 28-30 Hz
 # and that 22-26 Hz is an unreliable dead zone; a 10 fps webcam capture produced a
 # confident reading ~7 bpm below a known resting HR. Rate is a hard contract, not
@@ -72,7 +85,7 @@ MIN_REPORTABLE_FRACTION = 0.25
 
 
 # Classical spectral cross-check (app-side; not part of the training contract)
-SPECTRAL_METHOD = "pos" # reported method; "pos" and "green" also available
+SPECTRAL_METHOD = "pos" # reported method; "chrom" and "green" also available
 SPECTRAL_WINDOW_SECONDS = 1.6 # projection window used by both POS and CHROM
 SPECTRAL_FILTER_ORDER = 4 # Butterworth order for the cardiac bandpass
 # Fraction of the face crop, measured from its centre, averaged into the RGB
@@ -83,3 +96,8 @@ SPECTRAL_FILTER_ORDER = 4 # Butterworth order for the cardiac bandpass
 # region starts to miss skin. 0.35 sits on the flat part of that curve, so it
 # tolerates a face that is not perfectly centred in its box.
 SPECTRAL_ROI_FRACTION = 0.35
+# POS is the default rather than CHROM. CHROM wins narrowly on UBFC (1.29 bpm
+# window MAE against 1.35) but loses badly on the six held-out MCD-rPPG subjects,
+# where it is refused on 9 of 12 recordings to POS's 5 and carries 24.9 bpm window
+# RMSE against 18.4. POS is also the classical method Egorov et al. (ACMMM 2025)
+# benchmark on this corpus, at 3.80 bpm MAE on the frontal camera.
