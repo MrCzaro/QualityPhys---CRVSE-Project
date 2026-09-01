@@ -34,9 +34,17 @@ from app.live_vitals.scripts.check_contract_parity import load_reference
 
 HELD_OUT_SUBJECTS = [11, 13, 24, 25, 34, 35, 42, 47]
 DEFAULT_DATA_DIR = Path(r"D:\QualityPhys\demo_data")
-BASELINE_PATH = Path(__file__).with_name("ubfc_baseline.json")
 TOLERANCE_BPM = 0.05
 TOLERANCE_FRACTION = 0.01
+
+def baseline_path(estimator_name):
+    """Returns the baseline file for one estimator.
+
+    Baselines are per-estimator because they are absolute accuracy records, not
+    relative ones: comparing a model against another model's baseline would
+    report a difference between two models as a regression in one of them.
+    """
+    return Path(__file__).with_name(f"ubfc_baseline_{estimator_name}.json")
 
 
 def face_crops(video_path, cache_path=None):
@@ -141,6 +149,7 @@ def main():
                         help="overwrite the stored baseline with this run")
     args = parser.parse_args()
 
+    baseline_file = baseline_path(args.estimator)
     estimator = registry.get_estimator(args.estimator)
     if not estimator.is_available():
         print(f"ERROR: checkpoint missing for {args.estimator}")
@@ -168,16 +177,16 @@ def main():
                    mean_error=mean_error, subjects=results)
 
     if args.update_baseline:
-        BASELINE_PATH.write_text(json.dumps(summary, indent=2), encoding="utf-8")
-        print(f"baseline written: {BASELINE_PATH.name}")
+        baseline_file.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        print(f"baseline written: {baseline_file.name}")
         return 0
 
-    if not BASELINE_PATH.exists():
-        print(f"\nno baseline at {BASELINE_PATH.name}; "
+    if not baseline_file.exists():
+        print(f"\nno baseline at {baseline_file.name}; "
               f"run with --update-baseline first")
         return 0
 
-    baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    baseline = json.loads(baseline_file.read_text(encoding="utf-8"))
     if baseline.get("estimator") != args.estimator:
         print(f"\nbaseline is for {baseline.get('estimator')!r}; not comparable")
         return 0

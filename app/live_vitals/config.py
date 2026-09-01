@@ -69,3 +69,17 @@ MIN_FPS_WARN = 20.0     # below this the reading is refused outright
 # reported at all. A qualified wrong number is worse than a refusal: a capture that
 # loses 86% of its windows has not measured anything.
 MIN_REPORTABLE_FRACTION = 0.25
+
+
+# Classical spectral cross-check (app-side; not part of the training contract)
+SPECTRAL_METHOD = "pos" # reported method; "pos" and "green" also available
+SPECTRAL_WINDOW_SECONDS = 1.6 # projection window used by both POS and CHROM
+SPECTRAL_FILTER_ORDER = 4 # Butterworth order for the cardiac bandpass
+# Fraction of the face crop, measured from its centre, averaged into the RGB
+# trace. CROP_PADDING leaves the outer crop full of hair, shoulders and
+# background whose brightness changes are not pulsatile. Swept on the eight
+# held-out UBFC subjects (2026-09-01): CHROM window MAE 2.68 bpm over the whole
+# crop, 1.38 at 0.45, 1.29 at 0.35, 1.26 at 0.30, then 1.44 at 0.25 as the
+# region starts to miss skin. 0.35 sits on the flat part of that curve, so it
+# tolerates a face that is not perfectly centred in its box.
+SPECTRAL_ROI_FRACTION = 0.35

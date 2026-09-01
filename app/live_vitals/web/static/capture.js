@@ -235,6 +235,31 @@ document.addEventListener('click', event => {
   if (event.target.closest('.uk-accordion-title')) setTimeout(drawWaveform, 400);
 });
 
+
+/* Agreement between the neural and classical estimates. 5 bpm is the tolerance
+   ANSI/AAMI EC13 allows a heart-rate meter, so it is the natural line between
+   two readings that corroborate each other and two that do not. */
+const AGREEMENT_BPM = 5;
+
+function renderCrossCheck(d) {
+  const spec = d.spectral;
+  if (!spec) return;
+  const hr = $('spec-hr');
+  hr.textContent = spec.value == null ? '—' : spec.value.toFixed(1);
+  hr.classList.toggle('text-muted-foreground', spec.value == null);
+
+  const gap = (spec.value != null && d.value != null)
+    ? Math.abs(spec.value - d.value) : null;
+  const label = spec.value == null ? (spec.status || 'no reading')
+    : gap == null ? spec.method
+    : `${spec.method} · ${gap.toFixed(1)} bpm apart`;
+  setChip($('spec-status'), label,
+          spec.value == null ? 'REJECT'
+          : gap == null ? 'WARN'
+          : gap <= AGREEMENT_BPM ? 'ACCEPT' : 'WARN');
+}
+
+
 function render(d) {
   if (!d.ok) { $('state').textContent = 'error: ' + d.message; return; }
   lastResult = d;
@@ -288,7 +313,7 @@ function render(d) {
     ['IQR spread', d.spread_bpm == null ? '—' : `${d.spread_bpm} bpm`],
     ['status', d.status]
   ]);
-
+  renderCrossCheck(d);
   const rows = (d.window_hr || []).map((hr, i) =>
     `<tr class="${d.window_kept[i] ? '' : 'text-gray-400'}">
        <td class="pr-6">${i}</td><td class="pr-6">${hr.toFixed(2)}</td>

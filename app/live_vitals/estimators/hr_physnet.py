@@ -2,23 +2,19 @@
 import numpy as np
 import torch
 
-from ..config import (CLIP_LEN, WINDOW_STRIDE, PHYSNET_CKPT,
-                      MIN_CONFIDENCE, MIN_USABLE_WINDOWS, MIN_USABLE_FRACTION, MIN_REPORTABLE_FRACTION,
-                      MAX_HR_SPREAD_BPM, MAD_OUTLIER_K, MAD_FLOOR_BPM)
-
+from ..config import CLIP_LEN, WINDOW_STRIDE, PHYSNET_CKPT
 from ..preprocess.frames import clip_to_tensor
 from ..models.architectures.physnet import PhysNet
 from ..signal.hr import hr_from_bvp
-from .base import Estimator, EstimatorResult
+from .base import Estimator, EstimatorResult, aggregate_windows
 
 
 class HRPhysNet(Estimator):
     """Estimates HR by reconstructing BVP over overlapping clips.
 
-    Per-window heart rates are aggregated by median rather than by stitching the
-    predicted waveforms, because separate windows carry no shared phase or scale
-    and overlap-adding them can cancel a genuine pulse. The inter-quartile spread
-    across windows is retained as a stability signal.
+    Windowing and quality gating are shared with every other estimator through
+    `aggregate_windows`. What is specific to this model is only how each window's
+    waveform is produced.
     """
 
     name = "hr_physnet_v2"
@@ -50,11 +46,8 @@ class HRPhysNet(Estimator):
                                    detail=dict(n_frames=len(frames_u8), need=CLIP_LEN))
 
         model = self._load()
-        rates, confidences, waves = [], [], []
-        # Windows that produce no readable peak are counted but not collected, so
-        # they still weigh on the usable fraction. Dropping them from the
-        # denominator instead would make an unreadable capture look clean.
         starts = list(range(0, len(frames_u8) - CLIP_LEN + 1, WINDOW_STRIDE))
+        rates, confidences, waves = [], [], []
         for start in starts:
             tensor = clip_to_tensor(frames_u8[start:start + CLIP_LEN]).to(self.device)
             with torch.no_grad():
@@ -65,61 +58,5 @@ class HRPhysNet(Estimator):
                 confidences.append(reading["confidence"])
                 waves.append(bvp)
 
-        if not rates:
-            return EstimatorResult(self.vital, float("nan"), self.unit, 0.0,
-                                   "no_estimate",
-                                   detail=dict(n_total=len(starts),
-                                               n_no_peak=len(starts),
-                                               fps=float(fps)))
-
-        rates = np.asarray(rates)
-        confidences = np.asarray(confidences)
-
-        # Two independent filters. Confidence removes motion-corrupted windows;
-        # MAD removes gross outliers such as octave errors, which can carry a
-        # respectable confidence and which no confidence threshold reliably catches.
-        median_hr = float(np.median(rates))
-        mad = max(float(np.median(np.abs(rates - median_hr))) * 1.4826, MAD_FLOOR_BPM)
-        keep = (confidences >= MIN_CONFIDENCE) & (np.abs(rates - median_hr) <= MAD_OUTLIER_K * mad)
-        usable_fraction = float(keep.sum() / len(starts))
-
-        # A capture that loses most of its windows has not measured anything.
-        # Reporting a qualified value from one or two survivors is worse than
-        # refusing: the median of a handful of noisy windows is itself noise.
-        # Per-window values are always reported so callers can inspect or plot the
-        # windows without re-running the model, and without reaching past this
-        # interface into a particular model's internals.
-        windows = dict(window_hr=[float(x) for x in rates],
-                       window_confidence=[float(x) for x in confidences],
-                       window_kept=[bool(x) for x in keep],
-                       n_total=len(starts),
-                       n_no_peak=len(starts) - len(rates))
-
-        # Every window is returned in the waveform, kept or not. A refused capture
-        # is exactly when someone needs to see what the model actually produced,
-        # and the per-window flags let a caller mark the rejected stretches.
-        full_waveform = np.concatenate(waves) if waves else None
-
-        if keep.sum() < MIN_USABLE_WINDOWS or usable_fraction < MIN_REPORTABLE_FRACTION:
-            return EstimatorResult(
-                self.vital, float("nan"), self.unit,
-                float(np.median(confidences[keep])) if keep.any() else 0.0,
-                "insufficient_quality", waveform=full_waveform,
-                detail=dict(n_windows=int(keep.sum()),
-                            usable_fraction=usable_fraction, fps=float(fps),
-                            **windows))
-
-        used = keep
-        status = "ok" if usable_fraction >= MIN_USABLE_FRACTION else "degraded_capture"
-
-        spread = float(np.percentile(rates[used], 75) - np.percentile(rates[used], 25))
-        confidence = float(np.median(confidences[used]))
-        if status == "ok" and spread > MAX_HR_SPREAD_BPM:
-            status = "unstable"
-
-        return EstimatorResult(
-            self.vital, float(np.median(rates[used])), self.unit, confidence, status,
-            waveform=full_waveform,
-            detail=dict(n_windows=int(used.sum()),
-                        usable_fraction=usable_fraction,
-                        spread_bpm=spread, fps=float(fps), **windows))
+        return aggregate_windows(self.vital, self.unit, rates, confidences,
+                                 waves, fps, len(starts))

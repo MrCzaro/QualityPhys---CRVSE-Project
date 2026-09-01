@@ -151,6 +151,22 @@ def confidence(prefix):
         Progress(value="0", max="100", id=f"{prefix}-conf", cls="w-full"),
         cls="pt-2 space-y-1")
 
+def cross_check_payload(result):
+    """Serialises the spectral cross-check, or None when it was not run."""
+    if result is None:
+        return None
+    detail = result.detail or {}
+    value = None if result.value != result.value else round(float(result.value), 2)
+    methods = {name: (None if row["hr_bpm"] != row["hr_bpm"]
+                      else round(float(row["hr_bpm"]), 2))
+               for name, row in (detail.get("method_hr") or {}).items()}
+    return dict(value=value, unit=result.unit, status=result.status,
+                confidence=round(float(result.confidence), 3),
+                method=detail.get("method"), method_hr=methods,
+                n_windows=detail.get("n_windows"), n_total=detail.get("n_total"))
+
+
+
 @rt("/api/models")
 def api_models():
     """Lists registered estimators and whether their weights are present."""
@@ -227,6 +243,18 @@ async def api_analyze(video: UploadFile, model: str = None):
 
         result = estimator(name).estimate(clip, fps)
         detail = result.detail or {}
+        
+        # The classical estimator shares no weights and no training data with a
+        # neural one, so where the two agree that is corroboration rather than a
+        # model confirming itself. When it is the selected model it is reported
+        # as its own cross-check, which surfaces the POS/CHROM/GREEN spread.
+        if name == SPECTRAL_NAME:
+            cross = result
+        elif SPECTRAL_NAME in registry.available():
+            cross = estimator(SPECTRAL_NAME).estimate(clip, fps)
+        else:
+            cross = None
+
         value = None if result.value != result.value else round(float(result.value), 2)
         payload.update(
             vital=result.vital, unit=result.unit, value=value,
@@ -240,6 +268,7 @@ async def api_analyze(video: UploadFile, model: str = None):
                                for x in detail.get("window_confidence", [])],
             window_kept=list(detail.get("window_kept", [])),
             n_no_peak=detail.get("n_no_peak", 0),
+            spectral=cross_check_payload(cross),
             waveform=([round(float(x), 4) for x in result.waveform]
                       if result.waveform is not None else []))
         return payload

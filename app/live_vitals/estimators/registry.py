@@ -5,11 +5,12 @@ same data, is a configuration change rather than a code change. Nothing outside 
 module should import a concrete estimator class directly.
 """
 from .hr_physnet import HRPhysNet
+from .hr_spectral import HRSpectral
 
 ESTIMATORS = {
     HRPhysNet.name: HRPhysNet,
+    HRSpectral.name: HRSpectral,
 }
-
 DEFAULT_ESTIMATOR = HRPhysNet.name
 
 
