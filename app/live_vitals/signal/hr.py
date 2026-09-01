@@ -63,6 +63,14 @@ def hr_from_bvp(bvp, fps, low_hz=HR_LOW_HZ, high_hz=HR_HIGH_HZ,
                 local = int(w0 + np.argmax(power[w0:w1 + 1]))
                 if power[local] >= subharmonic_ratio * power[peak_idx]:
                     chosen, status = local, "subharmonic_adopted"
+    # An argmax sitting on a band edge is not a peak. The spectrum is still
+    # rising as it leaves the search band, so the real maximum is outside it, and
+    # what comes back is the edge frequency itself rather than a heart rate. This
+    # is what a window with no cardiac content looks like when drift and motion
+    # energy below the low cutoff dominate, and no confidence threshold catches
+    # it: the power genuinely is concentrated at the edge.
+    if chosen <= lower_idx or chosen >= upper_idx:
+        return dict(hr_bpm=float("nan"), confidence=0.0, status="band_edge")
 
     refined = _refine_peak_parabolic(power, chosen, lower_idx, upper_idx)
     f_hz = float(np.interp(refined, np.arange(power.size), freqs))

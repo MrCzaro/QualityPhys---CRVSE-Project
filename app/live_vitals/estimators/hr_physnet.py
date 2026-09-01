@@ -51,7 +51,11 @@ class HRPhysNet(Estimator):
 
         model = self._load()
         rates, confidences, waves = [], [], []
-        for start in range(0, len(frames_u8) - CLIP_LEN + 1, WINDOW_STRIDE):
+        # Windows that produce no readable peak are counted but not collected, so
+        # they still weigh on the usable fraction. Dropping them from the
+        # denominator instead would make an unreadable capture look clean.
+        starts = list(range(0, len(frames_u8) - CLIP_LEN + 1, WINDOW_STRIDE))
+        for start in starts:
             tensor = clip_to_tensor(frames_u8[start:start + CLIP_LEN]).to(self.device)
             with torch.no_grad():
                 bvp = model(tensor)[0].cpu().numpy()
@@ -62,7 +66,11 @@ class HRPhysNet(Estimator):
                 waves.append(bvp)
 
         if not rates:
-            return EstimatorResult(self.vital, float("nan"), self.unit, 0.0, "no_estimate")
+            return EstimatorResult(self.vital, float("nan"), self.unit, 0.0,
+                                   "no_estimate",
+                                   detail=dict(n_total=len(starts),
+                                               n_no_peak=len(starts),
+                                               fps=float(fps)))
 
         rates = np.asarray(rates)
         confidences = np.asarray(confidences)
@@ -73,7 +81,7 @@ class HRPhysNet(Estimator):
         median_hr = float(np.median(rates))
         mad = max(float(np.median(np.abs(rates - median_hr))) * 1.4826, MAD_FLOOR_BPM)
         keep = (confidences >= MIN_CONFIDENCE) & (np.abs(rates - median_hr) <= MAD_OUTLIER_K * mad)
-        usable_fraction = float(keep.sum() / len(rates))
+        usable_fraction = float(keep.sum() / len(starts))
 
         # A capture that loses most of its windows has not measured anything.
         # Reporting a qualified value from one or two survivors is worse than
@@ -83,7 +91,9 @@ class HRPhysNet(Estimator):
         # interface into a particular model's internals.
         windows = dict(window_hr=[float(x) for x in rates],
                        window_confidence=[float(x) for x in confidences],
-                       window_kept=[bool(x) for x in keep])
+                       window_kept=[bool(x) for x in keep],
+                       n_total=len(starts),
+                       n_no_peak=len(starts) - len(rates))
 
         # Every window is returned in the waveform, kept or not. A refused capture
         # is exactly when someone needs to see what the model actually produced,
@@ -95,7 +105,7 @@ class HRPhysNet(Estimator):
                 self.vital, float("nan"), self.unit,
                 float(np.median(confidences[keep])) if keep.any() else 0.0,
                 "insufficient_quality", waveform=full_waveform,
-                detail=dict(n_windows=int(keep.sum()), n_total=len(rates),
+                detail=dict(n_windows=int(keep.sum()),
                             usable_fraction=usable_fraction, fps=float(fps),
                             **windows))
 
@@ -110,6 +120,6 @@ class HRPhysNet(Estimator):
         return EstimatorResult(
             self.vital, float(np.median(rates[used])), self.unit, confidence, status,
             waveform=full_waveform,
-            detail=dict(n_windows=int(used.sum()), n_total=len(rates),
+            detail=dict(n_windows=int(used.sum()),
                         usable_fraction=usable_fraction,
                         spread_bpm=spread, fps=float(fps), **windows))

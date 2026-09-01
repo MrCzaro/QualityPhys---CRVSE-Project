@@ -239,6 +239,7 @@ async def api_analyze(video: UploadFile, model: str = None):
             window_confidence=[round(float(x), 3)
                                for x in detail.get("window_confidence", [])],
             window_kept=list(detail.get("window_kept", [])),
+            n_no_peak=detail.get("n_no_peak", 0),
             waveform=([round(float(x), 4) for x in result.waveform]
                       if result.waveform is not None else []))
         return payload

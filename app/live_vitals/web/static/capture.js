@@ -284,6 +284,7 @@ function render(d) {
   $('diag-quality').innerHTML = formatStats(Object.entries(q));
   $('diag-gates').innerHTML = formatStats([
     ['usable fraction', d.usable_fraction], ['windows kept', `${d.n_windows} / ${d.n_total}`],
+    ['no cardiac peak', `${d.n_no_peak ?? 0} windows`],
     ['IQR spread', d.spread_bpm == null ? '—' : `${d.spread_bpm} bpm`],
     ['status', d.status]
   ]);
