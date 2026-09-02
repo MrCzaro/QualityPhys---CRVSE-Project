@@ -157,8 +157,13 @@ def cross_check_payload(result):
         return None
     detail = result.detail or {}
     value = None if result.value != result.value else round(float(result.value), 2)
-    methods = {name: (None if row["hr_bpm"] != row["hr_bpm"]
-                      else round(float(row["hr_bpm"]), 2))
+    # Each method keeps its own window count. A method that agrees while surviving
+    # five windows is not the same evidence as one that agrees over sixty, and the
+    # bare number hides that difference.
+    methods = {name: dict(hr=(None if row["hr_bpm"] != row["hr_bpm"]
+                              else round(float(row["hr_bpm"]), 2)),
+                          n_windows=row.get("n_windows"),
+                          n_total=row.get("n_total"))
                for name, row in (detail.get("method_hr") or {}).items()}
     return dict(value=value, unit=result.unit, status=result.status,
                 confidence=round(float(result.confidence), 3),
@@ -380,6 +385,14 @@ def index():
         H4("Windows"),
         Div(waiting(), id="diag-windows", cls="overflow-x-auto pt-1"),
         DividerLine(),
+        H4("Spectral cross-check"),
+        P("POS and CHROM read the same colour trace through different projections, "
+          "so their agreeing says the trace itself is sound and their diverging "
+          "says the cross-check should not be trusted on this capture, however "
+          "close either one lands to the model. GREEN carries no specular "
+          "rejection and is shown for reference only.", cls=TextPresets.muted_sm),
+        Div(waiting(), id="diag-spectral", cls="overflow-x-auto pt-1"),
+        DividerLine(),
         H4("Reconstructed BVP waveform"),
         P("Drawn at about 100 px per second so individual beats are legible — "
           "scroll sideways to read the whole strip. Windows are inferred "
@@ -407,7 +420,7 @@ def index():
                       multiple=False),
             cls="space-y-6 pt-2"),
         P(DISCLAIMER, cls=(TextPresets.muted_sm, "pt-8 pb-4")),
-        Script(src="/static/capture.js?v=20260901-2"),
+        Script(src="/static/capture.js?v=20260901-4"),
         cls=("space-y-4", ContainerT.xl))
 
 def main():

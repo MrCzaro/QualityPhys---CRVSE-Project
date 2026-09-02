@@ -82,5 +82,7 @@ def hr_from_bvp(bvp, fps, low_hz=HR_LOW_HZ, high_hz=HR_HIGH_HZ,
     bin_hz = float(freqs[1] - freqs[0])
     half_width_hz = max(float(fps) / x.size, CONFIDENCE_FLOOR_HZ)
     lobe = max(1, int(round(half_width_hz / max(bin_hz, 1e-12))))
+    c0, c1 = max(lower_idx, chosen - lobe), min(upper_idx, chosen + lobe)
+    confidence = float(power[c0:c1 + 1].sum() / power[band].sum())
 
     return dict(hr_bpm=f_hz * 60.0, confidence=confidence, status=status)

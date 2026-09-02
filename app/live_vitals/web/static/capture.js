@@ -259,6 +259,43 @@ function renderCrossCheck(d) {
           : gap <= AGREEMENT_BPM ? 'ACCEPT' : 'WARN');
 }
 
+function renderSpectralDiagnostics(d) {
+  const host = $('diag-spectral'), spec = d.spectral;
+  if (!spec || !spec.method_hr || !Object.keys(spec.method_hr).length) {
+    host.innerHTML = '<p class="uk-text-muted uk-text-small">'
+      + 'No classical cross-check ran for this capture.</p>';
+    return;
+  }
+  const rows = Object.entries(spec.method_hr).map(([name, m]) => {
+    const gap = (m.hr != null && d.value != null) ? m.hr - d.value : null;
+    const reported = name === spec.method;
+    return `<tr class="${m.hr == null ? 'text-gray-400' : ''}">
+      <td class="pr-6">${name}${reported ? ' &middot; reported' : ''}</td>
+      <td class="pr-6">${m.hr == null ? 'no reading' : m.hr.toFixed(1)}</td>
+      <td class="pr-6">${m.n_total ? `${m.n_windows} / ${m.n_total}` : '\u2014'}</td>
+      <td>${gap == null ? '\u2014' : (gap >= 0 ? '+' : '') + gap.toFixed(1)}</td></tr>`;
+  }).join('');
+
+  /* POS and CHROM are two projections of one colour trace, so they normally track
+     each other closely. Their separation is the honest measure of whether the
+     classical path worked at all on this capture. */
+  const pos = spec.method_hr.pos, chrom = spec.method_hr.chrom;
+  const spread = (pos && chrom && pos.hr != null && chrom.hr != null)
+    ? Math.abs(pos.hr - chrom.hr) : null;
+  const verdict = spread == null
+    ? 'POS and CHROM did not both produce a reading, so the classical path is '
+      + 'unverified on this capture.'
+    : spread <= AGREEMENT_BPM
+      ? `POS and CHROM agree to ${spread.toFixed(1)} bpm, so the colour trace is sound.`
+      : `POS and CHROM differ by ${spread.toFixed(1)} bpm — the classical path is `
+        + 'unreliable here and its agreement with the model would be coincidence.';
+
+  host.innerHTML =
+    `<table class="uk-table uk-table-small uk-table-divider text-sm"><thead><tr class="text-left">
+       <th class="pr-6">method</th><th class="pr-6">HR</th>
+       <th class="pr-6">windows</th><th>vs model</th></tr></thead><tbody>${rows}</tbody></table>`
+    + `<p class="uk-text-muted uk-text-small pt-2">${verdict}</p>`;
+}
 
 function render(d) {
   if (!d.ok) { $('state').textContent = 'error: ' + d.message; return; }
@@ -314,6 +351,7 @@ function render(d) {
     ['status', d.status]
   ]);
   renderCrossCheck(d);
+  renderSpectralDiagnostics(d);
   const rows = (d.window_hr || []).map((hr, i) =>
     `<tr class="${d.window_kept[i] ? '' : 'text-gray-400'}">
        <td class="pr-6">${i}</td><td class="pr-6">${hr.toFixed(2)}</td>
