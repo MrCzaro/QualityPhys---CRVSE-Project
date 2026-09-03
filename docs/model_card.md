@@ -363,7 +363,15 @@ sha256: f30fae250fb948e2... (first 16 hex)
 parameters: 768,577 (0.769 M, all trainable)
 task: BVP waveform reconstruction; heart rate read out from the waveform
 unit: bpm
+weights: https://huggingface.co/MrCzaro/hr_physnet_v2
+weights licence: CC BY-NC-SA 4.0 (not the repository Apache-2.0)
 ```
+
+The checkpoint is not committed to this repository (`.gitignore` excludes
+`Data/Phase3/*.zip`). It is published separately under **CC BY-NC-SA 4.0**, which is
+inherited from DLCN, the most restrictive of the three training corpora — see the
+Trained model weights section of `docs/data_sources.md` for why the weights carry
+different terms from the code.
 
 Unlike Card 1, this model is the **primary** estimate in its app. The classical
 spectral estimator (`hr_spectral`) runs alongside it as an independent cross-check,

@@ -83,6 +83,14 @@ orderings appear in third-party reference lists; use the order above.
 DLCN (Dynamic Lighting Conditions at Night): 98 participants, 784 videos, four
 nighttime lighting scenarios, resting and post-exercise states.
 
+This project used the **preprocessed Kaggle release**, not the raw data, so that
+release must be cited alongside the paper:
+
+> Zhipeng Li. "rPPG-DLCN." Kaggle, 2025. DOI: 10.34740/KAGGLE/DSV/11970644
+> https://www.kaggle.com/datasets/dalaoplan/rppg-dlcn
+
+Licence on the Kaggle release: **CC BY-NC-SA 4.0**.
+
 Distribution and reference code: https://github.com/dalaoplan/Happp-rPPG-Toolkit
 
 ### PhysDrive
@@ -244,6 +252,38 @@ the most restricted: it is licensed per request, separately for academic and
 commercial use, and its academic terms must stay walled off from any commercial
 version of this project. The same caution applies to PhysDrive. Confirm current
 terms with each provider before any release.
+
+DLCN was obtained from its open-access Kaggle release rather than by the email
+request its repository describes for raw data, so no separate release agreement was
+signed. The Kaggle release is **CC BY-NC-SA 4.0**, which agrees with the repository's
+own custom licence on every operative point: attribution, non-commercial use only,
+and derivatives carrying the same terms.
+
+### Trained model weights
+
+Model weights are a distinct artifact from both the code and the data, and the
+Apache-2.0 licence on this repository does not reach them.
+
+Weights trained on this corpus inherit the **most restrictive input**. For the Phase-3
+`hr_physnet_v2` checkpoint that is DLCN: MCD-rPPG is permissive and UBFC-rPPG carries
+no licence document at all, so DLCN's CC BY-NC-SA 4.0 sets the floor. **Published
+weights therefore go out under CC BY-NC-SA 4.0** — non-commercial, attributed, and
+share-alike — with all three source datasets cited.
+
+Whether trained weights are legally "Adapted Material" under CC 4.0 is unsettled, and
+depends on whether model training is an act requiring permission in a given
+jurisdiction. Licensing the weights NC-SA voluntarily removes the need to answer that
+question: the terms are satisfied either way. This is a deliberate choice, not a
+concession, and it is why the weights carry different terms from the code.
+
+Two source conditions are met by construction rather than by promise. The network is
+768,577 parameters producing a one-dimensional waveform: it cannot reconstruct a face,
+and it cannot be used to identify or re-identify a participant. No frame, crop or
+subject image is contained in or recoverable from a checkpoint.
+
+A model trained without DLCN would carry no non-commercial term, since the remaining
+sources impose none. That is the route to a permissively licensed release if one is
+ever needed; it costs the low-light robustness DLCN contributes.
 
 ## Current App Data Claim
 
