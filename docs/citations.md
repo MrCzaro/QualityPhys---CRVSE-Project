@@ -31,6 +31,24 @@ any distribution or commercial use.
 `ubicomplab/rPPG-Toolbox` is additionally the general code reference for the Phase-3
 modelling approach, and the PhaseNet authors ask that it be cited alongside their work.
 
+## Classical rPPG methods
+
+These are published algorithms rather than architectures: fixed linear projections of
+per-frame skin colour, with no learned parameters. All three are implemented from the
+papers in `app/live_vitals/signal/spectral.py`, so the obligation is citation only and
+no licence attaches.
+
+| Method | Paper | Reference implementation | Licence | Used in |
+|---|---|---|---|---|
+| POS | Wang et al., IEEE TBME 2017 | not cloned — reimplemented | n/a (own code) | `live_vitals` `hr_spectral` (default method), Phase-2 `rppg/live_methods.py` |
+| CHROM | de Haan & Jeanne, IEEE TBME 2013 | not cloned — reimplemented | n/a (own code) | `live_vitals` `hr_spectral`, Phase-2 `rppg/live_methods.py` |
+| GREEN | Verkruysse et al., Optics Express 2008 | not cloned — reimplemented | n/a (own code) | `live_vitals` `hr_spectral` (comparison only), Phase-2 `rppg/live_methods.py` |
+
+Verkruysse et al. is the origin of camera-based rPPG as a field — the first
+demonstration that a consumer camera's green channel carries a plethysmographic
+signal under ambient light — so it is cited even though the GREEN method is retained
+for comparison rather than used for any reported value.
+
 ## Licence points requiring attention
 
 **rPPG-Toolbox is under a Responsible AI Source Code License (RAIL v1.1), not a
@@ -109,6 +127,37 @@ NB_P3_09 through NB_P3_23. Pinning a commit SHA per clone would resolve this.
           Soumyadip and Patel, Shwetak and McDuff, Daniel},
   journal={arXiv preprint arXiv:2210.00716},
   year={2022}
+}
+
+@article{verkruysse2008remote,
+  title={Remote plethysmographic imaging using ambient light},
+  author={Verkruysse, Wim and Svaasand, Lars O. and Nelson, J. Stuart},
+  journal={Optics Express},
+  volume={16},
+  number={26},
+  pages={21434--21445},
+  year={2008}
+}
+
+@article{dehaan2013robust,
+  title={Robust pulse rate from chrominance-based rPPG},
+  author={de Haan, Gerard and Jeanne, Vincent},
+  journal={IEEE Transactions on Biomedical Engineering},
+  volume={60},
+  number={10},
+  pages={2878--2886},
+  year={2013}
+}
+
+@article{wang2017algorithmic,
+  title={Algorithmic principles of remote PPG},
+  author={Wang, Wenjin and den Brinker, Albertus C. and Stuijk, Sander and
+          de Haan, Gerard},
+  journal={IEEE Transactions on Biomedical Engineering},
+  volume={64},
+  number={7},
+  pages={1479--1491},
+  year={2017}
 }
 
 @inproceedings{zhao2026phasenet,

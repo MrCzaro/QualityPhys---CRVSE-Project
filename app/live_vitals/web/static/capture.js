@@ -131,6 +131,27 @@ function waveOptions(wave, seam, fps, kept) {
     tooltip: { enabled: false }
   };
 }
+/* ---------- what the pipeline actually looks at ----------
+   The overlay draws the measured regions, not a face mesh. Nothing here tracks
+   landmarks per frame, and drawing a mesh would depict a pipeline we do not have:
+   the crop is one square box, frozen for the whole capture. */
+function drawRoi(box) {
+  const video = $('preview'), canvas = $('roi');
+  if (!canvas || !video.videoWidth) return;
+  if (canvas.width !== video.videoWidth) {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!box) return;
+
+  ctx.lineWidth = Math.max(2, canvas.width / 320);
+  ctx.strokeStyle = 'rgba(59,130,246,0.95)';
+  ctx.strokeRect(box[0] * canvas.width, box[1] * canvas.height,
+                 (box[2] - box[0]) * canvas.width,
+                 (box[3] - box[1]) * canvas.height);
+}
 
 /* ---------- live framing guidance ---------- */
 async function checkFraming() {
@@ -150,6 +171,7 @@ async function checkFraming() {
     const text = d.verdict === 'NO_FACE' ? 'no face'
       : d.verdict + (d.notes && d.notes.length ? ' — ' + d.notes[0] : '');
     setChip($('framing-chip'), text, d.verdict);
+    drawRoi(d.box);
     $('record').disabled = (d.verdict === 'REJECT' || d.verdict === 'NO_FACE');
   } catch (_) { /* transient failures are not worth surfacing */ }
 }
@@ -174,6 +196,7 @@ $('start').onclick = async () => {
     checkFraming();
   } catch (err) {
     stream = null;
+    drawRoi(null);
     setChip($('framing-chip'), 'camera unavailable', 'REJECT');
     $('state').textContent = `Could not start the camera: ${err.message || err}`;
   } finally {
@@ -189,7 +212,6 @@ $('record').onclick = () => {
 
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   rec.onstop = async () => {
-    clearInterval(framingTimer);
     $('state').textContent = 'analysing…';
     const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
     const body = new FormData();
@@ -204,6 +226,10 @@ $('record').onclick = () => {
     framingTimer = setInterval(checkFraming, 1000);
   };
 
+  // Framing guidance stops for the duration of the capture. Polling it competes
+  // with the encoder for CPU, and dropped frames would violate the rate contract
+  // the reading depends on. The box is frozen by now in any case.
+  clearInterval(framingTimer);
   rec.start();
   $('record').disabled = true;
   let left = SETTINGS.seconds;

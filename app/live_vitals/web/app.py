@@ -307,9 +307,24 @@ def index():
         cols_md=3, cols_sm=1, cls="gap-5")
 
     capture = Card(
-        Video(id="preview", playsinline=True, muted=True, autoplay=True,
-              cls="w-full rounded-xl border border-border bg-black block",
-              style="transform:scaleX(-1)"),
+        # The canvas carries the same mirroring as the video, so the overlay can be
+        # drawn straight in frame coordinates without flipping them by hand.
+        Div(Video(id="preview", playsinline=True, muted=True, autoplay=True,
+                  cls="w-full rounded-xl border border-border bg-black block",
+                  style="transform:scaleX(-1)"),
+            Canvas(id="roi",
+                   cls="absolute inset-0 w-full h-full pointer-events-none",
+                   style="transform:scaleX(-1)"),
+            cls="relative"),
+        # The spectral region is stated rather than drawn. Both boxes moved together,
+        # so an inner rectangle told the viewer nothing they could act on while
+        # sitting over their own eyes. The fraction is read from config so the text
+        # cannot drift away from what the estimator actually averages.
+        P("The box is the crop both estimators receive, estimated here from a "
+          "single preview frame — the one used for the measurement is a median "
+          "across the whole capture, frozen for its duration. The model reads the "
+          "entire crop; the classical estimator averages only its central "
+          f"{config.SPECTRAL_ROI_FRACTION:.0%}.", cls=TextPresets.muted_sm),
         Div(
             DivFullySpaced(
                 DivLAligned(chip("framing-chip", "no camera"),
@@ -350,7 +365,7 @@ def index():
         DividerLine(),
         DivFullySpaced(Div(Strong("Spectral", cls=TextT.sm),
                            P("classical cross-check", cls=TextPresets.muted_sm)),
-                       chip("spec-status", "not installed")),
+                       chip("spec-status", "idle")),
         DivLAligned(Span("—", id="spec-hr",
                          cls="text-2xl tabular-nums text-muted-foreground"),
                     Span("bpm", cls=TextPresets.muted_sm),
@@ -420,7 +435,7 @@ def index():
                       multiple=False),
             cls="space-y-6 pt-2"),
         P(DISCLAIMER, cls=(TextPresets.muted_sm, "pt-8 pb-4")),
-        Script(src="/static/capture.js?v=20260901-4"),
+        Script(src="/static/capture.js?v=20260902-2"),
         cls=("space-y-4", ContainerT.xl))
 
 def main():
