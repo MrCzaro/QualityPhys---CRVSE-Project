@@ -1,277 +1,274 @@
 # QualityPhys / CRVSE
 
-QualityPhys / CRVSE is a research-stage project for camera-based remote vital
-sign estimation from facial video. CRVSE stands for Camera Remote Vital Signs
-Estimator. The current working product is a live browser demo for heart-rate
-estimation from facial remote photoplethysmography (rPPG).
+QualityPhys / CRVSE is a research-stage project for camera-based remote vital sign
+estimation from facial video. CRVSE stands for Camera Remote Vital Signs Estimator.
+The current deliverable is `app/live_vitals/`, a browser-based demo that measures
+heart rate from remote photoplethysmography (rPPG) using a trained frame-based model,
+cross-checked against a classical method that shares none of its assumptions.
 
-The project is not a medical device, not a diagnostic tool, and not validated
-for clinical decision-making.
+The project is not a medical device, not a diagnostic tool, and not validated for
+clinical decision-making.
 
 ## Evidence at a Glance
 
-Held-out test subjects, training-style preprocessing, frozen
-`crvse_physformer_multichannel_v1` checkpoint. Tracking statistics
-against reference HR:
+Held-out subjects only, under the seed-42 subject-wise split, measured end to end
+through the same code path the app uses.
 
-| Evaluation scope | OLS slope | Correlation |
-|---|---|---|
-| App-relevant datasets (UBFC-rPPG, UBFC-Phys, MCD-rPPG) — still/seated | 0.904 | 0.906 |
-| All four datasets (adds ECG-Fitness — exercise, high motion, high HR) | 0.419 | 0.506 |
+| Evaluation | Result |
+|---|---|
+| UBFC-rPPG, 8 held-out subjects | **1.24 bpm** mean window MAE, −0.78 signed |
+| MCD-rPPG, 6 held-out subjects / 12 recordings | **5.29 bpm** window RMSE, 12/12 reporting |
+| Cross-subject validation during training | **5.22 bpm** shared MAE (DLCN 3.08, MCD 6.84, UBFC 3.13) |
+| Pulse oximeter, one resting capture | oximeter 60 → model 61.2, classical 60.6–61.2 |
+| Beat timing (for HRV) | 93% of beats found, but **56 ms** jitter against 20–27 ms of RMSSD |
 
-The gap is the honest boundary of what the current training data supports.
-Still/seated tracking is good; exercise and elevated-HR conditions are not
-covered, which is why ECG-Fitness is excluded from app-relevant model
-selection and why the app claim stops at seated measurement.
+The last row is the honest boundary. Heart rate works; beat-to-beat timing does not,
+and the reason is measured rather than assumed - see *What It Cannot Do*.
 
-Tracking slope and correlation are reported alongside error magnitude
-because a low MAE can still hide regression toward the training-corpus
-mean. That failure mode is present in this checkpoint and is documented
-in `docs/model_card.md` rather than omitted.
+## What the App Does
 
-## Current State
+`app/live_vitals/` captures in the browser and analyses in Python. One codebase serves
+laptop and phone: the browser records a 60-second clip with `getUserMedia` and
+`MediaRecorder` and uploads it once; the server runs the same `crops_from_video` path
+used by every validation script, so preprocessing parity between evaluation and
+deployment is structural rather than defended by review.
 
-The live demo estimates heart rate from webcam-derived facial ROI color signals.
-Its primary heart-rate estimate is classical spectral consensus from GREEN, POS,
-and CHROM candidate rPPG signals. The CRVSE PhysFormer model is shown as an
-experimental secondary estimate and is not allowed to silently override the
-spectral estimate.
+The interface reports a heart rate with its confidence and status, an independent
+classical cross-check, a per-window trend, and a diagnostics panel holding every number
+behind the reading. HRV and respiratory rate are shown as unavailable rather than
+hidden, so the intended scope is visible.
 
-Current supported demo scope:
+**No capture is stored.** The uploaded clip goes to a temporary file deleted under every
+outcome; no frame, crop or clip is persisted. The interface says so while the camera is
+live.
 
-- still or seated webcam rPPG measurement
-- frontal face position
-- short measurement windows
-- spectral HR as the primary app estimate
-- experimental CRVSE model HR as a comparison
-- desktop diagnostics for research and debugging
-- simplified mobile workflow over local HTTPS
+### It refuses to answer
 
-Current unsupported scope:
+A qualified wrong number is worse than no number. Every threshold below was set by
+measurement, not taste:
 
-- exercise monitoring
-- high-motion robustness
-- general high-HR robustness
-- ECG-Fitness-style robustness
-- medical validation
-- diagnosis or treatment decisions
+| Gate | Behaviour |
+|---|---|
+| Band-edge peak | A spectral peak on the search-band edge is not a peak - window discarded |
+| Confidence | Windows below 0.65 spectral concentration discarded |
+| MAD outliers | Windows beyond 3 MADs from the median discarded |
+| Usable windows | Fewer than 3 survivors is not a reading |
+| Usable fraction | Below 0.25 surviving, no value is reported |
+| Acquisition rate | Below 20 fps refused outright; below 27 fps flagged |
+| Framing | A face box clamped by more than 2% of its side is refused |
 
-## Project Goals
+Acquisition rate is a hard gate because spectral confidence cannot detect a wrong time
+base: a 10 fps capture once produced a confident reading about 7 bpm below a known
+resting heart rate.
 
-The project started as an attempt to build a complete rPPG research pipeline:
-dataset preprocessing, signal extraction, model training, live inference, and
-honest demo presentation.
+### Two estimators, deliberately not blended
 
-The main learning and engineering goals were:
+The neural model is primary. `hr_spectral` runs beside it - POS, CHROM and GREEN, fixed
+linear projections with no learned parameters - as a cross-check that fails on different
+things. Where they agree, that is corroboration rather than a model confirming itself.
 
-- extract facial ROI time series from public rPPG datasets
-- build POS, CHROM, GREEN, and ensemble rPPG representations
-- compare classical spectral HR estimates with learned models
-- train and audit 1D and Transformer-family models
-- understand failure modes caused by motion, domain shift, high HR, and live
-  preprocessing mismatch
-- build a usable FastHTML and MonsterUI live demo without hiding uncertainty
-- keep the scientific claim narrow and evidence-based
+Blending them was tested and rejected. POS and CHROM per-window errors correlate at
+r = +0.945 on UBFC, so averaging them buys ~1.4% and measures nothing; averaging the
+model with a classical estimate costs a factor of six on MCD. The value is in the
+disagreement, which the diagnostics panel surfaces.
 
-## Repository Map
+## The Model
 
 ```text
-Notebooks/                         Research and preprocessing notebooks
-Data/                              Processing logs and derived CSV audit artifacts
-app/live_hr_demo/                  FastHTML live HR demo application
-app/live_hr_demo/README.md         App-specific run, HTTPS, route, and UI notes
-docs/notebook_index.md             Notebook chronology and research conclusions
-docs/data_sources.md               Dataset provenance and licensing boundaries
-docs/model_card.md                 Current model scope, inputs, limits, and evidence
-docs/citations.md                  Third-party attribution, licences, and citations
-LICENSE                            Apache-2.0 license for project code and docs
-AGENTS.md                          Local collaboration rules; may remain ignored
+name:        hr_physnet_v2
+architecture: PhysNet 3D-CNN encoder-decoder (Yu et al., BMVC 2019)
+parameters:  768,577 (3.11 MB)
+input:       [1, 3, 160, 72, 72] — 160 frames of a 72×72 face crop at 30 fps
+output:      160-sample BVP waveform; heart rate read out spectrally
+trained on:  MCD-rPPG, DLCN, UBFC-rPPG
+weights:     https://huggingface.co/MrCzaro/hr_physnet_v2  (CC BY-NC-SA 4.0)
 ```
 
-Large datasets, HDF5 corpora, pretrained checkpoints, MediaPipe model assets,
-and local HTTPS certificates are not treated as normal source files. They may be
-ignored locally and may have separate terms.
+The checkpoint is not committed here; `docs/model_card.md` Card 2 documents its input
+contract, evaluation, refusal behaviour and limitations in full.
 
-## Data Sources
+### Why this one
 
-The project work used four rPPG datasets:
+Seven architectures were trained on one fixed pipeline - five in the original screen,
+with RhythmFormer and PhaseNet added afterwards. Best cross-subject validation MAE on
+the shared three corpora, taking each model's strongest run:
 
-- UBFC-rPPG
-- UBFC-Phys
-- MCD-rPPG
-- ECG-Fitness
+| Model | Shared MAE | DLCN | MCD | UBFC-rPPG | Checkpoint |
+|---|---:|---:|---:|---:|---:|
+| RhythmFormer | **4.26** | 2.14 | 5.77 | 4.69 | 13.5 MB |
+| **PhysNet v2** | **5.22** | 3.08 | 6.84 | 3.13 | **3.1 MB** |
+| PhysFormer v2 | 5.63 | 2.88 | 7.70 | 3.12 | — |
+| PhaseNet (SNR) | 6.15 | 2.88 | 8.56 | 4.69 | — |
+| RhythmMamba v2 | 7.50 | 6.56 | 8.30 | 3.12 | — |
 
-UBFC-rPPG, UBFC-Phys, and MCD-rPPG define the current app-relevant still/seated
-scope. ECG-Fitness was valuable as a stress-test dataset for exercise,
-high-motion, and high-HR behavior, but it is not part of the current live demo
-support claim.
+TYrPPG and EfficientPhys were dropped at the screen stage - 10.77 and 12.71 shared MAE,
+and TYrPPG at roughly 26 minutes per epoch - and were not retrained.
 
-Raw datasets are external materials. The repository license does not grant
-rights to redistribute them. See `docs/data_sources.md` for the dataset boundary
-and artifact notes.
+RhythmFormer is the most accurate and is **not** used: it is 4.3× the checkpoint size
+and its inference cost does not fit a capture-then-analyse loop on a laptop or phone.
+PhysNet gives up 0.96 bpm for that. Size and latency are selection criteria here, not
+only accuracy.
 
-## Research Arc
+### The loss mattered more than the architecture
 
-The project moved through five main stages:
+Replacing a frequency-matching term with an SNR loss moved three of the four
+architectures it was tried on, and moved them by more than the gap between
+architectures:
 
-1. Dataset preprocessing notebooks created per-dataset ROI and rPPG artifacts.
-2. POS-only model experiments compared 1D CNN, Inception, ResNet, Transformer,
-   PhysFormer, and transfer-adaptation ideas on simpler signal inputs.
-3. Ensemble rPPG experiments compared one-channel ensemble inputs against
-   multichannel POS/CHROM/GREEN inputs.
-4. Live-compatible notebooks audited whether the offline model could be adapted
-   to the live app preprocessing and source-FPS contract.
-5. The FastHTML live app was polished into a simple desktop/mobile research demo
-   with spectral HR primary and model HR experimental.
+| Model | frequency loss | SNR loss |
+|---|---:|---:|
+| PhysNet | 7.31 | **5.22** |
+| PhysFormer | 9.71 | **5.63** |
+| PhaseNet | 10.32 | **6.15** |
+| RhythmMamba | 6.83 | 7.50 |
 
-The strongest app checkpoint remains the frozen source-FPS multichannel
-CRVSE PhysFormer checkpoint. Later NB10-NB13 experiments tested transfer
-learning and scratch retraining, but no candidate was adopted as a replacement.
+PhaseNet is the cleanest evidence: both variants ran in one notebook with everything
+else fixed. RhythmMamba is the exception and got slightly worse, so this is a strong
+tendency rather than a rule. The gains land hardest on MCD-rPPG, which had been the
+ceiling for every architecture screened.
 
-A 2026-07-21 audit pass added tracking statistics rather than error magnitudes
-alone. On held-out test subjects from the three app-relevant datasets, with
-training-style preprocessing, the frozen checkpoint tracks reference HR with an
-OLS slope of 0.904 and a correlation of 0.906. Across all four datasets the same
-statistics fall to 0.419 and 0.506.
+## What It Cannot Do
 
-The practical reading is that the earlier weak aggregate figures reflected
-ECG-Fitness contamination of the evaluation scope and live acquisition mismatch,
-rather than a weak checkpoint. This is independent support for the NB13 decision
-to exclude ECG-Fitness from app-relevant model selection.
+Each of these was measured, not assumed.
 
-It does not change the product decision. Spectral consensus remains the primary
-app estimate, model HR remains experimental, and the shrinkage bias described in
-`docs/model_card.md` is unresolved.
+**Heart rate variability.** The model finds 93% of reference beats, but median
+beat-timing jitter is 56 ms while resting RMSSD is 20–27 ms. Noise exceeds signal by
+two to three times, and RMSSD is built from successive differences, so it amplifies
+exactly that error. This is not the frame rate: resampling a contact PPG to 30 Hz costs
+only 2% of RMSSD when beat positions are refined sub-sample. Averaging overlapping
+model windows was tried and recovers 4%, because their errors correlate at r ≈ 0.83.
+The remaining lever is a timing-aware training objective.
 
-See `docs/notebook_index.md` for a concise chronology.
+**In-vehicle conditions.** Zero-shot on PhysDrive: 27.79 bpm MAE, +24.82 bias,
+r = 0.11 - not tracking at all. Training on PhysDrive repaired that corpus and destroyed
+the other three.
 
-## Current Model
+**Skin tone.** Not characterised. No stratified evaluation has been run and rPPG is
+known to degrade on darker skin. An unquantified gap, not an absence of risk.
 
-The app model is:
+**Elevated heart rate.** Untested, and the trend is unfavourable: UBFC-rPPG is the
+fastest corpus at 90–123 bpm and carries the only negative validation bias.
 
-```text
-crvse_physformer_multichannel_v1
-architecture: CRVSEPhysFormer
-input: POS, CHROM, GREEN
-shape: 3 x 240
-window: 8 seconds
-training/reference datasets: MCD-rPPG, UBFC-rPPG, UBFC-Phys, ECG-Fitness
-```
+**MCD-rPPG remains an unexplained ceiling** - roughly 7 bpm against 3 on the other
+corpora, for every architecture screened. Frame rate and crop aspect were each tested as
+explanations and eliminated.
 
-The current checkpoint came from the ensemble Transformer-family model search.
-It is treated as an experimental model in the app. The live app displays model
-agreement, rejection, skipped, unavailable, and disagreement states explicitly.
+Also: motion, poor light and backlighting degrade the signal; the face box is frozen per
+capture, so a subject who moves leaves their own crop; and single-operator testing is
+not validation.
 
-See `docs/model_card.md` for the current model card.
-
-## Live Demo
-
-The live demo is in:
-
-```text
-app/live_hr_demo/
-```
-
-The app uses:
-
-- FastHTML and MonsterUI for the UI shell and server-rendered partials
-- browser JavaScript for camera access, timers, sampling, waveform drawing, and
-  interaction state
-- Python backend routes for frame decoding, MediaPipe Face Landmarker face/ROI
-  detection, rPPG signal extraction, spectral analysis, quality gates, and model
-  inference
-- PyTorch for CRVSE PhysFormer inference
-
-Run locally from the repository root:
+## Running It
 
 ```powershell
-.\venv\Scripts\python.exe app\live_hr_demo\app.py
+.\venv\Scripts\python.exe -m app.live_vitals.web.app          # http://localhost:8000
+.\venv\Scripts\python.exe -m app.live_vitals.web.app --https  # https://localhost:8443
 ```
 
-Install the live app dependencies with:
+HTTPS is needed for camera access from a phone on the LAN; certificates are read from
+`app/live_hr_demo/certs/`.
+
+A command line exists for recorded video and direct webcam capture:
 
 ```powershell
-py -m venv venv
-.\venv\Scripts\python.exe -m pip install --upgrade pip
-.\venv\Scripts\python.exe -m pip install -r app/live_hr_demo/requirements.txt
-```
-
-The app requirements file is intentionally scoped to `app/live_hr_demo`.
-Notebook, Kaggle training, HDF5 audit, and dataset-preprocessing dependencies
-are not included there.
-
-If local HTTPS certificates exist at
-`app/live_hr_demo/certs/qualityphys-local.pem` and
-`app/live_hr_demo/certs/qualityphys-local-key.pem`, the app automatically serves
-HTTPS for local network mobile testing. Otherwise it serves HTTP for local
-desktop testing.
-
-For app-specific run commands, HTTPS setup, route ownership, mobile behavior,
-manual spot-check notes, and smoke tests, see:
-
-```text
-app/live_hr_demo/README.md
+.\venv\Scripts\python.exe -m app.live_vitals models
+.\venv\Scripts\python.exe -m app.live_vitals analyze path\to\video.mp4
+.\venv\Scripts\python.exe -m app.live_vitals camera --seconds 60
 ```
 
 ## Verification
 
-Useful app checks:
-
 ```powershell
-.\venv\Scripts\python.exe app\live_hr_demo\scripts\run_smoke_tests.py
-node --check app\live_hr_demo\static\live_demo.js
+.\venv\Scripts\python.exe -m app.live_vitals.scripts.check_ubfc_regression
+.\venv\Scripts\python.exe -m app.live_vitals.scripts.check_contract_parity
+.\venv\Scripts\python.exe -m app.live_vitals.scripts.check_hrv_sampling_ceiling
+.\venv\Scripts\python.exe -m app.live_vitals.scripts.check_hrv_from_video
 ```
 
-Smoke tests are not camera validation. The live camera workflow still requires
-manual browser testing on desktop and mobile.
+`check_ubfc_regression` compares reported value, window MAE, usable fraction and status
+against a committed per-estimator baseline, and fails on drift. The HRV scripts carry a
+reference-against-itself control row; any result there other than `0.00 / 100% / 0.0 ms`
+means the harness is broken rather than the model.
+
+These require the held-out corpora locally and are not camera validation. The live
+capture path still needs manual browser testing.
+
+## Repository Map
+
+```text
+app/live_vitals/                   Phase-3 app: frame-based model, web + CLI  (current)
+app/live_hr_demo/                  Phase-2 app: 1D POS/CHROM/GREEN demo       (frozen)
+Notebooks/Phase 3 Notebooks/       Preprocessing, dataloader, 7 architectures, v2 retrains
+Notebooks/Phase 2 Notebooks/       1D signal model search and audits
+Data/                              Processing logs and derived audit CSVs
+docs/model_card.md                 One card per shipped model; Card 2 is current
+docs/data_sources.md               Dataset provenance, licensing boundary, model weights
+docs/citations.md                  Architecture, classical-method and dataset citations
+docs/notebook_index.md             Notebook chronology and research conclusions
+LICENSE                            Apache-2.0, for project code and documentation
+```
+
+`app/live_hr_demo/` is retained deliberately as documentation of the Phase-2 work. It is
+no longer developed and its model has a characterised calibration failure recorded in
+Card 1 of the model card.
+
+Datasets, HDF5 corpora, checkpoints, MediaPipe assets and local certificates are not
+normal source files. They are ignored locally and carry separate terms.
+
+## Research Arc
+
+**Phase 1–2** built the pipeline on hand-crafted 1D signals: per-dataset ROI extraction,
+POS/CHROM/GREEN construction, then a model search across 1D CNN, Inception, ResNet and
+Transformer families. It produced a working demo and one clearly characterised failure -
+the model shrank predictions toward a training-corpus mean near 88 bpm, giving a positive
+bias for resting adults. Calibration was fitted and rejected: linear de-shrinkage reached
+a correct slope at 38% worse MAE.
+
+**Phase 3** moved to frame-based models that consume video directly and reconstruct
+waveforms. Three corpora were re-preprocessed into a unified schema, six architectures
+were screened under one fixed pipeline, and the SNR-loss retrain produced the current
+checkpoint. The shrinkage bias is gone: validation bias is +0.40 bpm on DLCN and +0.45 on
+MCD-rPPG.
+
+The app was rebuilt around the frame contract, with the quality gates and the classical
+cross-check added on evidence gathered while validating it.
+
+`docs/notebook_index.md` has the chronology.
+
+## Data Sources
+
+| Dataset | Role | Access |
+|---|---|---|
+| MCD-rPPG | training + held-out evaluation | most permissive source |
+| DLCN | training, low-light robustness | CC BY-NC-SA 4.0 (Kaggle release) |
+| UBFC-rPPG | training + held-out evaluation | research use, no formal licence |
+| PhysDrive | zero-shot in-vehicle benchmark | per request |
+| UBFC-Phys, ECG-Fitness | Phase-2 work only | per request / registration |
+| VitalVideos | planned | per request, academic and commercial separate |
+
+Raw datasets are external materials and the repository licence grants no rights to
+redistribute them. See `docs/data_sources.md` for the boundary, per-dataset terms, and
+the reasoning behind the licence on published model weights.
 
 ## Licensing
 
-The repository `LICENSE` file contains Apache License 2.0 text with project
-copyright attribution.
+Three artifacts, three positions:
 
-The Apache-2.0 license is intended to cover code and documentation owned by this
-project. It does not automatically cover:
+- **Code and documentation** — Apache-2.0, per `LICENSE`.
+- **Model weights** — CC BY-NC-SA 4.0, non-commercial. Weights inherit the most
+  restrictive training input, which is DLCN. The reasoning is in `docs/data_sources.md`.
+- **Datasets, third-party checkpoints, MediaPipe assets, certificates** — separate terms
+  in every case; the repository licence does not reach them.
 
-- raw datasets
-- derived datasets if their source terms restrict redistribution
-- pretrained checkpoints from third parties
-- MediaPipe Face Landmarker model assets
-- local certificates
-- any other third-party materials
+Two points in `docs/citations.md` affect distribution: the rPPG-Toolbox reference
+implementation is under a Responsible AI licence whose behavioural restrictions include
+diagnosing medical conditions without human oversight, and the PhaseNet reference
+implementation states no licence at all. No third-party model code is redistributed here;
+the architectures used are original implementations of published designs.
 
-Those materials may have separate licenses, terms, citation requirements, or
-redistribution limits. A `NOTICE` file is not included at this stage because no
-required bundled third-party NOTICE attribution was identified during this
-documentation pass. Add one before distribution if a dependency, model asset, or
-redistributed third-party artifact requires it.
+## Standing Position
 
-Third-party attribution, reference-implementation licences, and required citations
-are collected in `docs/citations.md`. Two points there affect distribution: the
-rPPG-Toolbox reference implementation is under a Responsible AI Source Code License
-whose behavioural use restrictions include diagnosing medical conditions without
-human oversight, and the PhaseNet reference implementation states no licence at all.
-The project's research-demo, non-diagnostic scope is what keeps the first of these
-satisfied.
-
-## Limitations
-
-The current evidence supports CRVSE as a research and portfolio demo, not as a
-validated physiological measurement product.
-
-Known limits:
-
-- live camera acquisition quality depends on lighting, face position, motion,
-  browser behavior, and sampling rate
-- spectral estimates can fail when channel SQI is weak or inconsistent
-- the model shows a characterized positive bias for resting subjects, because it
-  shrinks predictions toward a training corpus mean near 88 bpm; see
-  `docs/model_card.md`
-- model tracking degrades in a step below roughly 30 Hz acquisition
-- ECG-Fitness and exercise-like conditions remain outside the app claim
-- notebook results are saved research evidence unless explicitly rerun
-- pulse oximeter spot checks are useful sanity checks, not formal validation
-
-The current product stance is intentionally conservative: use spectral consensus
-as the primary estimate, show the model as experimental, and expose uncertainty
-rather than hiding it.
+The evidence supports this as a research and portfolio project, not a validated
+measurement product. The stance throughout has been to state the scope narrowly, gate
+what cannot be measured reliably, and publish the negative results - the HRV ceiling, the
+rejected ensemble, the rejected calibration, the unexplained MCD gap - alongside the
+numbers that worked.
