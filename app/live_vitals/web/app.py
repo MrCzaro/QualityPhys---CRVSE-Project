@@ -11,6 +11,7 @@ Run:
     python -m app.live_vitals.web.app
     python -m app.live_vitals.web.app --https   # for phone testing on the LAN
 """
+import json
 import sys
 import tempfile
 import threading
@@ -171,6 +172,75 @@ def cross_check_payload(result):
                 n_windows=detail.get("n_windows"), n_total=detail.get("n_total"))
 
 
+def print_capture_report(payload, client_raw=None):
+    """Prints the diagnostics panel to the server terminal, for device testing.
+
+    A phone can display the panel but not hand it back; this puts the same
+    numbers where they can be copied. The client block is the part the panel
+    cannot show: which MIME type MediaRecorder actually chose, and what the
+    browser granted for the camera against what was asked for.
+    """
+    quality = payload.get("quality") or {}
+    line = "=" * 74
+    print(f"\n{line}\ncapture report   model={payload.get('model')}")
+
+    if client_raw:
+        try:
+            client = json.loads(client_raw)
+        except (ValueError, TypeError):
+            client = {"raw": str(client_raw)[:200]}
+        want = client.get("requested") or {}
+        print(f"  client     {str(client.get('ua', ''))[:96]}")
+        print(f"             mime={client.get('mime') or 'browser default'}   "
+              f"granted {client.get('width')}x{client.get('height')}"
+              f"@{client.get('frameRate')}   "
+              f"requested {want.get('width')}x{want.get('height')}@{want.get('fps')}")
+
+    notes = quality.get("notes") or []
+    print(f"  capture    {quality.get('width')}x{quality.get('height')}  "
+          f"{quality.get('effective_fps')} fps  {quality.get('n_frames')} frames  "
+          f"verdict={quality.get('verdict')}  aspect={quality.get('crop_aspect')}  "
+          f"side_lost={quality.get('frac_side_lost')}")
+    print(f"             detections {quality.get('detections')}"
+          f"/{quality.get('detections_attempted')}"
+          + (f"   notes: {'; '.join(notes)}" if notes else ""))
+
+    value = payload.get("value")
+    print(f"  reading    {'refused' if value is None else str(value) + ' ' + str(payload.get('unit'))}"
+          f"   status={payload.get('status')}   confidence={payload.get('confidence')}")
+    print(f"  gates      windows {payload.get('n_windows')}/{payload.get('n_total')}   "
+          f"usable={payload.get('usable_fraction')}   "
+          f"no_peak={payload.get('n_no_peak')}   spread={payload.get('spread_bpm')}")
+
+    spectral = payload.get("spectral")
+    if spectral:
+        parts = []
+        for name, m in (spectral.get("method_hr") or {}).items():
+            hr = "none" if m.get("hr") is None else f"{m['hr']}"
+            parts.append(f"{name} {hr} ({m.get('n_windows')}/{m.get('n_total')})")
+        methods = spectral.get("method_hr") or {}
+        pos, chrom = methods.get("pos"), methods.get("chrom")
+        spread = (abs(pos["hr"] - chrom["hr"])
+                  if pos and chrom and pos.get("hr") is not None and chrom.get("hr") is not None
+                  else None)
+        print(f"  spectral   {'   '.join(parts)}"
+              + (f"   pos-chrom gap {spread:.2f} bpm" if spread is not None else ""))
+
+    hrs = payload.get("window_hr") or []
+    if hrs:
+        confs = payload.get("window_confidence") or []
+        kept = payload.get("window_kept") or []
+        cells = [f"{i}:{hr:.1f}/{confs[i]:.2f}{'' if kept[i] else '*'}"
+                 for i, hr in enumerate(hrs)]
+        # A 3-minute recording produces 65 windows; one line would be unreadable.
+        for row in range(0, len(cells), 6):
+            label = "  windows  " if row == 0 else "           "
+            print(label + "  " + "  ".join(f"{c:>14}" for c in cells[row:row + 6]))
+        print("             (* = dropped by the gates)")
+    print(f"{line}\n", flush=True)
+
+
+
 
 @rt("/api/models")
 def api_models():
@@ -215,7 +285,7 @@ async def api_framing(frame: UploadFile):
 
 
 @rt("/api/analyze", methods=["POST"])
-async def api_analyze(video: UploadFile, model: str = None):
+async def api_analyze(video: UploadFile, model: str = None, client: str = None):
     """Analyses one uploaded capture and returns a vital-sign reading.
 
     The upload is written to a temporary file only because video decoding needs a
@@ -276,6 +346,8 @@ async def api_analyze(video: UploadFile, model: str = None):
             spectral=cross_check_payload(cross),
             waveform=([round(float(x), 4) for x in result.waveform]
                       if result.waveform is not None else []))
+        if config.DEBUG_REPORT or "--debug" in sys.argv:
+            print_capture_report(payload, client)
         return payload
     except Exception as exc:
         return dict(ok=False, message=f"{type(exc).__name__}: {exc}")
@@ -315,6 +387,26 @@ def index():
             Canvas(id="roi",
                    cls="absolute inset-0 w-full h-full pointer-events-none",
                    style="transform:scaleX(-1)"),
+            # Everything below the video is off-screen on a phone, so each stage
+            # of a capture has to be announced on the camera view itself. The
+            # recording HUD is deliberately separate and unbacked: the subject
+            # must still be able to see their own framing while it runs.
+            Div(Div("", id="stage-big",
+                    cls="text-7xl font-bold tabular-nums leading-none"),
+                P("", id="stage-msg", cls="pt-3 text-sm opacity-90"),
+                id="stage", style="display:none",
+                cls="absolute inset-0 flex flex-col items-center justify-center "
+                    "rounded-xl bg-black/60 text-center text-white "
+                    "pointer-events-none"),
+            Div(Span("", id="rec-pill",
+                     cls="absolute right-2 top-2 rounded-full bg-red-600 px-3 "
+                         "py-1 text-xs font-semibold tabular-nums text-white"),
+                Div(Div(id="rec-fill",
+                        cls="h-full w-0 rounded-full bg-red-500 transition-all"),
+                    cls="absolute bottom-2 left-2 right-2 h-1.5 rounded-full "
+                        "bg-white/30"),
+                id="rec-hud", style="display:none",
+                cls="absolute inset-0 pointer-events-none"),
             cls="relative"),
         # The spectral region is stated rather than drawn. Both boxes moved together,
         # so an inner rectangle told the viewer nothing they could act on while
@@ -421,8 +513,10 @@ def index():
 
     # `cols` is omitted deliberately: passing it propagates to every breakpoint
     # and defeats the per-breakpoint values that make col-span layouts work.
-    return Container(
-        Title("CRVSE live vitals"),
+    # Title is returned alongside the Container, not inside it. FastHTML hoists
+    # HEAD elements only from a tuple returned by the handler; nested in the body
+    # it renders as ordinary markup and the tab keeps the framework default.
+    return Title("CRVSE live vitals"), Container(
         NavBar(chip("build-chip", "research only · not a medical device",
                     LabelT.secondary),
                brand=Div(H3("CRVSE live vitals"),
@@ -435,7 +529,7 @@ def index():
                       multiple=False),
             cls="space-y-6 pt-2"),
         P(DISCLAIMER, cls=(TextPresets.muted_sm, "pt-8 pb-4")),
-        Script(src="/static/capture.js?v=20260902-2"),
+        Script(src="/static/capture.js?v=20260902-6"),
         cls=("space-y-4", ContainerT.xl))
 
 def main():

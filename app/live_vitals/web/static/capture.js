@@ -2,14 +2,24 @@
    Records one clip, uploads it once, and renders the returned reading. */
 const $ = id => document.getElementById(id);
 const SETTINGS = { width: 640, height: 480, fps: 30, mbps: 6, seconds: 60 };
+/* FrankenUI ships only primary, secondary and destructive labels, and secondary
+   is the same neutral grey the chips use for "idle" -- a degraded capture would
+   have looked identical to a page that had measured nothing. WARN is therefore
+   coloured by inline style: Tailwind's runtime CDN does not reliably generate a
+   class that only ever appears inside a JavaScript string, so a utility class
+   here renders transparent. */
 const CHIP = { ACCEPT: 'uk-label-primary', WARN: 'uk-label-secondary',
                REJECT: 'uk-label-destructive', NO_FACE: 'uk-label-secondary' };
+const WARN_STYLE = 'background-color:#f59e0b;color:#ffffff;border-color:#f59e0b';
 
 let stream = null, framingTimer = null, lastVerdict = null;
 
 function setChip(el, text, verdict) {
   el.textContent = text;
   el.className = 'uk-label ' + (CHIP[verdict] || 'uk-label-secondary');
+  // Cleared explicitly: chips are reused across captures, so a stale warning
+  // colour would otherwise persist into a clean reading.
+  el.style.cssText = verdict === 'WARN' ? WARN_STYLE : '';
 }
 
 function setConfidence(prefix, value) {
@@ -204,37 +214,109 @@ $('start').onclick = async () => {
   }
 };
 
+/* ---------- capture stage feedback ----------
+   A phone shows only the video; the state line and the results sit below the
+   fold. Each stage of a capture is therefore announced over the camera view. */
+// Named defensively: the page already carries a global `sleep` from the
+// MonsterUI headers, and a bare top-level `const sleep` throws on load,
+// which silently kills every handler in this file.
+const captureDelay = ms => new Promise(resolve => setTimeout(resolve, ms));
+const SPINNER = '<div class="h-12 w-12 animate-spin rounded-full '
+              + 'border-4 border-white/30 border-t-white"></div>';
+
+/* Visibility is set inline, not through the `hidden` attribute. `hidden` maps to
+   a user-agent `display:none`, which any class-set display overrides -- and this
+   element carries Tailwind's `flex`. Setting `hidden` therefore left the last
+   countdown digit on screen through the whole recording, and the spinner on
+   screen after the results had rendered. The HUD below has no display utility so
+   `hidden` did work there, which is why only this one misbehaved. */
+function stage(big, message) {
+  const el = $('stage');
+  if (big === null) { el.style.display = 'none'; return; }
+  $('stage-big').innerHTML = big;
+  $('stage-msg').textContent = message || '';
+  el.style.display = 'flex';
+}
+
+function recordingHud(on, left, total) {
+  $('rec-hud').style.display = on ? 'block' : 'none';
+  if (!on) return;
+  $('rec-pill').textContent = `\u25CF ${left}s`;
+  $('rec-fill').style.width = `${(100 * (total - left)) / total}%`;
+}
+
+/* Android vibrates, iOS ignores this silently. Wrapped because some browsers
+   throw rather than no-op when the page has never been interacted with. */
+function buzz(pattern) {
+  if (navigator.vibrate) { try { navigator.vibrate(pattern); } catch (_) {} }
+}
+
 /* ---------- capture and analyse ---------- */
-$('record').onclick = () => {
+$('record').onclick = async () => {
+  if (!stream) return;
+  $('record').disabled = true;
+
+  // Framing guidance stops for the whole capture, countdown included. Polling it
+  // competes with the encoder for CPU, and dropped frames would violate the rate
+  // contract the reading depends on. The box is frozen by now in any case.
+  clearInterval(framingTimer);
+
+  // The countdown is not only politeness: it gives the subject time to settle and
+  // look at the lens, and lets exposure and white balance stabilise before the
+  // seconds that actually get measured.
+  for (let n = 3; n > 0; n--) {
+    stage(n, 'get ready \u2014 sit still and face the camera');
+    buzz(60);
+    await captureDelay(1000);
+  }
+  stage(null);
+
   const chunks = [], mime = pickMime();
   const rec = new MediaRecorder(stream,
     { mimeType: mime, videoBitsPerSecond: SETTINGS.mbps * 1e6 });
 
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   rec.onstop = async () => {
+    recordingHud(false);
+    buzz([80, 60, 80]);
+    stage(SPINNER, 'Recording complete \u2014 analysing, this takes a moment');
     $('state').textContent = 'analysing…';
     const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
     const body = new FormData();
     body.append('video', new Blob(chunks, { type: mime }), `capture.${ext}`);
     body.append('model', $('model').value);
+    // What the browser negotiated, which the server cannot otherwise observe:
+    // the container MediaRecorder settled on, and the camera settings actually
+    // granted against those requested. Only read by the terminal report.
+    const track = stream && stream.getVideoTracks()[0];
+    const got = track ? track.getSettings() : {};
+    body.append('client', JSON.stringify({
+      ua: navigator.userAgent, mime: mime,
+      width: got.width, height: got.height, frameRate: got.frameRate,
+      requested: SETTINGS
+    }));
     try {
       render(await (await fetch('/api/analyze', { method: 'POST', body })).json());
     } catch (err) {
       $('state').textContent = 'analysis failed: ' + err;
     }
+    stage(null);
     $('record').disabled = false;
     framingTimer = setInterval(checkFraming, 1000);
+    // The reading is below the fold on a phone, so bring it into view rather
+    // than leaving the user looking at their own face wondering if it finished.
+    $('model-hr').scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  // Framing guidance stops for the duration of the capture. Polling it competes
-  // with the encoder for CPU, and dropped frames would violate the rate contract
-  // the reading depends on. The box is frozen by now in any case.
-  clearInterval(framingTimer);
   rec.start();
-  $('record').disabled = true;
+  buzz(120);
   let left = SETTINGS.seconds;
+  recordingHud(true, left, SETTINGS.seconds);
+  $('state').textContent = `capturing ${left}s — sit still, face the camera`;
   const tick = setInterval(() => {
-    $('state').textContent = `capturing ${--left}s — sit still, face the camera`;
+    left -= 1;
+    recordingHud(true, left, SETTINGS.seconds);
+    $('state').textContent = `capturing ${left}s — sit still, face the camera`;
     if (left <= 0) { clearInterval(tick); rec.stop(); }
   }, 1000);
 };
@@ -328,14 +410,18 @@ function render(d) {
   lastResult = d;
 
   const hero = $('model-hr'), q = d.quality || {};
-  const level = d.value == null ? 'REJECT'
+  const captureWarn = q.verdict && q.verdict !== 'ACCEPT';
+  let level = d.value == null ? 'REJECT'
     : (d.status === 'ok' ? 'ACCEPT'
        : (d.status === 'insufficient_quality' ? 'REJECT' : 'WARN'));
+  if (level === 'ACCEPT' && captureWarn) level = 'WARN';
+  const statusText = (d.status || 'no reading')
+    + (captureWarn ? ` · capture ${q.verdict}` : '');
 
-  setChip($('model-status'), d.status || 'no reading', level);
-  setChip($('quality-chip'), d.status || 'no reading', level);
+  setChip($('model-status'), statusText, level);
+  setChip($('quality-chip'), statusText, level);
   setChip($('trend-chip'), `${d.n_windows ?? 0}/${d.n_total ?? 0} windows`, level);
-  setChip($('diag-chip'), d.status || 'no reading', level);
+  setChip($('diag-chip'), statusText, level);
   setConfidence('model', d.confidence);
 
   if (d.value == null) {
@@ -349,7 +435,8 @@ function render(d) {
     hero.classList.remove('text-muted-foreground');
     $('model-hr-note').textContent =
       d.status === 'ok' ? 'model estimate' : 'model estimate — treat as indicative';
-    $('state').textContent = `Reading complete — ${d.value.toFixed(1)} ${d.unit}.`;
+    $('state').textContent = `Reading complete — ${d.value.toFixed(1)} ${d.unit}.`
+      + ((q.notes && q.notes.length) ? ` ${q.notes[0]}.` : '');
   }
 
   $('stat-windows').textContent = `${d.n_windows ?? 0} / ${d.n_total ?? 0}`;

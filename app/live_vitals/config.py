@@ -88,6 +88,7 @@ MIN_REPORTABLE_FRACTION = 0.25
 SPECTRAL_METHOD = "pos" # reported method; "chrom" and "green" also available
 SPECTRAL_WINDOW_SECONDS = 1.6 # projection window used by both POS and CHROM
 SPECTRAL_FILTER_ORDER = 4 # Butterworth order for the cardiac bandpass
+
 # Fraction of the face crop, measured from its centre, averaged into the RGB
 # trace. CROP_PADDING leaves the outer crop full of hair, shoulders and
 # background whose brightness changes are not pulsatile. Swept on the eight
@@ -101,3 +102,12 @@ SPECTRAL_ROI_FRACTION = 0.35
 # where it is refused on 9 of 12 recordings to POS's 5 and carries 24.9 bpm window
 # RMSE against 18.4. POS is also the classical method Egorov et al. (ACMMM 2025)
 # benchmark on this corpus, at 3.80 bpm MAE on the frontal camera.
+
+
+# Print a full capture report to the server terminal after every analysis.
+# Off by default. It exists for testing on devices whose screen cannot be read
+# back conveniently -- a phone shows the diagnostics panel but cannot copy it,
+# while the server terminal is on the machine you are already working at. The
+# report also carries what the browser negotiated for the camera, which the
+# panel never sees. Enable here, or pass --debug when starting the web app.
+DEBUG_REPORT = False
