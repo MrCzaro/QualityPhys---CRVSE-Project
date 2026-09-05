@@ -546,12 +546,17 @@ def main():
     if use_https and key.exists() and crt.exists():
         announce("https", 8443)
         uvicorn.run(app, host="0.0.0.0", port=8443,
-                    ssl_keyfile=str(key), ssl_certfile=str(crt))
+                    ssl_keyfile=str(key), ssl_certfile=str(crt),
+                    timeout_graceful_shutdown=5)
     else:
         if use_https:
             print(f"no certificates in {CERT_DIR}; serving HTTP")
         announce("http", 8000)
-        uvicorn.run(app, host="0.0.0.0", port=8000)
+        # A phone left on the page holds a keep-alive connection open and polls
+        # /api/framing every second. uvicorn's graceful shutdown waits for open
+        # connections indefinitely by default, so Ctrl+C hangs until the phone
+        # gives up. Five seconds is long enough for a real request to finish.
+        uvicorn.run(app, host="0.0.0.0", port=8000, timeout_graceful_shutdown=5)
 
 
 if __name__ == "__main__":
