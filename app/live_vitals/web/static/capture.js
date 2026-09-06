@@ -12,7 +12,7 @@ const CHIP = { ACCEPT: 'uk-label-primary', WARN: 'uk-label-secondary',
                REJECT: 'uk-label-destructive', NO_FACE: 'uk-label-secondary' };
 const WARN_STYLE = 'background-color:#f59e0b;color:#ffffff;border-color:#f59e0b';
 
-let stream = null, framingTimer = null, lastVerdict = null;
+let stream = null, framingTimer = null, lastVerdict = null, capturing = false;
 
 function setChip(el, text, verdict) {
   el.textContent = text;
@@ -177,6 +177,11 @@ async function checkFraming() {
   try {
     const d = await (await fetch('/api/framing', { method: 'POST', body })).json();
     if (!d.ok) return;
+    // A poll already in flight when a capture starts resolves during the
+    // countdown, and would re-enable the record button below -- letting a second
+    // MediaRecorder start on the same stream. clearInterval stops the next poll,
+    // never the one already waiting on the network.
+    if (capturing) return;
     lastVerdict = d.verdict;
     const text = d.verdict === 'NO_FACE' ? 'no face'
       : d.verdict + (d.notes && d.notes.length ? ' — ' + d.notes[0] : '');
@@ -253,13 +258,32 @@ function buzz(pattern) {
 
 /* ---------- capture and analyse ---------- */
 $('record').onclick = async () => {
-  if (!stream) return;
+  if (!stream || capturing) return;
+  capturing = true;
   $('record').disabled = true;
 
   // Framing guidance stops for the whole capture, countdown included. Polling it
   // competes with the encoder for CPU, and dropped frames would violate the rate
   // contract the reading depends on. The box is frozen by now in any case.
   clearInterval(framingTimer);
+
+  // Returns the page to a usable state from any failure below. Without it a
+  // browser that cannot build a MediaRecorder left the button disabled and the
+  // framing poll stopped, with nothing on screen saying why -- dead until reload.
+  const abort = message => {
+    capturing = false;
+    stage(null);
+    recordingHud(false);
+    $('state').textContent = message;
+    $('record').disabled = false;
+    framingTimer = setInterval(checkFraming, 1000);
+  };
+
+  const mime = pickMime();
+  if (!mime) {
+    abort('This browser cannot record video in a format the server can read.');
+    return;
+  }
 
   // The countdown is not only politeness: it gives the subject time to settle and
   // look at the lens, and lets exposure and white balance stabilise before the
@@ -271,10 +295,18 @@ $('record').onclick = async () => {
   }
   stage(null);
 
-  const chunks = [], mime = pickMime();
-  const rec = new MediaRecorder(stream,
-    { mimeType: mime, videoBitsPerSecond: SETTINGS.mbps * 1e6 });
+  const chunks = [];
+  let rec;
+  try {
+    rec = new MediaRecorder(stream,
+      { mimeType: mime, videoBitsPerSecond: SETTINGS.mbps * 1e6 });
+  } catch (err) {
+    abort(`Could not start the recorder: ${err.message || err}`);
+    return;
+  }
 
+  rec.onerror = event => abort('Recording failed: '
+    + ((event.error && event.error.message) || 'unknown recorder error'));
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   rec.onstop = async () => {
     recordingHud(false);
@@ -301,6 +333,7 @@ $('record').onclick = async () => {
       $('state').textContent = 'analysis failed: ' + err;
     }
     stage(null);
+    capturing = false;
     $('record').disabled = false;
     framingTimer = setInterval(checkFraming, 1000);
     // The reading is below the fold on a phone, so bring it into view rather
@@ -308,7 +341,12 @@ $('record').onclick = async () => {
     $('model-hr').scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  rec.start();
+  try {
+    rec.start();
+  } catch (err) {
+    abort(`Could not start the recorder: ${err.message || err}`);
+    return;
+  }
   buzz(120);
   let left = SETTINGS.seconds;
   recordingHud(true, left, SETTINGS.seconds);
@@ -335,7 +373,7 @@ function drawWaveform() {
     'Drawn at about 100 px per second so individual beats are legible — scroll sideways to read the whole strip. ' +
     'Windows are inferred independently and concatenated; pale red stretches were rejected by the quality gates.';
   drawChart('diag-wave',
-            waveOptions(d.waveform || [], 160, fps, d.window_kept || []),
+            waveOptions(d.waveform || [], d.clip_len || 160, fps, d.window_kept || []),
             'No waveform: the model produced no output for this capture.');
 }
 
@@ -379,7 +417,7 @@ function renderSpectralDiagnostics(d) {
     const reported = name === spec.method;
     return `<tr class="${m.hr == null ? 'text-gray-400' : ''}">
       <td class="pr-6">${name}${reported ? ' &middot; reported' : ''}</td>
-      <td class="pr-6">${m.hr == null ? 'no reading' : m.hr.toFixed(1)}</td>
+      <td class="pr-6">${m.hr == null ? (m.status || 'no reading') : m.hr.toFixed(1)}</td>
       <td class="pr-6">${m.n_total ? `${m.n_windows} / ${m.n_total}` : '\u2014'}</td>
       <td>${gap == null ? '\u2014' : (gap >= 0 ? '+' : '') + gap.toFixed(1)}</td></tr>`;
   }).join('');
@@ -446,7 +484,9 @@ function render(d) {
     q.effective_fps ? `${q.effective_fps.toFixed(1)} fps` : '—';
 
   const fps = (d.quality && d.quality.effective_fps) || 30;
-  const stride = d.n_total > 1 ? (d.quality.n_frames / d.n_total) / fps : 2.67;
+  // Seconds between window starts, from the server's own WINDOW_STRIDE. Inferring
+  // it from the frame count put the trend axis about 8% long.
+  const stride = (d.window_stride || 80) / fps;
   drawChart('trend',
             trendOptions(d.window_hr || [], d.window_kept || [], d.value, stride),
             'No windows to plot.');

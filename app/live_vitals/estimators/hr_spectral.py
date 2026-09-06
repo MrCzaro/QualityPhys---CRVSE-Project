@@ -1,19 +1,33 @@
 """Heart-rate estimator using classical spectral rPPG, as a model-free cross-check."""
 import numpy as np
 
-from ..config import CLIP_LEN, WINDOW_STRIDE, MIN_CONFIDENCE, SPECTRAL_METHOD
+from ..config import CLIP_LEN, WINDOW_STRIDE, SPECTRAL_METHOD
 from ..signal.hr import hr_from_bvp
 from ..signal.spectral import METHODS, rgb_trace
 from .base import Estimator, EstimatorResult, aggregate_windows
 
 
-def _summarise(readings):
-    """Median HR across one method's windows, under the shared confidence gate."""
-    hr = np.array([r["hr_bpm"] for r in readings], dtype=float)
-    confidence = np.array([r["confidence"] for r in readings], dtype=float)
-    keep = np.isfinite(hr) & (confidence >= MIN_CONFIDENCE)
-    return dict(hr_bpm=float(np.median(hr[keep])) if keep.any() else float("nan"),
-                n_windows=int(keep.sum()), n_total=len(readings))
+def _summarise(vital, unit, readings, fps, n_attempted):
+    """One method's reading, under exactly the gates the reported value uses.
+
+    Routed through `aggregate_windows` rather than re-applying MIN_CONFIDENCE by
+    hand. Applying only the confidence gate here left the diagnostics table free
+    to report a POS value the reported figure had already refused: 3 surviving
+    windows of 16 passes MIN_CONFIDENCE but fails MIN_REPORTABLE_FRACTION, so the
+    table showed 73.1 bpm beside a headline that said there was no reading. A
+    cross-check whose methods are gated on different terms cannot tell a real
+    disagreement from a threshold artefact, which is the only thing it is for.
+    """
+    rates, confidences = [], []
+    for reading in readings:
+        if np.isfinite(reading["hr_bpm"]):
+            rates.append(reading["hr_bpm"])
+            confidences.append(reading["confidence"])
+    result = aggregate_windows(vital, unit, rates, confidences, [], fps,
+                               n_attempted)
+    return dict(hr_bpm=result.value, status=result.status,
+                n_windows=(result.detail or {}).get("n_windows", 0),
+                n_total=n_attempted)
 
 
 class HRSpectral(Estimator):
@@ -72,5 +86,5 @@ class HRSpectral(Estimator):
         return aggregate_windows(
             self.vital, self.unit, rates, confidences, waves, fps, len(starts),
             extra=dict(method=self.method,
-                       method_hr={name: _summarise(rows)
+            method_hr={name: _summarise(self.vital, self.unit, rows, fps, len(starts))
                                   for name, rows in readings.items()}))

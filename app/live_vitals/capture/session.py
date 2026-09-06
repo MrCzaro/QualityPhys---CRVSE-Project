@@ -37,7 +37,31 @@ class CaptureQuality:
 
 def decimation_stride(source_fps):
     """Returns the frame stride bringing a source rate near the training rate."""
+    # A container that declares no rate, or NaN, would otherwise raise inside
+    # int(round(...)) before rate_verdict ever gets to refuse the capture.
+    if not np.isfinite(source_fps) or source_fps <= 0:
+        return 1
     return max(1, int(round(source_fps / config.TARGET_FPS)))
+
+
+def measured_rate(timestamps_ms, declared_fps):
+    """Returns (fps, note): the rate the frames were actually delivered at.
+
+    A container's declared rate is a claim, and the readout scales heart rate
+    linearly with whatever rate it is handed -- a rate 4% high reports a heart
+    rate 4% high, with full confidence and no other symptom. Browser
+    MediaRecorder output is variable-rate and routinely declares an average it
+    did not hold, and three MCD-rPPG recordings declare a rate their own frame
+    count contradicts. The frames' presentation timestamps are the recording's
+    own account of when they arrived, so they are preferred wherever the
+    container provides them.
+    """
+    if len(timestamps_ms) > 1:
+        span = (timestamps_ms[-1] - timestamps_ms[0]) / 1000.0
+        if span > 0:
+            return (len(timestamps_ms) - 1) / span, None
+    return declared_fps, ("frame timestamps unavailable; the rate is the "
+                          "container's claim and has not been verified")
 
 
 def framing_verdict(box, width, height):
@@ -126,14 +150,9 @@ def crops_from_video(video_path, landmarker=None):
 
     verdict, report, notes = framing_verdict(box, width, height)
     stride = decimation_stride(source_fps)
-    effective_fps = source_fps / stride
-    rate, rate_note = rate_verdict(effective_fps)
-    if rate_note:
-        notes.append(rate_note)
-    verdict = worst_verdict(verdict, rate)
 
     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-    clip, index = [], 0
+    clip, stamps, index = [], [], 0
     while True:
         ok, bgr = cap.read()
         if not ok:
@@ -142,8 +161,26 @@ def crops_from_video(video_path, landmarker=None):
             crop = crop_resize(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB), box)
             if crop is not None:
                 clip.append(crop)
+                stamps.append(cap.get(cv2.CAP_PROP_POS_MSEC))
         index += 1
     cap.release()
+
+    # The rate verdict waits for the decode: until the frames have been read
+    # there is nothing to judge but the container's own claim about them.
+    declared_fps = source_fps / stride
+    effective_fps, stamp_note = measured_rate(stamps, declared_fps)
+    if stamp_note:
+        notes.append(stamp_note)
+    if declared_fps > 0 and np.isfinite(effective_fps):
+        drift = abs(effective_fps - declared_fps) / declared_fps
+        if drift > 0.02:
+            notes.append(f"container declares {declared_fps:.2f} fps but "
+                         f"delivered {effective_fps:.2f}; reading the declared "
+                         f"rate would have biased the result by {100 * drift:.1f}%")
+    rate, rate_note = rate_verdict(effective_fps)
+    if rate_note:
+        notes.append(rate_note)
+    verdict = worst_verdict(verdict, rate)
 
     quality = CaptureQuality(
         width=width, height=height, source_fps=source_fps,

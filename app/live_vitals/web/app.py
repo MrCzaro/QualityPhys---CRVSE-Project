@@ -64,7 +64,12 @@ def estimator(name):
 def quality_payload(quality):
     """Serialises capture diagnostics for the browser."""
     return dict(width=quality.width, height=quality.height,
-                effective_fps=round(quality.effective_fps, 2),
+                # Both rates: the one the frames were delivered at, and the one
+                # the container claimed. A gap between them is the note above.
+                effective_fps=(round(float(quality.effective_fps), 2)
+                               if np.isfinite(quality.effective_fps) else None),
+                declared_fps=(round(float(quality.source_fps), 2)
+                              if np.isfinite(quality.source_fps) else None),
                 n_frames=quality.n_frames,
                 detections=quality.detections,
                 detections_attempted=quality.detections_attempted,
@@ -163,6 +168,7 @@ def cross_check_payload(result):
     # bare number hides that difference.
     methods = {name: dict(hr=(None if row["hr_bpm"] != row["hr_bpm"]
                               else round(float(row["hr_bpm"]), 2)),
+                          status=row.get("status"),
                           n_windows=row.get("n_windows"),
                           n_total=row.get("n_total"))
                for name, row in (detail.get("method_hr") or {}).items()}
@@ -198,7 +204,9 @@ def print_capture_report(payload, client_raw=None):
 
     notes = quality.get("notes") or []
     print(f"  capture    {quality.get('width')}x{quality.get('height')}  "
-          f"{quality.get('effective_fps')} fps  {quality.get('n_frames')} frames  "
+          f"{quality.get('effective_fps')} fps "
+          f"(declared {quality.get('declared_fps')})  "
+          f"{quality.get('n_frames')} frames  "
           f"verdict={quality.get('verdict')}  aspect={quality.get('crop_aspect')}  "
           f"side_lost={quality.get('frac_side_lost')}")
     print(f"             detections {quality.get('detections')}"
@@ -216,7 +224,7 @@ def print_capture_report(payload, client_raw=None):
     if spectral:
         parts = []
         for name, m in (spectral.get("method_hr") or {}).items():
-            hr = "none" if m.get("hr") is None else f"{m['hr']}"
+            hr = m.get("status") or "none" if m.get("hr") is None else f"{m['hr']}"
             parts.append(f"{name} {hr} ({m.get('n_windows')}/{m.get('n_total')})")
         methods = spectral.get("method_hr") or {}
         pos, chrom = methods.get("pos"), methods.get("chrom")
@@ -343,6 +351,7 @@ async def api_analyze(video: UploadFile, model: str = None, client: str = None):
                                for x in detail.get("window_confidence", [])],
             window_kept=list(detail.get("window_kept", [])),
             n_no_peak=detail.get("n_no_peak", 0),
+            clip_len=config.CLIP_LEN, window_stride=config.WINDOW_STRIDE,
             spectral=cross_check_payload(cross),
             waveform=([round(float(x), 4) for x in result.waveform]
                       if result.waveform is not None else []))
@@ -516,7 +525,7 @@ def index():
     # Title is returned alongside the Container, not inside it. FastHTML hoists
     # HEAD elements only from a tuple returned by the handler; nested in the body
     # it renders as ordinary markup and the tab keeps the framework default.
-    return Title("CRVSE live vitals"), Container(
+    return Title("CRVSE Live Vitals"), Container(
         NavBar(chip("build-chip", "research only · not a medical device",
                     LabelT.secondary),
                brand=Div(H3("CRVSE live vitals"),
@@ -529,7 +538,7 @@ def index():
                       multiple=False),
             cls="space-y-6 pt-2"),
         P(DISCLAIMER, cls=(TextPresets.muted_sm, "pt-8 pb-4")),
-        Script(src="/static/capture.js?v=20260902-6"),
+        Script(src="/static/capture.js?v=20260906-1"),
         cls=("space-y-4", ContainerT.xl))
 
 def main():
