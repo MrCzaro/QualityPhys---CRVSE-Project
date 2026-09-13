@@ -53,7 +53,7 @@ from app.live_vitals.signal.hr import hr_from_bvp
 from app.live_vitals.signal.spectral import bandpass
 from app.live_vitals.scripts.check_contract_parity import load_reference
 
-UBFC_DIR = Path(r"D:\QualityPhys\demo_data")
+UBFC_DIR = Path(r"D:\QualityPhys\demo_data\ubfc_rppg_subset")
 MCD_DIR = Path(r"D:\QualityPhys\demo_data\mcd_rppg_subset")
 UBFC_SUBJECTS = [11, 13, 24, 25, 34, 35, 42, 47]
 CACHE = Path(r"D:\QualityPhys\demo_data\.roi_cache")

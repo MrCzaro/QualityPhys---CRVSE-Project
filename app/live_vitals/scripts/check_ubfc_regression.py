@@ -33,7 +33,7 @@ from app.live_vitals.signal.hr import hr_from_bvp
 from app.live_vitals.scripts.check_contract_parity import load_reference
 
 HELD_OUT_SUBJECTS = [11, 13, 24, 25, 34, 35, 42, 47]
-DEFAULT_DATA_DIR = Path(r"D:\QualityPhys\demo_data")
+DEFAULT_DATA_DIR = Path(r"D:\QualityPhys\demo_data\ubfc_rppg_subset")
 TOLERANCE_BPM = 0.05
 TOLERANCE_FRACTION = 0.01
 
