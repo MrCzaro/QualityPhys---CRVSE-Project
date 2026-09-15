@@ -113,16 +113,27 @@ def evaluate_subject(subject_dir, estimator, cache_path=None):
     # public interface, works for any registered model, and does not re-run the
     # model once per window.
     predicted = result.detail.get("window_hr")
-    if predicted is None:
-        raise RuntimeError(f"{estimator.name} does not report per-window values")
-    reference = [hr_from_bvp(reference_bvp[start:start + config.CLIP_LEN],
-                             fps)["hr_bpm"]
-                 for start in window_starts(len(clip))]
+    predicted_starts = result.detail.get("window_start")
+    if predicted is None or predicted_starts is None:
+        raise RuntimeError(f"{estimator.name} does not report per-window values "
+                           f"with their start frames")
+    if (len(predicted_starts) != len(predicted)
+            or result.detail["n_total"] - result.detail["n_no_peak"] != len(predicted)):
+        raise RuntimeError(f"{estimator.name} per-window report is inconsistent")
 
+    starts = list(window_starts(len(clip)))
+    reference = np.asarray([hr_from_bvp(reference_bvp[start:start + config.CLIP_LEN],
+                                        fps)["hr_bpm"]
+                            for start in starts], dtype=float)
+
+    # Windows without a readable peak are absent from the estimator's report, so the
+    # two lists are paired by start frame. Pairing by position would compare every
+    # later window against the wrong stretch of reference once a single window drops.
+    reference_at = dict(zip(starts, reference))
     predicted = np.asarray(predicted, dtype=float)
-    reference = np.asarray(reference, dtype=float)
-    finite = np.isfinite(predicted) & np.isfinite(reference)
-    mae = float(np.mean(np.abs(predicted[finite] - reference[finite])))
+    paired_reference = np.asarray([reference_at[s] for s in predicted_starts], dtype=float)
+    finite = np.isfinite(predicted) & np.isfinite(paired_reference)
+    mae = float(np.mean(np.abs(predicted[finite] - paired_reference[finite])))
     reference_hr = float(np.median(reference[np.isfinite(reference)]))
 
     return dict(value=float(result.value),

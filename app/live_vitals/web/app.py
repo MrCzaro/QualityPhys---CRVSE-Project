@@ -350,6 +350,7 @@ async def api_analyze(video: UploadFile, model: str = None, client: str = None):
             window_confidence=[round(float(x), 3)
                                for x in detail.get("window_confidence", [])],
             window_kept=list(detail.get("window_kept", [])),
+            window_start=[int(s) for s in detail.get("window_start", [])],
             n_no_peak=detail.get("n_no_peak", 0),
             clip_len=config.CLIP_LEN, window_stride=config.WINDOW_STRIDE,
             spectral=cross_check_payload(cross),

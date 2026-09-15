@@ -44,7 +44,7 @@ class Estimator:
 
 
 def aggregate_windows(vital, unit, rates, confidences, waves, fps,
-                      n_attempted, extra=None):
+                      n_attempted, extra=None, window_starts=None):
     """Reduces per-window readings to one gated value, identically for every model.
 
     Per-window rates are combined by median rather than by stitching the
@@ -62,10 +62,19 @@ def aggregate_windows(vital, unit, rates, confidences, waves, fps,
     weigh on the usable fraction: removing them from the denominator instead
     would make an unreadable capture look progressively cleaner the less of it
     could be read.
+
+    `window_starts`, when given, holds the start frame of each window in `rates`.
+    Windows without a readable peak are absent from `rates`, so list position alone
+    cannot say which analysis window a reading came from; a caller comparing
+    per-window values against a reference pairs them by start frame instead.
     """
     report = dict(n_total=int(n_attempted),
                   n_no_peak=int(n_attempted) - len(rates),
                   fps=float(fps), **(extra or {}))
+    if window_starts is not None:
+        if len(window_starts) != len(rates):
+            raise ValueError(f"{len(window_starts)} window starts for {len(rates)} rates")
+        report["window_start"] = [int(s) for s in window_starts]
 
     if not rates:
         return EstimatorResult(vital, float("nan"), unit, 0.0, "no_estimate",

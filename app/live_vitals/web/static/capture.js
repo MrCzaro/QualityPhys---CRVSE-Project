@@ -61,10 +61,18 @@ function drawChart(containerId, opts, emptyMessage) {
   host.innerHTML = `<uk-chart><script type="application/json">${json}<\/script></uk-chart>`;
 }
 
-function trendOptions(hr, kept, median, secondsPerWindow) {
+function trendOptions(hr, kept, median, secondsPerWindow, starts, fps) {
   if (!hr.length) return null;
   const p = chartPalette();
-  const points = hr.map((v, i) => ({ x: +(i * secondsPerWindow).toFixed(1), y: +v.toFixed(1) }));
+  // Windows with no cardiac peak are absent from `hr`, so a reading's list position is
+  // not its place in the capture: after one drop, index x stride draws every later point
+  // a stride early. The server's start frames place each reading where it was measured;
+  // index x stride remains only for a payload that predates them.
+  const placed = Array.isArray(starts) && starts.length === hr.length && fps > 0;
+  const points = hr.map((v, i) => ({
+    x: +((placed ? starts[i] / fps : i * secondsPerWindow)).toFixed(1),
+    y: +v.toFixed(1)
+  }));
   const discrete = hr.map((_, i) => ({
     seriesIndex: 0, dataPointIndex: i, size: 5,
     fillColor: kept[i] ? p.trend : p.surface,
@@ -488,7 +496,8 @@ function render(d) {
   // it from the frame count put the trend axis about 8% long.
   const stride = (d.window_stride || 80) / fps;
   drawChart('trend',
-            trendOptions(d.window_hr || [], d.window_kept || [], d.value, stride),
+            trendOptions(d.window_hr || [], d.window_kept || [], d.value, stride,
+                         d.window_start || [], fps),
             'No windows to plot.');
   drawWaveform();
 

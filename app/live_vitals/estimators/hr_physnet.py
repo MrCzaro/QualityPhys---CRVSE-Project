@@ -47,7 +47,7 @@ class HRPhysNet(Estimator):
 
         model = self._load()
         starts = list(range(0, len(frames_u8) - CLIP_LEN + 1, WINDOW_STRIDE))
-        rates, confidences, waves = [], [], []
+        rates, confidences, waves, kept_starts = [], [], [], []
         for start in starts:
             tensor = clip_to_tensor(frames_u8[start:start + CLIP_LEN]).to(self.device)
             with torch.no_grad():
@@ -57,6 +57,7 @@ class HRPhysNet(Estimator):
                 rates.append(reading["hr_bpm"])
                 confidences.append(reading["confidence"])
                 waves.append(bvp)
+                kept_starts.append(start)
 
         return aggregate_windows(self.vital, self.unit, rates, confidences,
-                                 waves, fps, len(starts))
+                                 waves, fps, len(starts), window_starts=kept_starts)

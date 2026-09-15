@@ -73,12 +73,13 @@ class HRSpectral(Estimator):
                     for name, signal in signals.items()}
 
         primary = signals[self.method]
-        rates, confidences, waves = [], [], []
+        rates, confidences, waves, kept_starts = [], [], [], []
         for start, reading in zip(starts, readings[self.method]):
             if np.isfinite(reading["hr_bpm"]):
                 rates.append(reading["hr_bpm"])
                 confidences.append(reading["confidence"])
                 waves.append(primary[start:start + CLIP_LEN])
+                kept_starts.append(start)
 
         # All three methods are summarised, not only the configured one. They fail
         # on different things, so the spread between them is a quality signal that
@@ -87,4 +88,5 @@ class HRSpectral(Estimator):
             self.vital, self.unit, rates, confidences, waves, fps, len(starts),
             extra=dict(method=self.method,
             method_hr={name: _summarise(self.vital, self.unit, rows, fps, len(starts))
-                                  for name, rows in readings.items()}))
+                                  for name, rows in readings.items()}),
+            window_starts=kept_starts)
