@@ -33,13 +33,15 @@ def _summarise(vital, unit, readings, fps, n_attempted):
 class HRSpectral(Estimator):
     """Estimates HR from the per-frame mean colour of the face crop.
 
-    Carries no learned parameters, so it fails on different things than a trained
-    model does and its agreement with one is real corroboration. On the eight
-    held-out UBFC subjects it reaches 1.29 bpm window MAE against a reference-BVP
-    readout, within noise of the PhysNet checkpoint at 1.24. That says UBFC is an
-    easy corpus, not that the model is redundant: the gap should open on motion,
-    poor light and darker skin, where the classical projections are known to
-    degrade, and exposing that is what this cross-check is for.
+    Carries no learned parameters, so it usually fails on different things than a
+    trained model does, and its agreement with one is evidence rather than proof.
+    Both read the same face video and can fail together: on UBFC-Phys T1, PhysNet
+    and POS agreed within 5 bpm while both missed the wrist reference by more than
+    20 bpm in 7.4% of windows. Agreement therefore cannot clear a reading, while
+    disagreement is a reliable alarm. On the eight held-out UBFC-rPPG subjects POS
+    reaches 1.35 bpm window MAE against a reference-BVP readout, within noise of the
+    PhysNet checkpoint at 1.24, which says UBFC-rPPG is an easy corpus, not that the
+    model is redundant.
     """
 
     name = "hr_spectral"

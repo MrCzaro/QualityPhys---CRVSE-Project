@@ -328,9 +328,11 @@ async def api_analyze(video: UploadFile, model: str = None, client: str = None):
         detail = result.detail or {}
         
         # The classical estimator shares no weights and no training data with a
-        # neural one, so where the two agree that is corroboration rather than a
-        # model confirming itself. When it is the selected model it is reported
-        # as its own cross-check, which surfaces the POS/CHROM/GREEN spread.
+        # neural one, so agreement between them is evidence that the model is not
+        # simply confirming itself. It is not proof: both read the same video, and on
+        # UBFC-Phys T1 they agreed while both being wrong in 7.4% of windows. When it
+        # is the selected model it is reported as its own cross-check, which surfaces
+        # the POS/CHROM/GREEN spread.
         if name == SPECTRAL_NAME:
             cross = result
         elif SPECTRAL_NAME in registry.available():

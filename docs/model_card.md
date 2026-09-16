@@ -389,7 +389,9 @@ Intended use:
 Not intended for:
 
 - diagnosis, treatment, triage or monitoring decisions
-- exercise, motion or elevated-HR conditions, which are untested
+- exercise or elevated-HR conditions, which are untested
+- speech or other movement during capture, where accuracy degrades sharply
+  (measured on UBFC-Phys, see Evaluation)
 - heart-rate **variability**, which was measured and found out of reach
 - skin tones outside the training corpora, which have not been characterised
 - respiratory rate or blood pressure, which the app shows as unavailable
@@ -482,13 +484,15 @@ board. It was not adopted. The `baseline` run is what ships.
 
 ### Evaluation
 
-All figures below come from scripts in `app/live_vitals/scripts/`, run on subjects
-the seed-42 split places in validation.
+All figures below come from scripts in `app/live_vitals/scripts/`, run on data the
+model never trained on: subjects the seed-42 split places in validation, and
+UBFC-Phys, which no training run used.
 
 **Held-out UBFC-rPPG, 8 subjects.** `check_ubfc_regression.py`, against a committed
 baseline (`ubfc_baseline_hr_physnet_v2.json`) so drift is detected rather than
 argued about. Per-window predicted HR is compared against the same spectral readout
-applied to the reference BVP over the same windows.
+applied to the reference BVP over the same windows, paired by window start frame so
+that a window without a readable peak cannot shift the comparison.
 
 | Subject | Reported | Reference | Error | Window MAE | Status |
 | --- | ---: | ---: | ---: | ---: | --- |
@@ -517,6 +521,58 @@ directly comparable**: their metric is MAE per 10-second segment, ours is either
 5.36-second window or a 3-minute median. The comparison is indicative only; a
 like-for-like run under their protocol has not been done.
 
+**Held-out UBFC-Phys, 168 recordings.** `check_ubfc_phys.py`, run 2026-09-15 on the
+whole corpus: 56 subjects, each recorded at rest (T1), during a speech task (T2) and
+during mental arithmetic (T3). No training run used UBFC-Phys, so these are
+cross-dataset figures. Two confounds apply to every number. The reference is a
+**wrist** Empatica E4 BVP, noisier than the finger and contact references of the
+training corpora. And the video runs at 35.138 fps, which is not decimated, so each
+160-frame window spans 4.55 s against the 5.33 s the model was trained on.
+
+The primary analysis scores only windows that the reference's own gating keeps, in
+recordings whose reference yields a reading (T1 54 of 56, T2 33 of 56, T3 41 of 56).
+That rule looks only at the reference, never at the estimate under test, and was fixed
+before any result was seen. The classical cross-check was scored the same way.
+
+| Task | Estimator | Windows | Window MAE | RMSE | Bias | 95% limits of agreement | Pearson r | Recording MAE | Recordings reported |
+| --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: |
+| T1 rest | PhysNet v2 | 3474 | 6.97 | 12.71 | +4.46 | -18.86 to +27.79 | 0.66 | 3.93 | 54 / 54 |
+| T1 rest | POS | 3475 | 6.96 | 12.34 | +2.79 | -20.78 to +26.36 | 0.66 | 3.65 | 54 / 54 |
+| T2 speech | PhysNet v2 | 1312 | 22.26 | 30.98 | +18.58 | -30.02 to +67.19 | 0.22 | 12.95 | 27 / 33 |
+| T2 speech | POS | 1308 | 19.11 | 26.54 | -1.99 | -53.89 to +49.90 | 0.06 | 8.22 | 20 / 33 |
+| T3 arithmetic | PhysNet v2 | 1817 | 15.86 | 24.06 | +11.25 | -30.46 to +52.95 | 0.30 | 6.42 | 40 / 41 |
+| T3 arithmetic | POS | 1819 | 13.99 | 20.35 | -2.26 | -41.91 to +37.40 | 0.33 | 4.11 | 34 / 41 |
+
+Recording MAE compares each reported value, a gated median over about 78 windows, with
+the reference median, over the recordings that reported. POS refuses more T2 and T3
+recordings, so its lower recording MAE there partly reflects what it declined, and the
+two estimators are not directly comparable on that column. T1 is the quantitative
+result; T2 and T3 are read qualitatively. Scoring every window with a finite reference
+instead (sensitivity analysis) raises T1 window MAE to 9.28 bpm for PhysNet and 9.08
+for POS.
+
+**A minority of windows dominates the T1 window MAE.** The median per-recording median
+error is 2.96 bpm for PhysNet and 3.18 for POS, but in 7.4% of T1 windows (256 of
+3474, in 22 recordings) the two estimators agree within 5 bpm while both miss the
+reference by more than 20. A review of those windows
+(`Notebooks/Phase 3 Notebooks/NB_P3_26_UBFC-Phys_evaluation_review.ipynb`) found:
+
+- **The reference is not at fault in the five worst recordings.** It shows no
+  amplitude bursts and a pulse-like waveform, and its spectrum does not contain the
+  camera frequency.
+- **No reference file is swapped.** For none of the 22 recordings does another
+  recording's reference fit better.
+- **s1_T1, s25_T1 and s27_T1 carry a timing offset** of about 4.6 s between video
+  and reference; for s1, shifting removes most of the error (median 16.7 to 2.0 bpm).
+  There is no single offset across the corpus, and no correction is applied, because
+  the delay can only be estimated from the estimates under test.
+- **In s8_T1, s33_T1, s52_T1 and s53_T1 both camera methods fail.** They lock onto a
+  component near 95-125 bpm while the reference reads 55-75. The cause is not
+  identified.
+
+Within subject, PhysNet reads the speech task 10.2 bpm above rest on average where the
+reference shows 5.0 (21 subjects reported in all three tasks).
+
 **Independent device check, 2026-09-01.** One resting capture on a laptop webcam
 against a pulse oximeter reading 60 bpm: model 61.2, CHROM 61.2, POS 60.9, GREEN
 60.6, with 21 of 21 windows kept. All four sit inside the oximeter's own display
@@ -531,6 +587,13 @@ The one consistent negative is UBFC-rPPG: -3.13 bpm bias in validation, and -0.7
 signed error across the 8 held-out subjects. That corpus sits at 90-123 bpm, the top of
 this app's stated range, and the largest single held-out error is -3.15 bpm on subject
 11 at 123 bpm — the fastest in the set. High rates are under-read.
+
+On UBFC-Phys T1 the window bias is **positive**: +4.46 bpm for PhysNet. The 256 windows
+where both estimators lock onto a higher component read on average 29.6 bpm high and
+carry about 2 bpm of it. Without them, a split made for description only, PhysNet
+still reads +2.46 bpm high at rest, against +0.66 for POS. This is the opposite
+direction to the Card 1 shrinkage and to the UBFC-rPPG under-read, and it has not been
+explained.
 
 ### Refusal Behaviour
 
@@ -584,8 +647,14 @@ wrong time base: a 10 fps webcam capture once produced a confident reading about
 - **Skin tone has not been characterised.** No stratified evaluation has been run,
   and rPPG is known to degrade on darker skin. This is an unquantified gap, not an
   absence of risk.
+- **Agreement with the classical cross-check is not corroboration.** PhysNet and POS
+  read the same face video and can fail together. In 7.4% of UBFC-Phys T1 windows they
+  agree within 5 bpm while both miss the reference by more than 20 bpm. The
+  cross-check cannot flag those failures, so a value it confirms can still be wrong.
 - **Motion, lighting and backlighting** degrade the signal. The framing gate catches
-  gross faults of position but not a badly lit face.
+  gross faults of position but not a badly lit face. On UBFC-Phys, window MAE is 6.97
+  bpm at rest and 22.26 bpm during the speech task, with Pearson r of 0.66 and 0.22
+  (each over its own reference-accepted recordings).
 - **The face box is frozen for the capture**, matching training. A subject who moves
   substantially leaves their own crop.
 - **Single-operator testing is not validation.** The device check above is one
