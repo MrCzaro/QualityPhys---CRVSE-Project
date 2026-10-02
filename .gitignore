@@ -49,6 +49,9 @@ Data/Phase3/*.zip
 Data/test_media/
 Data/ubfc_phys_eval/*
 !Data/ubfc_phys_eval/summary_*.json
+Data/vitalvideos_eval/*
+!Data/vitalvideos_eval/summary_*.json
+
 *.mov
 *.mp4
 *.avi
