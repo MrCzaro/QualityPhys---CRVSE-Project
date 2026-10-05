@@ -6,14 +6,20 @@ citation requirements, access rules, or redistribution limits.
 
 ## Summary
 
-The project used four rPPG datasets:
+The project uses seven rPPG datasets. Four entered in Phase 2 (UBFC-rPPG, UBFC-Phys,
+MCD-rPPG, ECG-Fitness) and three in Phase 3 (DLCN, PhysDrive, VitalVideos-Worldwide).
+The roles below are the Phase-3 ones; each section under Dataset Roles also records
+how the dataset was used before.
 
 | Dataset | Project role | Current app interpretation |
 | --- | --- | --- |
-| UBFC-rPPG | Clean controlled rPPG dataset | App-relevant still/seated evidence. |
-| UBFC-Phys | Facial video with physiological reference signals | App-relevant but harder than UBFC-rPPG. |
-| MCD-rPPG | Multi-camera and multimodal rPPG dataset | App-relevant evidence, including frontal-camera and multicamera preprocessing work. |
-| ECG-Fitness | Exercise/high-motion/high-HR stress dataset | Archived stress-test evidence. Not included in the current still/seated app support claim. |
+| UBFC-rPPG | Training corpus; eight held-out subjects form the app's regression set | Clean still/seated evidence; the easiest corpus in the project. |
+| MCD-rPPG | Training corpus, with held-out subjects for evaluation | Still/seated evidence at rest and after exercise; the hardest of the training corpora. |
+| DLCN | Training corpus for low-light robustness | Night-time lighting evidence. Its licence sets the terms of trained weights. |
+| VitalVideos-Worldwide | Training corpus with a frozen 240/60 subject split; so far evaluated zero-shot only | Still/seated evidence across Fitzpatrick skin types, confounded with recording site. |
+| UBFC-Phys | Held-out cross-dataset evaluation; never trained on | Still/seated evidence at rest and under speech and arithmetic stress tasks. |
+| PhysDrive | Zero-shot in-vehicle benchmark | Outside the app's scope; documents a failure mode. |
+| ECG-Fitness | Refusal benchmark only; never trained on | Tests whether the app declines or flags exercise captures. Not part of the still/seated support claim. |
 
 ## Required Citations
 
@@ -133,6 +139,9 @@ Project artifacts include:
 - `Data/processing_log_ubfc_rppg_ensemble.csv`
 - UBFC-rPPG rows in the live-compatible manifest and baseline summaries
 
+In Phase 3 it is a training corpus. Eight subjects are held out, and they form the
+app's regression set (`check_ubfc_regression`).
+
 ### UBFC-Phys
 
 UBFC-Phys was used to test behavior on a more difficult facial-video dataset
@@ -150,6 +159,13 @@ Project artifacts include:
 - `Data/processing_log_ubfc_phys.csv`
 - `Data/processing_log_ubfc_phys_ensemble.csv`
 - UBFC-Phys rows in the live-compatible manifest and baseline summaries
+
+In Phase 3 it is the held-out cross-dataset evaluation: never used in training, stored
+with `role='heldout'`, and evaluated over all 168 recordings (56 subjects, three tasks)
+by `check_ubfc_phys`. It is recorded at 35.1 fps, which the app does not decimate, so
+each analysis window spans less time than in training; every UBFC-Phys figure carries
+that confound. Phase-3 artifacts: `Data/processing_log_ubfc_phys_phase3.csv` and
+`Data/ubfc_phys_eval/`.
 
 ### MCD-rPPG
 
@@ -171,27 +187,77 @@ Project artifacts include:
 - `Data/processing_log_mcd_rppg_multicam.csv`
 - MCD-rPPG rows in the live-compatible manifest and baseline summaries
 
+In Phase 3 it is a training corpus, with held-out subjects for evaluation. Phase-3
+artifact: `Data/processing_log_mcd_phase3.csv`.
+
 ### ECG-Fitness
 
-ECG-Fitness was used to stress-test exercise, high-motion, and high-HR behavior.
-It exposed important limitations of both learned and spectral approaches in this
-project.
+In Phase 2, ECG-Fitness was used to stress-test exercise, high-motion, and high-HR
+behavior, and it exposed limitations of both learned and spectral approaches. NB13
+excluded it from app-relevant selection because the intended demo scope is
+still/seated webcam rPPG.
 
-The current app scope does not claim ECG-Fitness robustness. NB13 deliberately
-excluded ECG-Fitness from app-relevant selection because the intended demo scope
-is still/seated webcam rPPG.
+In Phase 3 it is an evaluation-only refusal benchmark (NB_P3_28 exploration, NB_P3_29
+store). It cannot be a training corpus: its PPG columns are constant in every usable
+recording, so there is no pulse waveform to train on, and the heart-rate reference is
+derived from the ECG instead. The question it answers is whether the app declines or
+flags exercise captures rather than reporting a confident wrong value. It tests the
+refusal gates; it does not extend the app's claim beyond still/seated use.
+
+The benchmark holds the 100 usable sessions (17 subjects, six sessions each; one
+session has no video and one a truncated reference), from the closer of the two
+cameras. In the dataset authors' description, the subjects speak, row, ride a
+stationary bike and use an elliptical trainer, with speaking and rowing each recorded
+with and without a 400 W halogen lamp (as quoted in a 2025 *Scientific Reports* study
+that used the dataset, doi:10.1038/s41598-025-06031-8). The store is kept apart from
+the training stores and carries no training label, so no training loader can pick it
+up.
 
 Access route: obtained by signed request form submitted to the Center for
 Machine Perception, Czech Technical University in Prague, following the dataset's
-stated access procedure. Redistribution is not permitted.
+stated access procedure. Redistribution is not permitted, and that covers the derived
+benchmark store: it is never uploaded, to Kaggle or anywhere else.
 
 Citation required: Spetlik et al., *BMVC*, 2018 (see Required Citations).
 
 Project artifacts include:
 
+- `Data/processing_log_ecg_fitness_phase3.csv` (Phase-3 benchmark store)
 - `Data/processing_log_ecg_fitness.csv`
 - `Data/processing_log_ecg_fitness_ensemble.csv`
 - ECG-Fitness evidence in earlier ensemble and live-compatible experiments
+
+### DLCN
+
+DLCN entered in Phase 3 as a training corpus for low-light robustness, through the
+preprocessed Kaggle release (see Required Citations); the Phase-3 store holds 780
+recordings. Its CC BY-NC-SA 4.0 licence is the most restrictive of the training
+inputs, so it sets the terms of the trained weights (see Trained model weights).
+
+Project artifact: `Data/processing_log_dlcn_phase3.csv`.
+
+### PhysDrive
+
+PhysDrive entered in Phase 3 as a zero-shot in-vehicle benchmark (283 recordings in
+the Phase-3 store). The model does not track heart rate there zero-shot, and training
+on it repaired that corpus at the expense of the others, so it stays out of training.
+It documents a condition the app does not support.
+
+### VitalVideos-Worldwide
+
+VitalVideos-Worldwide entered in Phase 3 as a training corpus, with a subject-wise
+split frozen before any video was processed: 240 subjects for training and 60 held out
+(`Data/vitalvideos_split.csv`). It has not yet been used to train a model; all 300
+recordings have been evaluated zero-shot (`check_vitalvideos`). It is the project's
+first data with Fitzpatrick skin type, which is confounded with recording site, and it
+carries respiration-belt and ECG references recorded with the video.
+
+Project artifacts include:
+
+- `Data/processing_log_vitalvideos_phase3.csv`
+- `Data/vitalvideos_split.csv`
+- `Data/vitalvideos_eval/summary_*.json`; the per-recording evaluation tables carry
+  participant age, sex and skin type and are not committed
 
 ## Derived Artifacts
 
@@ -241,7 +307,7 @@ It does not automatically license:
 Before publishing, sharing, or packaging any data artifact, check the original
 dataset terms and only include files that are allowed to be redistributed.
 
-Access conditions differ across the four datasets. UBFC-rPPG, UBFC-Phys, and
+Access conditions differ across the datasets. UBFC-rPPG, UBFC-Phys, and
 ECG-Fitness were obtained under their respective request or registration
 procedures and are not redistributable. MCD-rPPG is the most permissively
 licensed source in the project; confirm the current terms on its distribution
@@ -302,3 +368,7 @@ high-HR robust monitor
 medical or diagnostic device
 validated clinical measurement system
 ```
+
+The ECG-Fitness benchmark does not change this. It measures whether the app refuses
+or flags exercise captures; a good result there supports the refusal behavior, not
+an exercise claim.

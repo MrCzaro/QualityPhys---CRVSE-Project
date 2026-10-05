@@ -242,8 +242,9 @@ cross-check added on evidence gathered while validating it.
 | DLCN | training, low-light robustness | CC BY-NC-SA 4.0 (Kaggle release) |
 | UBFC-rPPG | training + held-out evaluation | research use, no formal licence |
 | PhysDrive | zero-shot in-vehicle benchmark | per request |
-| UBFC-Phys, ECG-Fitness | Phase-2 work only | per request / registration |
-| VitalVideos | planned | per request, academic and commercial separate |
+| UBFC-Phys | held-out evaluation: rest, speech and arithmetic tasks | per request / registration |
+| ECG-Fitness | refusal benchmark only, never trained on: exercise, high heart rate | signed request, no redistribution |
+| VitalVideos-WW | training + held-out evaluation, frozen 240/60 split | per request, academic and commercial separate |
 
 Raw datasets are external materials and the repository licence grants no rights to
 redistribute them. See `docs/data_sources.md` for the boundary, per-dataset terms, and

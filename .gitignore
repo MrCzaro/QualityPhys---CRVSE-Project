@@ -21,8 +21,6 @@ app/live_hr_demo/models/mediapipe/*.task
 
 
 # Local Codex / AI collaboration instructions
-CRVSE_PLAN.md
-CRVSE_RR_exploration_plan.md
 docs/PROJECT_CONTEXT.md
 # CRVSE generated audit / fine-tuning artifacts
 Data/audit_live_compatible_window_*.csv
