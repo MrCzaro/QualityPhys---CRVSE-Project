@@ -14,7 +14,7 @@ CHROM: de Haan & Jeanne, "Robust Pulse Rate from Chrominance-Based rPPG",
 import numpy as np
 from scipy.signal import butter, filtfilt
 
-from ..config import (HR_LOW_HZ, HR_HIGH_HZ, SPECTRAL_ROI_FRACTION,
+from ..config import (HR_LOW_HZ, HR_HIGH_HZ, SPECTRAL_METHOD, SPECTRAL_ROI_FRACTION,
                       SPECTRAL_WINDOW_SECONDS, SPECTRAL_FILTER_ORDER)
 
 
@@ -132,5 +132,8 @@ def green(rgb, fps):
     return bandpass(-(rgb[:, 1] - rgb[:, 1].mean()), fps)
 
 
-# Ordered so the configured default is reported first in any diagnostic listing.
-METHODS = {"chrom": chrom, "pos": pos, "green": green}
+# The configured method comes first, so it heads every diagnostic listing. The
+# order is derived from config rather than written out: a hand-ordered literal kept
+# CHROM first after the default moved to POS.
+_ALL_METHODS = {"pos": pos, "chrom": chrom, "green": green}
+METHODS = {SPECTRAL_METHOD: _ALL_METHODS[SPECTRAL_METHOD], **_ALL_METHODS}

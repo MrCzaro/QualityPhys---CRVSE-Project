@@ -513,10 +513,12 @@ def index():
         Div(waiting(), id="diag-spectral", cls="overflow-x-auto pt-1"),
         DividerLine(),
         H4("Reconstructed BVP waveform"),
-        P("Drawn at about 100 px per second so individual beats are legible — "
-          "scroll sideways to read the whole strip. Windows are inferred "
-          "independently and concatenated; pale red stretches were rejected by "
-          "the quality gates.", id="diag-wave-note",
+        P("Drawn on the capture's own timeline at about 100 px per second, so "
+          "individual beats are legible — scroll sideways to read the whole strip. "
+          "Analysis windows overlap by half; each is drawn from its start until the "
+          "next one takes over, and the vertical lines mark those joins. Pale red "
+          "stretches were rejected by the quality gates; a break in the line is "
+          "where no window found a cardiac peak.", id="diag-wave-note",
           cls=TextPresets.muted_sm),
         Div(waiting(), id="diag-wave", cls="w-full pt-2 overflow-x-auto"),
         header=card_heading("Diagnostics", "every number behind the reading",
@@ -541,7 +543,7 @@ def index():
                       multiple=False),
             cls="space-y-6 pt-2"),
         P(DISCLAIMER, cls=(TextPresets.muted_sm, "pt-8 pb-4")),
-        Script(src="/static/capture.js?v=20260906-1"),
+        Script(src="/static/capture.js?v=20261004-1"),
         cls=("space-y-4", ContainerT.xl))
 
 def main():

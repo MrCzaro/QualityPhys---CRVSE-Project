@@ -105,29 +105,56 @@ function trendOptions(hr, kept, median, secondsPerWindow, starts, fps) {
   };
 }
 
-// The diagnostic strip deliberately shows all independently inferred windows.
-// It is not a continuous ECG/PPG recording: vertical dividers mark joins and
-// pale red regions identify the windows rejected by the quality gates.
+// The diagnostic strip is drawn on the capture's own timeline. The server returns
+// every window that found a cardiac peak, clipLen samples each and in the order of
+// `starts`, and consecutive windows overlap by half. Each window is drawn from its
+// own start until the next one takes over, so every moment appears once, at the
+// time it was recorded. A model infers each window separately, so its windows need
+// not line up at a join: vertical dividers mark the joins, pale red marks the output
+// of windows rejected by the quality gates, and a break in the line is a stretch no
+// window with a cardiac peak covered.
 const PX_PER_SECOND = 100;
 
-function waveOptions(wave, seam, fps, kept) {
-  if (!wave.length) return null;
+function waveLayout(wave, starts, clipLen) {
+  const n = Math.floor(wave.length / clipLen);
+  // A payload that predates the start frames is laid end to end, as it used to be.
+  const placed = Array.isArray(starts) && starts.length === n && n * clipLen === wave.length;
+  const at = placed ? starts : Array.from({ length: n }, (_, i) => i * clipLen);
+  return at.map((start, i) => ({
+    start, offset: i * clipLen,
+    length: i + 1 < n ? Math.max(0, Math.min(clipLen, at[i + 1] - start)) : clipLen
+  }));
+}
+
+function waveOptions(wave, starts, clipLen, fps, kept) {
+  if (!wave.length || !(fps > 0) || !(clipLen > 0)) return null;
+  const segments = waveLayout(wave, starts, clipLen);
+  if (!segments.length) return null;
   const p = chartPalette();
-  const points = wave.map((v, i) => ({ x: +(i / fps).toFixed(3), y: +v.toFixed(4) }));
-  const seconds = wave.length / fps;
-  const regions = [];
-  (kept || []).forEach((ok, windowIndex) => {
-    if (ok) return;
-    regions.push({
-      x: +(windowIndex * seam / fps).toFixed(2),
-      x2: +((windowIndex + 1) * seam / fps).toFixed(2),
-      fillColor: '#ef4444', opacity: 0.08, borderColor: 'transparent', label: { text: '' }
-    });
+  const points = [], regions = [];
+  segments.forEach((s, i) => {
+    for (let k = 0; k < s.length; k++) {
+      points.push({ x: +((s.start + k) / fps).toFixed(3), y: +wave[s.offset + k].toFixed(4) });
+    }
+    const end = s.start + s.length;
+    const next = segments[i + 1];
+    // A null point breaks the line, so a stretch with no reading is not bridged.
+    if (next && next.start > end) points.push({ x: +(end / fps).toFixed(3), y: null });
+    if (kept && kept.length === segments.length && !kept[i]) {
+      regions.push({
+        x: +(s.start / fps).toFixed(2), x2: +(end / fps).toFixed(2),
+        fillColor: '#ef4444', opacity: 0.08, borderColor: 'transparent', label: { text: '' }
+      });
+    }
+    if (i > 0) {
+      regions.push({ x: +(s.start / fps).toFixed(2), borderColor: p.grid,
+                     strokeDashArray: 0, opacity: 1 });
+    }
   });
-  for (let windowIndex = 1; windowIndex * seam < wave.length; windowIndex++) {
-    regions.push({ x: +(windowIndex * seam / fps).toFixed(2), borderColor: p.grid,
-                   strokeDashArray: 0, opacity: 1 });
-  }
+  const last = segments[segments.length - 1];
+  // The axis runs to the next whole 5 s with a tick every 5 s. drawChart's JSON
+  // round trip drops the label formatter, so round labels need round tick positions.
+  const seconds = Math.max(5, Math.ceil((last.start + last.length) / fps / 5) * 5);
   return {
     chart: { type: 'line', height: 220,
              width: Math.max(900, Math.round(seconds * PX_PER_SECOND)),
@@ -141,7 +168,8 @@ function waveOptions(wave, seam, fps, kept) {
     grid: { borderColor: p.grid, strokeDashArray: 0,
             xaxis: { lines: { show: false } }, yaxis: { lines: { show: false } },
             padding: { left: 12, right: 12, top: 0, bottom: 0 } },
-    xaxis: { type: 'numeric', tickAmount: 10, title: { text: 'seconds' },
+    xaxis: { type: 'numeric', tickAmount: seconds / 5, title: { text: 'seconds' },
+             min: 0, max: seconds, decimalsInFloat: 0,
              axisTicks: { show: false }, axisBorder: { show: false },
              labels: { formatter: v => Math.round(v) } },
     yaxis: { show: false },
@@ -378,10 +406,14 @@ function drawWaveform() {
   if (!d) return;
   const fps = (d.quality && d.quality.effective_fps) || 30;
   $('diag-wave-note').textContent =
-    'Drawn at about 100 px per second so individual beats are legible — scroll sideways to read the whole strip. ' +
-    'Windows are inferred independently and concatenated; pale red stretches were rejected by the quality gates.';
+    "Drawn on the capture's own timeline at about 100 px per second, so individual beats are legible " +
+    '— scroll sideways to read the whole strip. Analysis windows overlap by half; each is drawn from ' +
+    'its start until the next one takes over, and the vertical lines mark those joins. Pale red ' +
+    'stretches were rejected by the quality gates; a break in the line is where no window found a ' +
+    'cardiac peak.';
   drawChart('diag-wave',
-            waveOptions(d.waveform || [], d.clip_len || 160, fps, d.window_kept || []),
+            waveOptions(d.waveform || [], d.window_start || [], d.clip_len || 160, fps,
+                        d.window_kept || []),
             'No waveform: the model produced no output for this capture.');
 }
 

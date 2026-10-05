@@ -50,6 +50,13 @@ def report(result, quality, model_name, source):
     total = detail.get("n_total", 0)
     print(f"windows    : {used}/{total} usable "
           f"({detail.get('usable_fraction', float('nan')):.2f})")
+    if result.value != result.value:
+        # A refusal is printed as one rather than as "nan bpm": the gates found no
+        # reading, and the status says which gate.
+        print(f"\n  {result.vital.replace('_', ' ')}   no reading")
+        print(f"  status       {result.status}")
+        print(f"\n{DISCLAIMER}")
+        return 1
     print(f"\n  {result.vital.replace('_', ' ')}   {result.value:.2f} {result.unit}")
     print(f"  confidence   {result.confidence:.2f} {confidence_bar(result.confidence)}")
     print(f"  status       {result.status}")

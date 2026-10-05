@@ -5,6 +5,7 @@ matches how the Phase-3 models were trained: the preprocessing notebooks derived
 one box per recording rather than tracking per frame.
 """
 from dataclasses import dataclass, field
+import time
 
 import numpy as np
 import cv2
@@ -96,6 +97,10 @@ def rate_verdict(effective_fps):
         return "WARN", (f"{effective_fps:.1f} fps is below the "
                         f"{config.TARGET_FPS:.0f} fps training rate; "
                         f"treat as indicative")
+    if effective_fps > config.MAX_FPS_ACCEPT:
+        return "WARN", (f"{effective_fps:.1f} fps is above the "
+                        f"{config.TARGET_FPS:.0f} fps training rate, so each window "
+                        f"spans less time than in training; treat as indicative")
     return "ACCEPT", None
 
 
@@ -217,10 +222,18 @@ def crops_from_camera(camera, seconds, landmarker=None, on_progress=None):
 
     clip, stamps = [], []
     start = None
+    last_delivery = time.perf_counter()
     while True:
         ok, rgb, stamp = camera.read()
         if not ok:
+            # Only a delivered frame advances the clock that ends the capture, so
+            # a camera that stops delivering would otherwise hold this loop forever.
+            if time.perf_counter() - last_delivery > config.CAMERA_STALL_SECONDS:
+                raise RuntimeError(f"camera delivered no frame for "
+                                   f"{config.CAMERA_STALL_SECONDS:.0f} s; "
+                                   f"capture abandoned")
             continue
+        last_delivery = time.perf_counter()
         start = start if start is not None else stamp
         elapsed = stamp - start
         if elapsed > seconds:

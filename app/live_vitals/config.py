@@ -75,8 +75,22 @@ CONFIDENCE_FLOOR_HZ = 0.15
 # and that 22-26 Hz is an unreliable dead zone; a 10 fps webcam capture produced a
 # confident reading ~7 bpm below a known resting HR. Rate is a hard contract, not
 # a note: confidence cannot detect a wrong time base.
-MIN_FPS_ACCEPT = 27.0   # at or above this, rate is not a concern
+MIN_FPS_ACCEPT = 27.0   # from here up to MAX_FPS_ACCEPT, rate is not a concern
 MIN_FPS_WARN = 20.0     # below this the reading is refused outright
+
+# The gate is two-sided. Above the training rate the readout still converts with
+# the true rate, so the number is not scaled, but the model sees each pulse spread
+# over more frames than it ever saw in training: 60 bpm at 40 fps looks like 45 bpm
+# at 30, and a resting rate drifts toward the floor of the band it learned.
+# Decimation removes whole multiples (60 fps becomes 30); this catches what it
+# cannot, such as 40 fps, or UBFC-Phys at 35.1. The margin mirrors the lower one:
+# ten percent either side of the training rate.
+MAX_FPS_ACCEPT = 33.0   # above this the reading is kept but marked indicative
+
+# A webcam that stops delivering mid-capture (unplugged, or claimed by another
+# application) returns failed reads indefinitely, and the capture loop is timed by
+# delivered frames, so without a limit it would never end.
+CAMERA_STALL_SECONDS = 2.0
 
 # Below this surviving fraction the median is dominated by noise, so no value is
 # reported at all. A qualified wrong number is worse than a refusal: a capture that
