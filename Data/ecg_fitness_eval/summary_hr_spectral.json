@@ -1,0 +1,732 @@
+{
+  "estimator": "hr_spectral",
+  "store": "D:\\QualityPhys\\phase 3 benchmarks\\ecg_fitness_phase3_rc_none.h5",
+  "device": "cuda",
+  "limit": null,
+  "protocol": "NB_P3_29 Part 0 (pre-registered 2026-10-03; low-detection set added 2026-10-04)",
+  "settings": {
+    "clip_len": 160,
+    "window_stride": 80,
+    "min_confidence": 0.65,
+    "wrong_bpm": 10.0,
+    "ref_min_agree": 2,
+    "ref_recording_min": 0.8,
+    "span_tolerance": 0.05,
+    "low_detection_below": 6.0,
+    "max_box_side_lost": 0.02,
+    "fps_range": [
+      28.158211898761913,
+      30.015850504713438
+    ],
+    "bootstrap": {
+      "unit": "subject",
+      "resamples": 2000,
+      "seed": 0
+    }
+  },
+  "sets": {
+    "n_recordings": 100,
+    "n_primary": 80,
+    "primary_by_activity": {
+      "01": 16,
+      "02": 11,
+      "03": 17,
+      "04": 8,
+      "05": 14,
+      "06": 14
+    },
+    "store_mismatches": {}
+  },
+  "primary_by_activity": {
+    "01": {
+      "lighting": "ambient",
+      "motion_class": "low",
+      "n_recordings": 16,
+      "n_reported": 7,
+      "refusal": 0.5625,
+      "refusal_ci": [
+        0.3125,
+        0.8125
+      ],
+      "n_windows": 336,
+      "n_discarded": 258,
+      "window_discard": 0.7678571428571429,
+      "window_discard_ci": [
+        0.6946472338935574,
+        0.8392857142857143
+      ],
+      "n_scored": 55,
+      "n_confident_wrong": 18,
+      "confident_wrong": 0.32727272727272727,
+      "confident_wrong_ci": [
+        0.07687500000000001,
+        0.64
+      ],
+      "mae": 12.487241454869274,
+      "bias": -10.965693204867572,
+      "coverage": 0.1636904761904762,
+      "n_kept_unreferenced": 1
+    },
+    "02": {
+      "lighting": "ambient",
+      "motion_class": "moderate",
+      "n_recordings": 11,
+      "n_reported": 7,
+      "refusal": 0.36363636363636365,
+      "refusal_ci": [
+        0.1,
+        0.6666666666666666
+      ],
+      "n_windows": 231,
+      "n_discarded": 123,
+      "window_discard": 0.5324675324675324,
+      "window_discard_ci": [
+        0.3412698412698413,
+        0.7238095238095238
+      ],
+      "n_scored": 92,
+      "n_confident_wrong": 92,
+      "confident_wrong": 1.0,
+      "confident_wrong_ci": [
+        1.0,
+        1.0
+      ],
+      "mae": 43.29467484119233,
+      "bias": -43.29467484119233,
+      "coverage": 0.39826839826839827,
+      "n_kept_unreferenced": 9
+    },
+    "03": {
+      "lighting": "halogen",
+      "motion_class": "low",
+      "n_recordings": 17,
+      "n_reported": 5,
+      "refusal": 0.7058823529411765,
+      "refusal_ci": [
+        0.47058823529411764,
+        0.8823529411764706
+      ],
+      "n_windows": 357,
+      "n_discarded": 296,
+      "window_discard": 0.8291316526610645,
+      "window_discard_ci": [
+        0.7703081232492998,
+        0.8796218487394954
+      ],
+      "n_scored": 32,
+      "n_confident_wrong": 16,
+      "confident_wrong": 0.5,
+      "confident_wrong_ci": [
+        0.0,
+        0.875
+      ],
+      "mae": 19.390280596377274,
+      "bias": -18.31066973285651,
+      "coverage": 0.0896358543417367,
+      "n_kept_unreferenced": 2
+    },
+    "04": {
+      "lighting": "halogen",
+      "motion_class": "moderate",
+      "n_recordings": 8,
+      "n_reported": 2,
+      "refusal": 0.75,
+      "refusal_ci": [
+        0.42857142857142855,
+        1.0
+      ],
+      "n_windows": 168,
+      "n_discarded": 131,
+      "window_discard": 0.7797619047619048,
+      "window_discard_ci": [
+        0.6394557823129252,
+        0.8928571428571429
+      ],
+      "n_scored": 20,
+      "n_confident_wrong": 14,
+      "confident_wrong": 0.7,
+      "confident_wrong_ci": [
+        0.14285714285714285,
+        1.0
+      ],
+      "mae": 37.49272061195008,
+      "bias": -37.38441859488117,
+      "coverage": 0.11904761904761904,
+      "n_kept_unreferenced": 0
+    },
+    "05": {
+      "lighting": "ambient",
+      "motion_class": "high",
+      "n_recordings": 14,
+      "n_reported": 6,
+      "refusal": 0.5714285714285714,
+      "refusal_ci": [
+        0.3076923076923077,
+        0.8125
+      ],
+      "n_windows": 294,
+      "n_discarded": 196,
+      "window_discard": 0.6666666666666666,
+      "window_discard_ci": [
+        0.5054761904761904,
+        0.8174603174603174
+      ],
+      "n_scored": 79,
+      "n_confident_wrong": 55,
+      "confident_wrong": 0.6962025316455697,
+      "confident_wrong_ci": [
+        0.32781139964788736,
+        0.9375
+      ],
+      "mae": 25.213529158415717,
+      "bias": -21.746586143388186,
+      "coverage": 0.2687074829931973,
+      "n_kept_unreferenced": 3
+    },
+    "06": {
+      "lighting": "ambient",
+      "motion_class": "high",
+      "n_recordings": 14,
+      "n_reported": 6,
+      "refusal": 0.5714285714285714,
+      "refusal_ci": [
+        0.3123798076923077,
+        0.8333333333333334
+      ],
+      "n_windows": 294,
+      "n_discarded": 213,
+      "window_discard": 0.7244897959183674,
+      "window_discard_ci": [
+        0.5970634920634921,
+        0.8285912698412697
+      ],
+      "n_scored": 58,
+      "n_confident_wrong": 45,
+      "confident_wrong": 0.7758620689655172,
+      "confident_wrong_ci": [
+        0.38095238095238093,
+        1.0
+      ],
+      "mae": 28.815436216522333,
+      "bias": -28.738896842511174,
+      "coverage": 0.19727891156462585,
+      "n_kept_unreferenced": 3
+    }
+  },
+  "hypotheses": {
+    "H1": {
+      "difference": 0.02640941935957153,
+      "ci": [
+        -0.24728866067824876,
+        0.2677559401782664
+      ],
+      "share_of_confident_wrong": 0.4166666666666667,
+      "share_of_scored_windows": 0.40773809523809523,
+      "reading": "unresolved"
+    },
+    "H2": {
+      "refusal": {
+        "01/03": 0.6363636363636364,
+        "02/04": 0.5263157894736842,
+        "05/06": 0.5714285714285714
+      },
+      "moderate_minus_low": {
+        "difference": -0.11004784688995217,
+        "ci": [
+          -0.41670454545454544,
+          0.15207623722700855
+        ]
+      },
+      "high_minus_moderate": {
+        "difference": 0.045112781954887216,
+        "ci": [
+          -0.17148502459623,
+          0.335585721468074
+        ]
+      },
+      "reading": "unresolved"
+    },
+    "H3": {
+      "03_vs_01": {
+        "refusal": {
+          "difference": 0.14338235294117652,
+          "ci": [
+            -0.17647058823529405,
+            0.47058823529411764
+          ],
+          "reading": "not contradicted"
+        },
+        "confident_wrong": {
+          "difference": 0.17272727272727273,
+          "ci": [
+            -0.29513672685761727,
+            0.5953384652981426
+          ],
+          "reading": "not contradicted"
+        },
+        "n_recordings": {
+          "03": 17,
+          "01": 16
+        }
+      },
+      "04_vs_02": {
+        "refusal": {
+          "difference": 0.38636363636363635,
+          "ci": [
+            -0.05555555555555558,
+            0.8
+          ],
+          "reading": "not contradicted"
+        },
+        "confident_wrong": {
+          "difference": -0.30000000000000004,
+          "ci": [
+            -0.8571428571428572,
+            0.0
+          ],
+          "reading": "not contradicted"
+        },
+        "n_recordings": {
+          "04": 8,
+          "02": 11
+        }
+      }
+    }
+  },
+  "supplementary_not_preregistered": {
+    "confident_wrong_by_recording_status": {
+      "flagged (degraded/unstable)": {
+        "n_scored": 129,
+        "n_confident_wrong": 61
+      },
+      "ok": {
+        "n_scored": 207,
+        "n_confident_wrong": 179
+      }
+    },
+    "recordings_reported_off_by_more_than_10_bpm": {
+      "01": {
+        "n_reported": 7,
+        "n_off_by_more_than_10": 1,
+        "n_ok_status_off_by_more_than_10": 0
+      },
+      "02": {
+        "n_reported": 7,
+        "n_off_by_more_than_10": 7,
+        "n_ok_status_off_by_more_than_10": 6
+      },
+      "03": {
+        "n_reported": 5,
+        "n_off_by_more_than_10": 3,
+        "n_ok_status_off_by_more_than_10": 0
+      },
+      "04": {
+        "n_reported": 2,
+        "n_off_by_more_than_10": 1,
+        "n_ok_status_off_by_more_than_10": 1
+      },
+      "05": {
+        "n_reported": 6,
+        "n_off_by_more_than_10": 3,
+        "n_ok_status_off_by_more_than_10": 3
+      },
+      "06": {
+        "n_reported": 6,
+        "n_off_by_more_than_10": 4,
+        "n_ok_status_off_by_more_than_10": 2
+      }
+    }
+  },
+  "reported_separately": {
+    "below_reference_gate": [
+      {
+        "recording": "00_02",
+        "activity": "02",
+        "ref_frac": 0.619,
+        "ref_hr_median": 152.01504516601562,
+        "face_detections": 3,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "degraded_capture",
+        "value": 44.04989198068918,
+        "forced_status": "degraded_capture",
+        "forced_value": 44.04989198068918,
+        "error_vs_reference": -107.96515318532644
+      },
+      {
+        "recording": "00_04",
+        "activity": "04",
+        "ref_frac": 0.762,
+        "ref_hr_median": 159.3010025024414,
+        "face_detections": 5,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "insufficient_quality",
+        "value": NaN,
+        "forced_status": "insufficient_quality",
+        "forced_value": NaN,
+        "error_vs_reference": NaN
+      },
+      {
+        "recording": "00_05",
+        "activity": "05",
+        "ref_frac": 0.762,
+        "ref_hr_median": 98.98097229003906,
+        "face_detections": 12,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "insufficient_quality",
+        "value": NaN,
+        "forced_status": "insufficient_quality",
+        "forced_value": NaN,
+        "error_vs_reference": NaN
+      },
+      {
+        "recording": "01_04",
+        "activity": "04",
+        "ref_frac": 0.762,
+        "ref_hr_median": 106.4983139038086,
+        "face_detections": 11,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "ok",
+        "value": 81.57078252781832,
+        "forced_status": "ok",
+        "forced_value": 81.57078252781832,
+        "error_vs_reference": -24.92753137599027
+      },
+      {
+        "recording": "03_02",
+        "activity": "02",
+        "ref_frac": 0.667,
+        "ref_hr_median": 136.03174591064453,
+        "face_detections": 12,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "insufficient_quality",
+        "value": NaN,
+        "forced_status": "insufficient_quality",
+        "forced_value": NaN,
+        "error_vs_reference": NaN
+      },
+      {
+        "recording": "08_02",
+        "activity": "02",
+        "ref_frac": 0.238,
+        "ref_hr_median": 136.05738830566406,
+        "face_detections": 8,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "ok",
+        "value": 69.84199340669859,
+        "forced_status": "ok",
+        "forced_value": 69.84199340669859,
+        "error_vs_reference": -66.21539489896547
+      },
+      {
+        "recording": "08_04",
+        "activity": "04",
+        "ref_frac": 0.524,
+        "ref_hr_median": 137.47637939453125,
+        "face_detections": 8,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "insufficient_quality",
+        "value": NaN,
+        "forced_status": "insufficient_quality",
+        "forced_value": NaN,
+        "error_vs_reference": NaN
+      },
+      {
+        "recording": "08_05",
+        "activity": "05",
+        "ref_frac": 0.667,
+        "ref_hr_median": 134.1070327758789,
+        "face_detections": 11,
+        "frac_side_lost": 0.0523,
+        "box_side_lost_stored": 0.093,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
+        "forced_status": "insufficient_quality",
+        "forced_value": NaN,
+        "error_vs_reference": NaN
+      },
+      {
+        "recording": "08_06",
+        "activity": "06",
+        "ref_frac": 0.714,
+        "ref_hr_median": 139.1076202392578,
+        "face_detections": 10,
+        "frac_side_lost": 0.038,
+        "box_side_lost_stored": 0.0675,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
+        "forced_status": "insufficient_quality",
+        "forced_value": NaN,
+        "error_vs_reference": NaN
+      },
+      {
+        "recording": "09_02",
+        "activity": "02",
+        "ref_frac": 0.238,
+        "ref_hr_median": 153.56964111328125,
+        "face_detections": 11,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "degraded_capture",
+        "value": 73.15686645447789,
+        "forced_status": "degraded_capture",
+        "forced_value": 73.15686645447789,
+        "error_vs_reference": -80.41277465880336
+      },
+      {
+        "recording": "09_04",
+        "activity": "04",
+        "ref_frac": 0.619,
+        "ref_hr_median": 163.1141815185547,
+        "face_detections": 10,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "insufficient_quality",
+        "value": NaN,
+        "forced_status": "insufficient_quality",
+        "forced_value": NaN,
+        "error_vs_reference": NaN
+      },
+      {
+        "recording": "11_01",
+        "activity": "01",
+        "ref_frac": 0.762,
+        "ref_hr_median": 125.05606079101562,
+        "face_detections": 12,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "insufficient_quality",
+        "value": NaN,
+        "forced_status": "insufficient_quality",
+        "forced_value": NaN,
+        "error_vs_reference": NaN
+      },
+      {
+        "recording": "12_04",
+        "activity": "04",
+        "ref_frac": 0.762,
+        "ref_hr_median": 111.25064086914062,
+        "face_detections": 9,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "ok",
+        "value": 74.97211591075717,
+        "forced_status": "ok",
+        "forced_value": 74.97211591075717,
+        "error_vs_reference": -36.27852495838346
+      },
+      {
+        "recording": "14_02",
+        "activity": "02",
+        "ref_frac": 0.762,
+        "ref_hr_median": 114.96538543701172,
+        "face_detections": 9,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "ok",
+        "value": 67.37284022495388,
+        "forced_status": "ok",
+        "forced_value": 67.37284022495388,
+        "error_vs_reference": -47.59254521205784
+      },
+      {
+        "recording": "14_04",
+        "activity": "04",
+        "ref_frac": 0.762,
+        "ref_hr_median": 118.19611358642578,
+        "face_detections": 7,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "insufficient_quality",
+        "value": NaN,
+        "forced_status": "insufficient_quality",
+        "forced_value": NaN,
+        "error_vs_reference": NaN
+      },
+      {
+        "recording": "15_04",
+        "activity": "04",
+        "ref_frac": 0.667,
+        "ref_hr_median": 132.96609497070312,
+        "face_detections": 7,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "ok",
+        "value": 68.28315051740952,
+        "forced_status": "ok",
+        "forced_value": 68.28315051740952,
+        "error_vs_reference": -64.6829444532936
+      },
+      {
+        "recording": "16_04",
+        "activity": "04",
+        "ref_frac": 0.619,
+        "ref_hr_median": 156.14561462402344,
+        "face_detections": 5,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "degraded_capture",
+        "value": 103.95391880885288,
+        "forced_status": "degraded_capture",
+        "forced_value": 103.95391880885288,
+        "error_vs_reference": -52.19169581517056
+      }
+    ],
+    "clamped": [
+      {
+        "recording": "07_05",
+        "activity": "05",
+        "ref_frac": 0.952,
+        "ref_hr_median": 115.2558708190918,
+        "face_detections": 12,
+        "frac_side_lost": 0.0497,
+        "box_side_lost_stored": 0.0883,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
+        "forced_status": "degraded_capture",
+        "forced_value": 56.329411739877635,
+        "error_vs_reference": NaN
+      },
+      {
+        "recording": "08_05",
+        "activity": "05",
+        "ref_frac": 0.667,
+        "ref_hr_median": 134.1070327758789,
+        "face_detections": 11,
+        "frac_side_lost": 0.0523,
+        "box_side_lost_stored": 0.093,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
+        "forced_status": "insufficient_quality",
+        "forced_value": NaN,
+        "error_vs_reference": NaN
+      },
+      {
+        "recording": "08_06",
+        "activity": "06",
+        "ref_frac": 0.714,
+        "ref_hr_median": 139.1076202392578,
+        "face_detections": 10,
+        "frac_side_lost": 0.038,
+        "box_side_lost_stored": 0.0675,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
+        "forced_status": "insufficient_quality",
+        "forced_value": NaN,
+        "error_vs_reference": NaN
+      },
+      {
+        "recording": "10_06",
+        "activity": "06",
+        "ref_frac": 0.81,
+        "ref_hr_median": 138.70567321777344,
+        "face_detections": 12,
+        "frac_side_lost": 0.0363,
+        "box_side_lost_stored": 0.0645,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
+        "forced_status": "insufficient_quality",
+        "forced_value": NaN,
+        "error_vs_reference": NaN
+      }
+    ],
+    "low_detection": [
+      {
+        "recording": "00_02",
+        "activity": "02",
+        "ref_frac": 0.619,
+        "ref_hr_median": 152.01504516601562,
+        "face_detections": 3,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "degraded_capture",
+        "value": 44.04989198068918,
+        "forced_status": "degraded_capture",
+        "forced_value": 44.04989198068918,
+        "error_vs_reference": -107.96515318532644
+      },
+      {
+        "recording": "00_04",
+        "activity": "04",
+        "ref_frac": 0.762,
+        "ref_hr_median": 159.3010025024414,
+        "face_detections": 5,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "insufficient_quality",
+        "value": NaN,
+        "forced_status": "insufficient_quality",
+        "forced_value": NaN,
+        "error_vs_reference": NaN
+      },
+      {
+        "recording": "01_06",
+        "activity": "06",
+        "ref_frac": 1.0,
+        "ref_hr_median": 110.34201049804688,
+        "face_detections": 3,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "insufficient_quality",
+        "value": NaN,
+        "forced_status": "insufficient_quality",
+        "forced_value": NaN,
+        "error_vs_reference": NaN
+      },
+      {
+        "recording": "16_04",
+        "activity": "04",
+        "ref_frac": 0.619,
+        "ref_hr_median": 156.14561462402344,
+        "face_detections": 5,
+        "frac_side_lost": 0.0,
+        "box_side_lost_stored": 0.0,
+        "capture_verdict": "ACCEPT",
+        "status": "degraded_capture",
+        "value": 103.95391880885288,
+        "forced_status": "degraded_capture",
+        "forced_value": 103.95391880885288,
+        "error_vs_reference": -52.19169581517056
+      }
+    ],
+    "off_span_windows": {
+      "n_windows": 21,
+      "recordings": [
+        "08_05"
+      ],
+      "n_kept": 2,
+      "n_kept_referenced_reported": 0,
+      "n_off_by_more_than_10": 1
+    }
+  }
+}

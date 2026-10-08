@@ -1,0 +1,392 @@
+{
+  "script": "diagnose_ecg_fitness_motion",
+  "exploratory": true,
+  "store": "D:\\QualityPhys\\phase 3 benchmarks\\ecg_fitness_phase3_rc_none.h5",
+  "bbox_root": "D:\\QualityPhys\\demo_data\\ecg_fitness_subset\\bbox",
+  "eval_dir": "D:\\code\\QualityPhys - CRVSE Project\\Data\\ecg_fitness_eval",
+  "recordings": 100,
+  "windows": 2100,
+  "tolerance_bpm": 5.0,
+  "clear_rhythm": 0.65,
+  "problems": [],
+  "motion_by_activity": {
+    "01": {
+      "windows": 357,
+      "box_amp_pct_face": 1.9947185336466045,
+      "box_clear": 0.4957983193277311,
+      "box_rhythm_when_clear": 51.54681946107782,
+      "crop_amp_px": 0.43739368134326717,
+      "crop_clear": 0.24649859943977592
+    },
+    "02": {
+      "windows": 336,
+      "box_amp_pct_face": 6.811518494648304,
+      "box_clear": 0.9101796407185628,
+      "box_rhythm_when_clear": 63.697098870768414,
+      "crop_amp_px": 1.758820923496827,
+      "crop_clear": 0.5089285714285714
+    },
+    "03": {
+      "windows": 357,
+      "box_amp_pct_face": 2.278283970317367,
+      "box_clear": 0.5098039215686274,
+      "box_rhythm_when_clear": 52.172263382055405,
+      "crop_amp_px": 0.4391390668733625,
+      "crop_clear": 0.22969187675070027
+    },
+    "04": {
+      "windows": 336,
+      "box_amp_pct_face": 7.841506450977665,
+      "box_clear": 0.8761329305135952,
+      "box_rhythm_when_clear": 61.22352029312504,
+      "crop_amp_px": 2.080385397565841,
+      "crop_clear": 0.4583333333333333
+    },
+    "05": {
+      "windows": 357,
+      "box_amp_pct_face": 10.557888071152048,
+      "box_clear": 0.8487394957983193,
+      "box_rhythm_when_clear": 61.57153818499775,
+      "crop_amp_px": 4.340699249864535,
+      "crop_clear": 0.9635854341736695
+    },
+    "06": {
+      "windows": 357,
+      "box_amp_pct_face": 8.242775860568276,
+      "box_clear": 0.7186440677966102,
+      "box_rhythm_when_clear": 56.29565681456636,
+      "crop_amp_px": 2.7263365408369338,
+      "crop_clear": 0.9635854341736695
+    }
+  },
+  "crop_sees_box": {
+    "01": {
+      "windows": 177,
+      "same": 0.7175141242937854,
+      "harmonic": 0.03954802259887006,
+      "median_abs_diff": 2.200419955976173
+    },
+    "02": {
+      "windows": 304,
+      "same": 0.7796052631578947,
+      "harmonic": 0.029605263157894735,
+      "median_abs_diff": 1.1437356368043297
+    },
+    "03": {
+      "windows": 182,
+      "same": 0.7472527472527473,
+      "harmonic": 0.016483516483516484,
+      "median_abs_diff": 1.912298284986342
+    },
+    "04": {
+      "windows": 290,
+      "same": 0.6413793103448275,
+      "harmonic": 0.1103448275862069,
+      "median_abs_diff": 1.974473560933614
+    },
+    "05": {
+      "windows": 303,
+      "same": 0.7623762376237624,
+      "harmonic": 0.17491749174917492,
+      "median_abs_diff": 0.41408383040838004
+    },
+    "06": {
+      "windows": 212,
+      "same": 0.839622641509434,
+      "harmonic": 0.07075471698113207,
+      "median_abs_diff": 0.24667751134808213
+    }
+  },
+  "scored": {
+    "physnet": {
+      "box": {
+        "01/03": {
+          "wrong": 9,
+          "wrong_kept_when_on": 1.0,
+          "wrong_kept_when_off": 1.0,
+          "wrong_reading_on": 0.0,
+          "wrong_reading_harmonic": 0.2222222222222222,
+          "wrong_ecg_on": 0.0,
+          "wrong_ecg_harmonic": 0.1111111111111111,
+          "right": 125,
+          "right_reading_on_any": 0.216
+        },
+        "02/04": {
+          "wrong": 24,
+          "wrong_kept_when_on": 1.0,
+          "wrong_kept_when_off": 1.0,
+          "wrong_reading_on": 0.7083333333333334,
+          "wrong_reading_harmonic": 0.0,
+          "wrong_ecg_on": 0.0,
+          "wrong_ecg_harmonic": 0.041666666666666664,
+          "right": 5,
+          "right_reading_on_any": 0.2
+        },
+        "05/06": {
+          "wrong": 93,
+          "wrong_kept_when_on": 1.0,
+          "wrong_kept_when_off": 1.0,
+          "wrong_reading_on": 0.0641025641025641,
+          "wrong_reading_harmonic": 0.7948717948717948,
+          "wrong_ecg_on": 0.0,
+          "wrong_ecg_harmonic": 0.01282051282051282,
+          "right": 78,
+          "right_reading_on_any": 0.9102564102564102
+        }
+      },
+      "crop": {
+        "01/03": {
+          "wrong": 9,
+          "wrong_kept_when_on": 1.0,
+          "wrong_kept_when_off": 1.0,
+          "wrong_reading_on": 0.1111111111111111,
+          "wrong_reading_harmonic": 0.0,
+          "wrong_ecg_on": 0.2222222222222222,
+          "wrong_ecg_harmonic": 0.0,
+          "right": 125,
+          "right_reading_on_any": 0.2
+        },
+        "02/04": {
+          "wrong": 24,
+          "wrong_kept_when_on": 1.0,
+          "wrong_kept_when_off": 1.0,
+          "wrong_reading_on": 0.5833333333333334,
+          "wrong_reading_harmonic": 0.0,
+          "wrong_ecg_on": 0.0,
+          "wrong_ecg_harmonic": 0.041666666666666664,
+          "right": 5,
+          "right_reading_on_any": 0.0
+        },
+        "05/06": {
+          "wrong": 93,
+          "wrong_kept_when_on": 1.0,
+          "wrong_kept_when_off": 1.0,
+          "wrong_reading_on": 0.26881720430107525,
+          "wrong_reading_harmonic": 0.6344086021505376,
+          "wrong_ecg_on": 0.0,
+          "wrong_ecg_harmonic": 0.0,
+          "right": 78,
+          "right_reading_on_any": 0.9487179487179487
+        }
+      }
+    },
+    "pos": {
+      "box": {
+        "01/03": {
+          "wrong": 34,
+          "wrong_kept_when_on": 1.0,
+          "wrong_kept_when_off": 1.0,
+          "wrong_reading_on": 0.5,
+          "wrong_reading_harmonic": 0.0,
+          "wrong_ecg_on": 0.0,
+          "wrong_ecg_harmonic": 0.14705882352941177,
+          "right": 53,
+          "right_reading_on_any": 0.3584905660377358
+        },
+        "02/04": {
+          "wrong": 106,
+          "wrong_kept_when_on": 1.0,
+          "wrong_kept_when_off": 1.0,
+          "wrong_reading_on": 0.9150943396226415,
+          "wrong_reading_harmonic": 0.0,
+          "wrong_ecg_on": 0.0,
+          "wrong_ecg_harmonic": 0.03773584905660377,
+          "right": 6,
+          "right_reading_on_any": 0.0
+        },
+        "05/06": {
+          "wrong": 100,
+          "wrong_kept_when_on": 1.0,
+          "wrong_kept_when_off": 1.0,
+          "wrong_reading_on": 0.4945054945054945,
+          "wrong_reading_harmonic": 0.2857142857142857,
+          "wrong_ecg_on": 0.0,
+          "wrong_ecg_harmonic": 0.06593406593406594,
+          "right": 37,
+          "right_reading_on_any": 0.8108108108108109
+        }
+      },
+      "crop": {
+        "01/03": {
+          "wrong": 34,
+          "wrong_kept_when_on": 1.0,
+          "wrong_kept_when_off": 1.0,
+          "wrong_reading_on": 0.4411764705882353,
+          "wrong_reading_harmonic": 0.11764705882352941,
+          "wrong_ecg_on": 0.0,
+          "wrong_ecg_harmonic": 0.11764705882352941,
+          "right": 53,
+          "right_reading_on_any": 0.33962264150943394
+        },
+        "02/04": {
+          "wrong": 106,
+          "wrong_kept_when_on": 1.0,
+          "wrong_kept_when_off": 1.0,
+          "wrong_reading_on": 0.839622641509434,
+          "wrong_reading_harmonic": 0.0,
+          "wrong_ecg_on": 0.0,
+          "wrong_ecg_harmonic": 0.03773584905660377,
+          "right": 6,
+          "right_reading_on_any": 1.0
+        },
+        "05/06": {
+          "wrong": 100,
+          "wrong_kept_when_on": 1.0,
+          "wrong_kept_when_off": 1.0,
+          "wrong_reading_on": 0.71,
+          "wrong_reading_harmonic": 0.21,
+          "wrong_ecg_on": 0.0,
+          "wrong_ecg_harmonic": 0.05,
+          "right": 37,
+          "right_reading_on_any": 0.972972972972973
+        }
+      }
+    }
+  },
+  "all_referenced": {
+    "physnet": {
+      "box": {
+        "01/03": {
+          "wrong": 309,
+          "wrong_kept_when_on": 0.09333333333333334,
+          "wrong_kept_when_off": 0.06837606837606838,
+          "wrong_reading_on": 0.04854368932038835,
+          "wrong_reading_harmonic": 0.1941747572815534,
+          "wrong_ecg_on": 0.061488673139158574,
+          "wrong_ecg_harmonic": 0.07766990291262135,
+          "right": 379,
+          "right_reading_on_any": 0.1820580474934037
+        },
+        "02/04": {
+          "wrong": 424,
+          "wrong_kept_when_on": 0.20105820105820105,
+          "wrong_kept_when_off": 0.16228070175438597,
+          "wrong_reading_on": 0.2829736211031175,
+          "wrong_reading_harmonic": 0.17026378896882494,
+          "wrong_ecg_on": 0.0,
+          "wrong_ecg_harmonic": 0.11990407673860912,
+          "right": 113,
+          "right_reading_on_any": 0.21238938053097345
+        },
+        "05/06": {
+          "wrong": 463,
+          "wrong_kept_when_on": 0.4262295081967213,
+          "wrong_kept_when_off": 0.11320754716981132,
+          "wrong_reading_on": 0.16129032258064516,
+          "wrong_reading_harmonic": 0.4441687344913151,
+          "wrong_ecg_on": 0.0,
+          "wrong_ecg_harmonic": 0.04962779156327544,
+          "right": 170,
+          "right_reading_on_any": 0.7235294117647059
+        }
+      },
+      "crop": {
+        "01/03": {
+          "wrong": 309,
+          "wrong_kept_when_on": 0.09210526315789473,
+          "wrong_kept_when_off": 0.06866952789699571,
+          "wrong_reading_on": 0.0970873786407767,
+          "wrong_reading_harmonic": 0.1488673139158576,
+          "wrong_ecg_on": 0.08737864077669903,
+          "wrong_ecg_harmonic": 0.0744336569579288,
+          "right": 379,
+          "right_reading_on_any": 0.1820580474934037
+        },
+        "02/04": {
+          "wrong": 424,
+          "wrong_kept_when_on": 0.21081081081081082,
+          "wrong_kept_when_off": 0.1506276150627615,
+          "wrong_reading_on": 0.3466981132075472,
+          "wrong_reading_harmonic": 0.08962264150943396,
+          "wrong_ecg_on": 0.007075471698113208,
+          "wrong_ecg_harmonic": 0.1320754716981132,
+          "right": 113,
+          "right_reading_on_any": 0.25663716814159293
+        },
+        "05/06": {
+          "wrong": 463,
+          "wrong_kept_when_on": 0.3724340175953079,
+          "wrong_kept_when_off": 0.09836065573770492,
+          "wrong_reading_on": 0.31965442764578833,
+          "wrong_reading_harmonic": 0.4168466522678186,
+          "wrong_ecg_on": 0.0064794816414686825,
+          "wrong_ecg_harmonic": 0.02159827213822894,
+          "right": 170,
+          "right_reading_on_any": 0.8117647058823529
+        }
+      }
+    },
+    "pos": {
+      "box": {
+        "01/03": {
+          "wrong": 354,
+          "wrong_kept_when_on": 0.20967741935483872,
+          "wrong_kept_when_off": 0.11304347826086956,
+          "wrong_reading_on": 0.2994350282485876,
+          "wrong_reading_harmonic": 0.05084745762711865,
+          "wrong_ecg_on": 0.025423728813559324,
+          "wrong_ecg_harmonic": 0.0903954802259887,
+          "right": 311,
+          "right_reading_on_any": 0.2347266881028939
+        },
+        "02/04": {
+          "wrong": 430,
+          "wrong_kept_when_on": 0.5731225296442688,
+          "wrong_kept_when_off": 0.2631578947368421,
+          "wrong_reading_on": 0.5518867924528302,
+          "wrong_reading_harmonic": 0.04481132075471698,
+          "wrong_ecg_on": 0.0,
+          "wrong_ecg_harmonic": 0.11556603773584906,
+          "right": 43,
+          "right_reading_on_any": 0.09523809523809523
+        },
+        "05/06": {
+          "wrong": 503,
+          "wrong_kept_when_on": 0.3574144486692015,
+          "wrong_kept_when_off": 0.1774193548387097,
+          "wrong_reading_on": 0.3429844097995546,
+          "wrong_reading_harmonic": 0.24276169265033407,
+          "wrong_ecg_on": 0.013363028953229399,
+          "wrong_ecg_harmonic": 0.10022271714922049,
+          "right": 137,
+          "right_reading_on_any": 0.5615384615384615
+        }
+      },
+      "crop": {
+        "01/03": {
+          "wrong": 354,
+          "wrong_kept_when_on": 0.2413793103448276,
+          "wrong_kept_when_off": 0.10084033613445378,
+          "wrong_reading_on": 0.2542372881355932,
+          "wrong_reading_harmonic": 0.07344632768361582,
+          "wrong_ecg_on": 0.062146892655367235,
+          "wrong_ecg_harmonic": 0.0847457627118644,
+          "right": 311,
+          "right_reading_on_any": 0.2090032154340836
+        },
+        "02/04": {
+          "wrong": 430,
+          "wrong_kept_when_on": 0.562992125984252,
+          "wrong_kept_when_off": 0.2840909090909091,
+          "wrong_reading_on": 0.5511627906976744,
+          "wrong_reading_harmonic": 0.03953488372093023,
+          "wrong_ecg_on": 0.004651162790697674,
+          "wrong_ecg_harmonic": 0.12558139534883722,
+          "right": 43,
+          "right_reading_on_any": 0.3953488372093023
+        },
+        "05/06": {
+          "wrong": 503,
+          "wrong_kept_when_on": 0.37910447761194027,
+          "wrong_kept_when_off": 0.07142857142857142,
+          "wrong_reading_on": 0.4274353876739563,
+          "wrong_reading_harmonic": 0.23856858846918488,
+          "wrong_ecg_on": 0.015904572564612324,
+          "wrong_ecg_harmonic": 0.05765407554671968,
+          "right": 137,
+          "right_reading_on_any": 0.6131386861313869
+        }
+      }
+    }
+  }
+}
