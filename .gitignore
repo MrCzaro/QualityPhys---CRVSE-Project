@@ -55,3 +55,4 @@ Data/ecg_fitness_eval/*
 *.mov
 *.mp4
 *.avi
+.vscode
