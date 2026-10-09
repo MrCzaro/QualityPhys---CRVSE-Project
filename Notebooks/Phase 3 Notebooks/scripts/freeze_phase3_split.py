@@ -1,8 +1,8 @@
 """Freezes, as a file, the subject split the shipped PhysNet v2 was actually trained on.
 
 NB_P3_18 trained v2 with NB_P3_07's `subject_split`, but its index also held PhysDrive
-(scored zero-shot), so the seed-42 shuffle ran over 785 subjects rather than the
-documented 739 (PROJECT_CONTEXT §8). This script replays NB_P3_18's index and split
+(scored zero-shot), so the seed-42 shuffle ran over 785 subjects rather than
+NB_P3_07's 739. This script replays NB_P3_18's index and split
 from the stores' attributes - no frames are read - checks the result against NB_P3_18's
 own printout, adds VitalVideos' frozen 240/60 split, and writes Data/phase3_split.csv.
 From then on training and evaluation read the split from that file; nothing

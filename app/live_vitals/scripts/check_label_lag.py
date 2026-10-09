@@ -12,8 +12,8 @@ stored bvp, both band-passed to the app's HR band, then Pearson r at every lag w
 --max-lag. A lag > 0 means the video trails the label: the video at time t matches the
 label at t - lag.
 
-A pulse correlates again one beat later, and with its sign flipped half a beat later
-(PROJECT_CONTEXT §8), so one recording's largest |r| is not its offset. Per corpus, the
+A pulse correlates again one beat later, and with its sign flipped half a beat later,
+so one recording's largest |r| is not its offset. Per corpus, the
 recordings' correlograms are averaged on a common lag grid: heart rates differ between
 recordings, so those echoes fall at different lags and wash out, while an offset the
 recordings share adds up. The average's extremum gives the corpus's sign and anchors
@@ -22,7 +22,7 @@ of the anchor, and the corpus's offset is the median of those. A recording whose
 alignment of that sign lies elsewhere by a clear margin (r higher by ELSEWHERE_MARGIN)
 is counted, since it may carry an offset of its own.
 
-Decision rule, fixed before the run (PROJECT_CONTEXT §11): labels are shifted only if
+Decision rule, fixed before the run: labels are shifted only if
 the training corpora's offsets differ by more than 2 frames at 30 fps (0.067 s); then
 every corpus is shifted by its own offset, in every training run.
 
