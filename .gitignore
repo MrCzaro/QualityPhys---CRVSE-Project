@@ -5,7 +5,7 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 Data/Phase3/*.db
-
+.vscode
 # FastHTML / local session key
 app/live_hr_demo/.sesskey
 .sesskey
@@ -51,8 +51,9 @@ Data/vitalvideos_eval/*
 !Data/vitalvideos_eval/summary_*.json
 Data/ecg_fitness_eval/*
 !Data/ecg_fitness_eval/summary_*.json
+Data/motion_gate/*
+!Data/motion_gate/summary_*.json
 
 *.mov
 *.mp4
 *.avi
-.vscode
