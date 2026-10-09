@@ -1,0 +1,85 @@
+{
+  "script": "check_label_lag",
+  "per_corpus": 60,
+  "max_lag_s": 1.0,
+  "seed": 0,
+  "grid_step_s": 0.005,
+  "convention": "lag > 0: the video trails the label",
+  "corpora": {
+    "MCD": {
+      "n": 60,
+      "sign": "+",
+      "lag_s": -0.742,
+      "lag_frames_at_30fps": -22.27,
+      "lag_iqr_s": [
+        -0.92,
+        -0.565
+      ],
+      "within_one_frame": 0.15,
+      "recording_r_median": 0.324,
+      "offset_elsewhere": 0,
+      "averaged_lag_s": -0.715,
+      "averaged_peak_r": 0.031,
+      "readable": false
+    },
+    "DLCN": {
+      "n": 60,
+      "sign": "-",
+      "lag_s": 0.06,
+      "lag_frames_at_30fps": 1.8,
+      "lag_iqr_s": [
+        0.039,
+        0.1
+      ],
+      "within_one_frame": 0.533,
+      "recording_r_median": 0.512,
+      "offset_elsewhere": 1,
+      "averaged_lag_s": 0.065,
+      "averaged_peak_r": 0.469,
+      "readable": true
+    },
+    "UBFC-rPPG": {
+      "n": 35,
+      "sign": "+",
+      "lag_s": -0.265,
+      "lag_frames_at_30fps": -7.95,
+      "lag_iqr_s": [
+        -0.327,
+        -0.202
+      ],
+      "within_one_frame": 0.343,
+      "recording_r_median": 0.646,
+      "offset_elsewhere": 3,
+      "averaged_lag_s": -0.265,
+      "averaged_peak_r": 0.451,
+      "readable": true
+    },
+    "VitalVideos-WW": {
+      "n": 60,
+      "sign": "-",
+      "lag_s": 0.11,
+      "lag_frames_at_30fps": 3.3,
+      "lag_iqr_s": [
+        0.085,
+        0.14
+      ],
+      "within_one_frame": 0.617,
+      "recording_r_median": 0.817,
+      "offset_elsewhere": 0,
+      "averaged_lag_s": 0.105,
+      "averaged_peak_r": 0.697,
+      "readable": true
+    }
+  },
+  "decision": {
+    "spread_s": 0.375,
+    "spread_frames_at_30fps": 11.25,
+    "limit_s": 0.067,
+    "verdict": "shift each corpus's labels by its own offset (unreadable, so not judged: MCD)",
+    "unreadable": [
+      "MCD"
+    ]
+  },
+  "skipped": [],
+  "minutes": 0.5
+}
