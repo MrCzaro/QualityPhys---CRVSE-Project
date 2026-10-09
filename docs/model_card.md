@@ -426,9 +426,12 @@ rather than defended by review.
 ### Training Reference
 
 Trained on the Phase-3 corpus — **MCD-rPPG, DLCN and UBFC-rPPG** — under a seed-42
-subject-wise split: 739 subjects, 148 held out for validation. The split is
-reproducible offline from the CSV logs in `Data/`, which is what makes the held-out
-evaluations below verifiable without the corpus itself.
+subject-wise split. The architecture screen below split 739 subjects and held out 148.
+The shipped v2 run also indexed PhysDrive to score it zero-shot, so the same shuffle ran
+over 785 subjects and held out 157: a different assignment. This was found on
+2026-10-09 by replaying both splits from the CSV logs in `Data/`; each replay
+reproduces its notebook's printout exactly. v2's split is frozen in
+`Data/phase3_split.csv`, and each evaluation below says where its subjects sit in it.
 
 Loss was negative-Pearson on the waveform plus a frequency-matching / SNR term.
 
@@ -484,11 +487,13 @@ board. It was not adopted. The `baseline` run is what ships.
 
 ### Evaluation
 
-All figures below come from scripts in `app/live_vitals/scripts/`, run on data the
-model never trained on: subjects the seed-42 split places in validation, and
-UBFC-Phys, which no training run used.
+All figures below come from scripts in `app/live_vitals/scripts/`. UBFC-Phys was never
+used in training. The UBFC-rPPG and MCD-rPPG sets were drawn from the screen's
+validation split, not v2's, so most of their subjects were in v2's training data
+(Training Reference): they check the pipeline and catch drift, but they are not
+held-out accuracy.
 
-**Held-out UBFC-rPPG, 8 subjects.** `check_ubfc_regression.py`, against a committed
+**UBFC-rPPG regression set, 8 subjects.** `check_ubfc_regression.py`, against a committed
 baseline (`ubfc_baseline_hr_physnet_v2.json`) so drift is detected rather than
 argued about. Per-window predicted HR is compared against the same spectral readout
 applied to the reference BVP over the same windows, paired by window start frame so
@@ -506,7 +511,11 @@ that a window without a readable peak cannot shift the comparison.
 | 47 | 111.24 | 111.41 | -0.17 | 1.16 | ok |
 | **mean** | | | **-0.784** | **1.239** | |
 
-**Held-out MCD-rPPG, 6 subjects across 12 recordings** (rest and post-exercise).
+Only subjects 24 and 25 are outside v2's training split (window MAE 2.38 and 1.46);
+the other six were trained on. The set detects drift; it is not a held-out figure.
+
+**MCD-rPPG subset, 6 subjects across 12 recordings** (rest and post-exercise). Three of
+the six (4874, 6137, 8584) are in v2's training split.
 Ground truth is the 100 Hz contact PPG that ships frame-aligned with each recording.
 
 ```text
@@ -583,10 +592,11 @@ validation.
 **absent** here. Validation bias is +0.40 bpm on DLCN and +0.45 on MCD-rPPG, and on the
 MCD subset above it is near zero across 63-96 bpm (+0.04 at 29.9 fps, -0.19 at 24 fps).
 
-The one consistent negative is UBFC-rPPG: -3.13 bpm bias in validation, and -0.784 mean
-signed error across the 8 held-out subjects. That corpus sits at 90-123 bpm, the top of
-this app's stated range, and the largest single held-out error is -3.15 bpm on subject
-11 at 123 bpm — the fastest in the set. High rates are under-read.
+The one consistent negative is UBFC-rPPG: -3.13 bpm bias in validation (7 subjects),
+and -0.784 mean signed error across the 8 regression subjects, 6 of them seen in
+training. That corpus sits at 90-123 bpm, the top of this app's stated range, and the
+largest single error in the set is -3.15 bpm on subject 11 at 123 bpm — the fastest,
+and a training subject. High rates are under-read.
 
 On UBFC-Phys T1 the window bias is **positive**: +4.46 bpm for PhysNet. The 256 windows
 where both estimators lock onto a higher component read on average 29.6 bpm high and
@@ -622,8 +632,9 @@ wrong time base: a 10 fps webcam capture once produced a confident reading about
 
 ### Limitations
 
-- **Heart-rate variability is out of reach with this model.** Measured across 12
-  held-out MCD recordings: 93% of reference beats are found, but median beat-timing
+- **Heart-rate variability is out of reach with this model.** Measured across the 12
+  MCD subset recordings (3 of the 6 subjects in v2's training split): 93% of reference
+  beats are found, but median beat-timing
   jitter is 56 ms while the RMSSD being measured is 20-27 ms. The noise is two to
   three times the signal, and RMSSD is built from successive differences, so it
   amplifies precisely that error. This is a property of the reconstruction, not of
@@ -642,8 +653,8 @@ wrong time base: a 10 fps webcam capture once produced a confident reading about
 - **Elevated heart rate is untested, and the trend is unfavourable.** The MCD
   post-exercise recordings begin after the subject has settled, so they do not serve as
   an exertion test. What evidence exists points one way: UBFC-rPPG is the fastest corpus
-  at 90-123 bpm and carries the only negative validation bias, and the largest held-out
-  error is on its fastest subject.
+  at 90-123 bpm and carries the only negative validation bias, and the largest error in
+  its regression set is on its fastest subject.
 - **Skin tone has not been characterised.** No stratified evaluation has been run,
   and rPPG is known to degrade on darker skin. This is an unquantified gap, not an
   absence of risk.

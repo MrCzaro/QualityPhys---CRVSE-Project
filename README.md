@@ -11,13 +11,17 @@ clinical decision-making.
 
 ## Evidence at a Glance
 
-Held-out subjects only, under the seed-42 subject-wise split, measured end to end
-through the same code path the app uses.
+Measured end to end through the same code path the app uses. UBFC-Phys and
+VitalVideos were never used in training. Most of the UBFC-rPPG and MCD-rPPG subjects
+below were in the shipped model's training split, so those two rows check the pipeline
+rather than held-out accuracy (see the model card).
 
 | Evaluation | Result |
 |---|---|
-| UBFC-rPPG, 8 held-out subjects | **1.24 bpm** mean window MAE, −0.78 signed |
-| MCD-rPPG, 6 held-out subjects / 12 recordings | **5.29 bpm** window RMSE, 12/12 reporting |
+| UBFC-Phys, 168 recordings, never trained on | rest (T1): **6.97 bpm** window MAE, 3.93 recording MAE |
+| VitalVideos-WW, 300 recordings, zero-shot | **3.12 bpm** window MAE; `ok` recordings **0.37 bpm** (n = 252) |
+| UBFC-rPPG regression set, 8 subjects (6 in training) | 1.24 bpm mean window MAE, −0.78 signed |
+| MCD-rPPG subset, 6 subjects / 12 recordings (3 in training) | 5.29 bpm window RMSE, 12/12 reporting |
 | Cross-subject validation during training | **5.22 bpm** shared MAE (DLCN 3.08, MCD 6.84, UBFC 3.13) |
 | Pulse oximeter, one resting capture | oximeter 60 → model 61.2, classical 60.6–61.2 |
 | Beat timing (for HRV) | 93% of beats found, but **56 ms** jitter against 20–27 ms of RMSSD |
