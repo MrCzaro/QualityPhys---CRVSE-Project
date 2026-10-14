@@ -1,23 +1,42 @@
-"""Regression check for Phase-3 estimators against the held-out UBFC-rPPG subjects.
+"""Regression check for Phase-3 estimators on eight UBFC-rPPG subjects.
 
-Runs a registered estimator over the eight held-out UBFC-rPPG subjects, compares each
-analysis window against the reference BVP, and fails if accuracy has drifted from a
-stored baseline. The pipeline is deterministic, so any change beyond floating-point
-noise indicates a real behavioural change rather than run-to-run variation.
+Runs a registered estimator over the subjects through the app's own capture path
+(`crops_from_video`: face box, decimation, measured frame rate, capture verdict), compares
+each analysis window against the reference BVP, and fails if anything has drifted from the
+stored baseline. The pipeline is deterministic, so any change beyond floating-point noise
+indicates a real behavioural change rather than run-to-run variation. The subjects were
+drawn from the screen's validation split, not v2's, and six of the eight were in v2's
+training data: this check catches drift, it does not measure held-out accuracy.
+
+Compared per subject: the reported value, window MAE, usable fraction and status, and the
+capture path's frame count, measured rate and verdict. The baseline also records the
+conditions it was taken under. The config constants, the face model and the weights are
+part of what it certifies, so a run under different ones fails until a new baseline is
+recorded, even if its figures happen to match. The capture code's hash and the library
+versions are recorded for diagnosis only: an edit or upgrade that changes no figure
+passes, with a note.
 
 Usage:
     python -m app.live_vitals.scripts.check_ubfc_regression [--estimator NAME]
-        [--data-dir DIR] [--cache-dir DIR] [--subjects 11 13] [--update-baseline]
+        [--data-dir DIR] [--subjects 11 13] [--update-baseline]
 
-Exits non-zero when a regression is detected. No frames are rendered or written.
+Exit codes: 0 pass; 1 drift, or changed conditions; 2 nothing comparable to check against
+(no baseline, another estimator's, one written before these fields existed, a subject it
+does not cover) or a missing checkpoint. No frames are rendered or written.
 """
 import argparse
+import hashlib
+import inspect
 import json
+import platform
 import sys
 from pathlib import Path
 
-import numpy as np
 import cv2
+import mediapipe
+import numpy as np
+import scipy
+import torch
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -25,17 +44,28 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from app.live_vitals import config
+from app.live_vitals.capture import session
 from app.live_vitals.estimators import registry
-from app.live_vitals.preprocess.face_box import (
-    make_landmarker, landmark_box, square_padded_box)
-from app.live_vitals.preprocess.frames import crop_resize
+from app.live_vitals.preprocess import face_box, frames
 from app.live_vitals.signal.hr import hr_from_bvp
+from app.live_vitals.scripts.bench_outputs import file_sha256, provenance, unique
 from app.live_vitals.scripts.check_contract_parity import load_reference
 
-HELD_OUT_SUBJECTS = [11, 13, 24, 25, 34, 35, 42, 47]
+SUBJECTS = [11, 13, 24, 25, 34, 35, 42, 47]  # from the screen's validation split
 DEFAULT_DATA_DIR = Path(r"D:\QualityPhys\demo_data\ubfc_rppg_subset")
+BASELINE_FORMAT = 2  # 2 (2026-10-14): capture-path fields, recorded conditions, provenance
 TOLERANCE_BPM = 0.05
 TOLERANCE_FRACTION = 0.01
+TOLERANCE_FPS = 0.001
+# Compared per subject, with the tolerance of each; None compares exactly.
+COMPARED = (("mae", TOLERANCE_BPM), ("value", TOLERANCE_BPM),
+            ("usable_fraction", TOLERANCE_FRACTION), ("status", None),
+            ("n_frames", None), ("effective_fps", TOLERANCE_FPS), ("verdict", None))
+# Config settings that never reach a recorded video's reading, so they are not recorded.
+RUNTIME_ONLY = ("CAMERA_STALL_SECONDS", "DEBUG_REPORT")
+# Recorded conditions whose change fails the check; the rest only add a note.
+CERTIFIED = ("config.", "face_model_sha256", "weights_sha256")
+
 
 def baseline_path(estimator_name):
     """Returns the baseline file for one estimator.
@@ -47,53 +77,40 @@ def baseline_path(estimator_name):
     return Path(__file__).with_name(f"ubfc_baseline_{estimator_name}.json")
 
 
-def face_crops(video_path, cache_path=None):
-    """Returns the 72x72 face-crop sequence and source fps for one recording."""
-    if cache_path and cache_path.exists():
-        with np.load(cache_path) as store:
-            return store["clip"], float(store["fps"])
+def conditions(estimator):
+    """What the readings depend on besides the data, as recorded with a baseline.
 
-    cap = cv2.VideoCapture(str(video_path))
-    if not cap.isOpened():
-        raise FileNotFoundError(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    n_total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    if n_total <= 0:
-        probe = cv2.VideoCapture(str(video_path))
-        n_total = 0
-        while probe.grab():
-            n_total += 1
-        probe.release()
+    Paths are left out of the config: they differ between machines and say nothing about
+    behaviour; the files that matter are recorded by hash. The capture modules are hashed
+    whole, comments included, which is why that hash only ever adds a note.
+    """
+    source = hashlib.sha256()
+    for module in (session, face_box, frames):
+        source.update(inspect.getsource(module).encode("utf-8"))
+    checkpoint = getattr(estimator, "checkpoint", None)
+    recorded = dict(
+        config={name: value for name, value in sorted(vars(config).items())
+                if name.isupper() and name not in RUNTIME_ONLY
+                and not isinstance(value, Path)},
+        face_model_sha256=file_sha256(config.MP_MODEL),
+        weights_sha256=file_sha256(checkpoint) if checkpoint is not None else None,
+        capture_code_sha256=source.hexdigest(),
+        versions=dict(python=platform.python_version(), numpy=np.__version__,
+                      scipy=scipy.__version__, torch=torch.__version__,
+                      opencv=cv2.__version__, mediapipe=mediapipe.__version__))
+    return json.loads(json.dumps(recorded))  # tuples become lists, as in a stored baseline
 
-    detector = make_landmarker()
-    samples = []
-    for index in sorted(set(np.linspace(0, n_total - 1,
-                                        config.N_DETECT_FRAMES).astype(int))):
-        cap.set(cv2.CAP_PROP_POS_FRAMES, int(index))
-        ok, bgr = cap.read()
-        if ok:
-            samples.append(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
-    boxes = [b for b in (landmark_box(f, detector) for f in samples) if b is not None]
-    if not boxes:
-        raise RuntimeError(f"no face detected in {video_path}")
-    box = square_padded_box(boxes)
 
-    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-    clip = []
-    while True:
-        ok, bgr = cap.read()
-        if not ok:
-            break
-        crop = crop_resize(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB), box)
-        if crop is not None:
-            clip.append(crop)
-    cap.release()
-    clip = np.asarray(clip, dtype=np.uint8)
-
-    if cache_path:
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez_compressed(cache_path, clip=clip, fps=fps)
-    return clip, fps
+def condition_changes(was, now, prefix=""):
+    """Lists the entries of two nested condition records that differ, as 'key: was -> now'."""
+    changes = []
+    for key in sorted(set(was) | set(now)):
+        a, b = was.get(key), now.get(key)
+        if isinstance(a, dict) and isinstance(b, dict):
+            changes += condition_changes(a, b, f"{prefix}{key}.")
+        elif a != b:
+            changes.append(f"{prefix}{key}: {_short(a)} -> {_short(b)}")
+    return changes
 
 
 def window_starts(n_frames):
@@ -101,9 +118,15 @@ def window_starts(n_frames):
     return range(0, n_frames - config.CLIP_LEN + 1, config.WINDOW_STRIDE)
 
 
-def evaluate_subject(subject_dir, estimator, cache_path=None):
-    """Returns one subject's estimator reading and window-level agreement."""
-    clip, fps = face_crops(subject_dir / "vid.avi", cache_path)
+def evaluate_subject(subject_dir, estimator, landmarker):
+    """Returns one subject's reading, window-level agreement and capture report.
+
+    The crops come from the app's capture path, so a change there - box, decimation, rate
+    measurement, verdict - reaches this check as it would reach a user. They are not
+    cached: a cached crop would hide exactly such a change, and the decode costs about a
+    second per subject.
+    """
+    clip, fps, quality = session.crops_from_video(subject_dir / "vid.avi", landmarker)
     reference_bvp, _ = load_reference(subject_dir / "ground_truth.txt",
                                       np.arange(len(clip)) / fps)
 
@@ -143,7 +166,95 @@ def evaluate_subject(subject_dir, estimator, cache_path=None):
                 confidence=float(result.confidence),
                 status=result.status,
                 usable_fraction=float(result.detail.get("usable_fraction",
-                                                        float("nan"))))
+                                                        float("nan"))),
+                n_frames=int(len(clip)),
+                effective_fps=float(fps),
+                verdict=quality.verdict)
+
+
+def same(now, was, tolerance):
+    """True when a value matches its baseline; NaN matches only NaN."""
+    if tolerance is None:
+        return now == was
+    if np.isnan(now) or np.isnan(was):
+        return bool(np.isnan(now) and np.isnan(was))
+    return abs(now - was) <= tolerance
+
+
+def compare(run, baseline_file):
+    """Checks a run against the stored baseline and returns the exit code."""
+    if not baseline_file.exists():
+        print(f"\nNO BASELINE: {baseline_file.name} does not exist; "
+              f"run with --update-baseline to create it")
+        return 2
+    baseline = json.loads(baseline_file.read_text(encoding="utf-8"))
+    if baseline.get("estimator") != run["estimator"]:
+        print(f"\nNOT COMPARABLE: {baseline_file.name} is for {baseline.get('estimator')!r}")
+        return 2
+    older = baseline.get("format", 1) < BASELINE_FORMAT
+
+    print("\n-- regression check --")
+    if set(run["subjects"]) == set(baseline["subjects"]):
+        print(f"  baseline mean MAE {baseline['mean_mae']:.3f} -> {run['mean_mae']:.3f} "
+              f"({run['mean_mae'] - baseline['mean_mae']:+.3f} bpm)")
+    else:
+        # A subset mean is not comparable to the full-set baseline mean; the
+        # per-subject comparisons below are what decide pass or fail.
+        print(f"  {len(run['subjects'])} subject(s) against a baseline of "
+              f"{len(baseline['subjects'])}; comparing per subject only")
+
+    # Per-window MAE exercises the model and readout but not the aggregation layer:
+    # a single window always falls back past the gates, so MAE alone cannot see a
+    # gating change. The reported value, status and usable fraction are compared too,
+    # and the capture report catches a change in how the frames reached the model.
+    drifted, uncovered = [], []
+    for subject, row in run["subjects"].items():
+        want = baseline["subjects"].get(subject)
+        if want is None:
+            uncovered.append(subject)
+            continue
+        for field, tolerance in COMPARED:
+            if field in want and not same(row[field], want[field], tolerance):
+                drifted.append((subject, field, want[field], row[field]))
+
+    changes = [] if older else condition_changes(baseline["conditions"], run["conditions"])
+    certified = [c for c in changes if c.startswith(CERTIFIED)]
+    noted = [c for c in changes if not c.startswith(CERTIFIED)]
+
+    if drifted or certified:
+        if drifted:
+            print(f"  REGRESSION: {len(drifted)} change(s) from baseline")
+            for subject, field, was, now in drifted:
+                print(f"    subject{subject} {field}: {_value(was)} -> {_value(now)}"
+                      f"{_shift(was, now)}")
+        if certified:
+            print("  CHANGED SINCE THE BASELINE (record a new one if this is intended):")
+            for change in certified:
+                print(f"    {change}")
+        if noted:
+            print("  also differs from the baseline's run:")
+            for change in noted:
+                print(f"    {change}")
+        elif not certified and not older:
+            print("  nothing recorded with the baseline moved, so look at the estimator, "
+                  "readout\n  and gating code, or the data")
+        return 1
+    if uncovered:
+        print(f"  NOT COMPARABLE: the baseline has no "
+              f"{', '.join(f'subject{s}' for s in uncovered)}")
+        return 2
+    if older:
+        print("  value, MAE, usable fraction and status match the baseline")
+        print("  NOT COMPARABLE: the baseline predates the capture-path fields (frame count, "
+              "measured rate,\n  verdict); record a new one with --update-baseline")
+        return 2
+    print("  PASS: value, MAE, usable fraction, status, frame count, measured rate and "
+          "verdict all match baseline")
+    if noted:
+        print("  note - differs from the baseline's run, with no effect on the figures:")
+        for change in noted:
+            print(f"    {change}")
+    return 0
 
 
 def main():
@@ -153,12 +264,15 @@ def main():
                         choices=registry.available(),
                         help="registered estimator name")
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
-    parser.add_argument("--cache-dir", type=Path, default=None,
-                        help="cache face crops here to speed up repeat runs")
-    parser.add_argument("--subjects", type=int, nargs="+", default=HELD_OUT_SUBJECTS)
+    parser.add_argument("--subjects", type=int, nargs="+", default=SUBJECTS)
     parser.add_argument("--update-baseline", action="store_true",
-                        help="overwrite the stored baseline with this run")
+                        help="overwrite the stored baseline with this run (all subjects)")
     args = parser.parse_args()
+
+    subjects = unique(args.subjects)
+    if args.update_baseline and sorted(subjects) != sorted(SUBJECTS):
+        print("ERROR: a baseline is written from all eight subjects; drop --subjects")
+        return 2
 
     baseline_file = baseline_path(args.estimator)
     estimator = registry.get_estimator(args.estimator)
@@ -166,83 +280,49 @@ def main():
         print(f"ERROR: checkpoint missing for {args.estimator}")
         return 2
 
-    print(f"estimator: {args.estimator}   subjects: {len(args.subjects)}")
-    print(f"{'subj':>5} {'value':>7} {'ref':>7} {'err':>6} {'MAE':>6} "
-          f"{'conf':>6} {'frac':>5}  status")
+    print(f"estimator: {args.estimator}   subjects: {len(subjects)}")
+    landmarker = face_box.make_landmarker()
+    print(f"{'subj':>5} {'value':>7} {'ref':>7} {'err':>6} {'MAE':>6} {'conf':>6} "
+          f"{'frac':>5} {'frames':>6} {'fps':>7}  {'verdict':7} status")
 
     results = {}
-    for subject in args.subjects:
-        subject_dir = args.data_dir / f"subject{subject}"
-        cache = (args.cache_dir / f"subject{subject}.npz") if args.cache_dir else None
-        row = evaluate_subject(subject_dir, estimator, cache)
+    for subject in subjects:
+        row = evaluate_subject(args.data_dir / f"subject{subject}", estimator, landmarker)
         results[str(subject)] = row
         print(f"{subject:5d} {row['value']:7.2f} {row['reference_hr']:7.2f} "
               f"{row['error']:+6.2f} {row['mae']:6.2f} {row['confidence']:6.3f} "
-              f"{row['usable_fraction']:5.2f}  {row['status']}")
+              f"{row['usable_fraction']:5.2f} {row['n_frames']:6d} {row['effective_fps']:7.3f}  "
+              f"{row['verdict']:7} {row['status']}")
 
     mean_mae = float(np.mean([r["mae"] for r in results.values()]))
     mean_error = float(np.mean([r["error"] for r in results.values()]))
     print(f"\nmean MAE {mean_mae:.3f} bpm | mean signed error {mean_error:+.3f} bpm")
 
-    summary = dict(estimator=args.estimator, mean_mae=mean_mae,
-                   mean_error=mean_error, subjects=results)
+    run = dict(format=BASELINE_FORMAT, estimator=args.estimator, mean_mae=mean_mae,
+               mean_error=mean_error, subjects=results, conditions=conditions(estimator),
+               provenance=provenance(estimator))
 
     if args.update_baseline:
-        baseline_file.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        baseline_file.write_text(json.dumps(run, indent=2), encoding="utf-8")
         print(f"baseline written: {baseline_file.name}")
         return 0
+    return compare(run, baseline_file)
 
-    if not baseline_file.exists():
-        print(f"\nno baseline at {baseline_file.name}; "
-              f"run with --update-baseline first")
-        return 0
 
-    baseline = json.loads(baseline_file.read_text(encoding="utf-8"))
-    if baseline.get("estimator") != args.estimator:
-        print(f"\nbaseline is for {baseline.get('estimator')!r}; not comparable")
-        return 0
+def _short(value):
+    """Shortens a hash for display; other values print as they are."""
+    return f"{value[:12]}..." if isinstance(value, str) and len(value) == 64 else value
 
-    print("\n-- regression check --")
-    if set(results) == set(baseline["subjects"]):
-        print(f"  baseline mean MAE {baseline['mean_mae']:.3f} -> {mean_mae:.3f} "
-              f"({mean_mae - baseline['mean_mae']:+.3f} bpm)")
-    else:
-        # A subset mean is not comparable to the full-set baseline mean; the
-        # per-subject comparisons below are what decide pass or fail.
-        print(f"  subset of {len(results)}/{len(baseline['subjects'])} subjects; "
-              f"comparing per-subject only")
 
-    # Per-window MAE exercises the model and readout but not the aggregation layer:
-    # a single window always falls back past the gates, so MAE alone cannot see a
-    # gating change. The reported value, status and usable fraction are compared too.
-    drifted = []
-    for subject, row in results.items():
-        want = baseline["subjects"].get(subject)
-        if want is None:
-            print(f"  subject{subject}: not in baseline")
-            continue
-        for field, tolerance in (("mae", TOLERANCE_BPM),
-                                 ("value", TOLERANCE_BPM),
-                                 ("usable_fraction", TOLERANCE_FRACTION)):
-            delta = row[field] - want[field]
-            # NaN compares false against any tolerance, so a value that became
-            # NaN would otherwise pass silently. Treat it as drift explicitly.
-            if delta != delta or abs(delta) > tolerance:
-                drifted.append((subject, field, want[field], row[field], delta))
-        if row["status"] != want["status"]:
-            drifted.append((subject, "status", want["status"], row["status"], None))
+def _value(value):
+    """Formats a compared value for the drift report."""
+    return f"{value:.3f}" if isinstance(value, float) else str(value)
 
-    if drifted:
-        print(f"  REGRESSION: {len(drifted)} change(s) from baseline")
-        for subject, field, was, now, delta in drifted:
-            shift = "" if delta is None else f" ({delta:+.3f})"
-            was_s = was if isinstance(was, str) else f"{was:.3f}"
-            now_s = now if isinstance(now, str) else f"{now:.3f}"
-            print(f"    subject{subject} {field}: {was_s} -> {now_s}{shift}")
-        return 1
 
-    print(f"  PASS: value, MAE, usable fraction and status all match baseline")
-    return 0
+def _shift(was, now):
+    """The signed change of a numeric value, when both ends are numbers."""
+    numeric = all(isinstance(v, (int, float)) and np.isfinite(v) for v in (was, now))
+    return f" ({now - was:+.3f})" if numeric else ""
 
 
 if __name__ == "__main__":

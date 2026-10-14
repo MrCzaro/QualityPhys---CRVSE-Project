@@ -1,34 +1,44 @@
 {
+  "format": 2,
   "estimator": "hr_physnet_v2",
-  "mean_mae": 1.2392669951879758,
-  "mean_error": -0.78388675392622,
+  "mean_mae": 1.239266995187976,
+  "mean_error": -0.7838867539262164,
   "subjects": {
     "11": {
-      "value": 120.18222687549506,
-      "reference_hr": 123.33408793155655,
-      "error": -3.1518610560614917,
-      "mae": 2.324318662035165,
+      "value": 120.1822268754951,
+      "reference_hr": 123.33408793155658,
+      "error": -3.1518610560614775,
+      "mae": 2.3243186620351697,
       "confidence": 0.8384419944775723,
       "status": "ok",
-      "usable_fraction": 0.6666666666666666
+      "usable_fraction": 0.6666666666666666,
+      "n_frames": 2031,
+      "effective_fps": 29.700708000000002,
+      "verdict": "ACCEPT"
     },
     "13": {
-      "value": 108.39917609020154,
+      "value": 108.39917609020156,
       "reference_hr": 108.63116443245869,
-      "error": -0.2319883422571536,
-      "mae": 1.0384605735228913,
+      "error": -0.23198834225712517,
+      "mae": 1.038460573522891,
       "confidence": 0.9173279687531998,
       "status": "ok",
-      "usable_fraction": 1.0
+      "usable_fraction": 1.0,
+      "n_frames": 2018,
+      "effective_fps": 29.790300000000002,
+      "verdict": "ACCEPT"
     },
     "24": {
-      "value": 106.3150763149483,
-      "reference_hr": 108.98006095483021,
+      "value": 106.31507631494833,
+      "reference_hr": 108.98006095483024,
       "error": -2.664984639881908,
       "mae": 2.3782404984331933,
       "confidence": 0.9035450057366158,
       "status": "unstable",
-      "usable_fraction": 1.0
+      "usable_fraction": 1.0,
+      "n_frames": 2009,
+      "effective_fps": 29.368114000000002,
+      "verdict": "ACCEPT"
     },
     "25": {
       "value": 89.01793893143677,
@@ -37,16 +47,22 @@
       "mae": 1.4623441223350715,
       "confidence": 0.8623135241873123,
       "status": "ok",
-      "usable_fraction": 0.9411764705882353
+      "usable_fraction": 0.9411764705882353,
+      "n_frames": 1448,
+      "effective_fps": 23.206781,
+      "verdict": "WARN"
     },
     "34": {
-      "value": 115.86528320772466,
+      "value": 115.86528320772464,
       "reference_hr": 115.79560620133583,
-      "error": 0.06967700638882945,
-      "mae": 0.425104626429287,
+      "error": 0.06967700638881524,
+      "mae": 0.4251046264292834,
       "confidence": 0.9217097990105589,
       "status": "ok",
-      "usable_fraction": 1.0
+      "usable_fraction": 1.0,
+      "n_frames": 2035,
+      "effective_fps": 29.975690999999998,
+      "verdict": "ACCEPT"
     },
     "35": {
       "value": 109.1718427613556,
@@ -55,7 +71,10 @@
       "mae": 0.6957048149512476,
       "confidence": 0.923442992654712,
       "status": "ok",
-      "usable_fraction": 1.0
+      "usable_fraction": 1.0,
+      "n_frames": 2051,
+      "effective_fps": 29.906009,
+      "verdict": "ACCEPT"
     },
     "42": {
       "value": 97.29934210773138,
@@ -64,7 +83,10 @@
       "mae": 0.4293896750571958,
       "confidence": 0.9220198984131645,
       "status": "ok",
-      "usable_fraction": 0.9166666666666666
+      "usable_fraction": 0.9166666666666666,
+      "n_frames": 2042,
+      "effective_fps": 29.948008999999995,
+      "verdict": "ACCEPT"
     },
     "47": {
       "value": 111.23998866744944,
@@ -73,7 +95,78 @@
       "mae": 1.1605729887397558,
       "confidence": 0.9165983312673174,
       "status": "ok",
-      "usable_fraction": 0.9166666666666666
+      "usable_fraction": 0.9166666666666666,
+      "n_frames": 2023,
+      "effective_fps": 29.789803000000003,
+      "verdict": "ACCEPT"
     }
+  },
+  "conditions": {
+    "config": {
+      "CLIP_LEN": 160,
+      "CONFIDENCE_FLOOR_HZ": 0.15,
+      "CROP_PADDING": 0.6,
+      "FFT_PAD_FACTOR": 8,
+      "HARMONIC_GUARD_ENABLED": false,
+      "HR_HIGH_HZ": 3.0,
+      "HR_LOW_HZ": 0.66,
+      "MAD_FLOOR_BPM": 1.0,
+      "MAD_OUTLIER_K": 3.0,
+      "MAX_BOX_SIDE_LOST": 0.02,
+      "MAX_FPS_ACCEPT": 33.0,
+      "MAX_HR_SPREAD_BPM": 25.0,
+      "MIN_CONFIDENCE": 0.65,
+      "MIN_FPS_ACCEPT": 27.0,
+      "MIN_FPS_WARN": 20.0,
+      "MIN_REPORTABLE_FRACTION": 0.25,
+      "MIN_USABLE_FRACTION": 0.5,
+      "MIN_USABLE_WINDOWS": 3,
+      "N_DETECT_FRAMES": 12,
+      "SPECTRAL_FILTER_ORDER": 4,
+      "SPECTRAL_METHOD": "pos",
+      "SPECTRAL_ROI_FRACTION": 0.35,
+      "SPECTRAL_WINDOW_SECONDS": 1.6,
+      "SUBHARMONIC_RATIO": 0.2,
+      "TARGET_FPS": 30.0,
+      "TARGET_SIZE": 72,
+      "TRAIN_ASPECT_RANGE": [
+        1.2,
+        1.9
+      ],
+      "WINDOW_STRIDE": 80
+    },
+    "face_model_sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
+    "weights_sha256": "f30fae250fb948e2aaece9aae5ec2d77fcc438d7ef1abbe54ae878a7eecee6b8",
+    "capture_code_sha256": "8341c21de770724282c547e81cf022f0c080b3209748363cff6a1235ddd0f6de",
+    "versions": {
+      "python": "3.14.7",
+      "numpy": "2.5.0",
+      "scipy": "1.18.0",
+      "torch": "2.14.0+cu130",
+      "opencv": "4.13.0",
+      "mediapipe": "0.10.35"
+    }
+  },
+  "provenance": {
+    "command": [
+      "check_ubfc_regression.py",
+      "--estimator",
+      "hr_physnet_v2",
+      "--update-baseline"
+    ],
+    "git": {
+      "commit": "dcac1981474d0596b80d5319dbf26cc02fd62b87",
+      "dirty": true,
+      "changed": [
+        "README.md",
+        "app/live_vitals/scripts/check_ubfc_regression.py"
+      ]
+    },
+    "weights": {
+      "file": "phase_3_physnet_v2_baseline_best.zip",
+      "sha256": "f30fae250fb948e2aaece9aae5ec2d77fcc438d7ef1abbe54ae878a7eecee6b8",
+      "bytes": 3106459
+    },
+    "written_utc": "2026-10-14T08:26:34+00:00"
   }
 }

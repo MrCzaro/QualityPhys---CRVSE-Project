@@ -188,13 +188,14 @@ A command line exists for recorded video and direct webcam capture:
 .\venv\Scripts\python.exe -m app.live_vitals.scripts.check_hrv_from_video
 ```
 
-`check_ubfc_regression` compares reported value, window MAE, usable fraction and status
-against a committed per-estimator baseline, and fails on drift. The HRV scripts carry a
-reference-against-itself control row; any result there other than `0.00 / 100% / 0.0 ms`
-means the harness is broken rather than the model.
+`check_ubfc_regression` runs each subject through the app's own capture path and compares
+the reported value, window MAE, usable fraction and status, and the capture's frame count,
+measured rate and verdict, against a committed per-estimator baseline. It exits 1 on drift
+or when the config, face model or weights differ from the baseline's, and 2 when there is
+no comparable baseline. The HRV scripts carry a reference-against-itself control row; any
+result there other than `0.00 / 100% / 0.0 ms` means the harness is broken rather than
+the model.
 
-These require the held-out corpora locally and are not camera validation. The live
-capture path still needs manual browser testing.
 
 ## Repository Map
 
