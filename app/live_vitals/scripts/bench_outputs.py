@@ -5,6 +5,8 @@ produced it. A run on a subset - one split, some tasks, the first N recordings -
 under a name that says so, so it can never replace the full run's committed summary.
 Every summary records the command, the code's commit and the weights' hash.
 """
+
+import functools
 import hashlib
 import subprocess
 import sys
@@ -42,8 +44,13 @@ def file_sha256(path, chunk=1 << 20):
     return digest.hexdigest()
 
 
+@functools.lru_cache(maxsize=1)
 def git_state():
-    """The repository's commit and the tracked files that differ from it; None without git."""
+    """The repository's commit and the tracked files that differ from it; None without git.
+
+    Read once per run, before the run's own outputs exist: asked again after the first
+    summary is written, git would list that summary among the changed files.
+    """
     def git(*args):
         return subprocess.run(["git", *args], cwd=_REPO_ROOT, capture_output=True,
                               text=True, check=True).stdout
