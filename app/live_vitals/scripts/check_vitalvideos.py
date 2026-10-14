@@ -58,7 +58,8 @@ from app.live_vitals import config
 from app.live_vitals.estimators import registry
 from app.live_vitals.scripts.check_ubfc_regression import window_starts
 from app.live_vitals.scripts.check_ubfc_phys import (REPORTED, _plain, _write_csv, agreement,
-                                                     make_estimators, predicted_windows,
+                                                     common_windows, make_estimators,
+                                                     predicted_windows, print_common,
                                                      reference_windows, summarise_task,
                                                      window_set)
 from app.live_vitals.scripts.bench_outputs import provenance, subset_suffix, unique
@@ -303,6 +304,9 @@ def print_summary(summary):
     if a.get("n", 0):
         print(f"\nECG cross-check ({ecg['n_recordings']} recordings the audit accepted): "
               f"MAE {a['mae']:.2f} bias {a['bias']:+.2f} r {a['r']:.2f}")
+    if summary.get("common_windows"):
+        print("\nlike for like, primary set, on the windows both estimators read:")
+        print_common(summary["common_windows"])
 
 
 def main():
@@ -336,6 +340,9 @@ def main():
     for estimator in estimators:
         name = estimator.name
         summary = build_summary(estimator, recordings[name], windows[name], args)
+        if len(estimators) > 1:
+            summary["common_windows"] = common_windows(
+                windows[name], {o.name: windows[o.name] for o in estimators if o.name != name})
         summary["provenance"] = provenance(estimator)
         _write_csv(args.out_dir / f"windows_{name}{suffix}.csv", windows[name])
         _write_csv(args.out_dir / f"recordings_{name}{suffix}.csv", recordings[name])

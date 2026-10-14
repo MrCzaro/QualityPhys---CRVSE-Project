@@ -147,6 +147,47 @@ def summarise_task(recordings, windows):
     return out
 
 
+def common_windows(windows, others):
+    """This estimator against each other one on the windows both read, per analysis set.
+
+    An estimator's own figures cover the windows where it found a peak, so one that reads
+    more of the hard windows looks worse than one that skips them. On the windows both read
+    the two are scored like for like. Every estimator in a run gets the same window rows in
+    the same order, so rows are paired by position, and the pairing is checked by key.
+    """
+    keys = [(w["recording"], w["start"]) for w in windows]
+    out = {}
+    for other, rows in others.items():
+        if [(w["recording"], w["start"]) for w in rows] != keys:
+            raise RuntimeError(f"the window rows of {other} do not line up with this estimator's")
+        sets = {}
+        for name in ("primary", "sensitivity"):
+            pairs = [(a, b) for a, b in zip(windows, rows) if a[name]]
+            read_a = [bool(np.isfinite(a["pred_hr"])) for a, _ in pairs]
+            read_b = [bool(np.isfinite(b["pred_hr"])) for _, b in pairs]
+            both = [p for p, x, y in zip(pairs, read_a, read_b) if x and y]
+            sets[name] = dict(
+                n_windows_eligible=len(pairs), n_both=len(both),
+                n_this_only=sum(x and not y for x, y in zip(read_a, read_b)),
+                n_other_only=sum(y and not x for x, y in zip(read_a, read_b)),
+                n_recordings=len({a["recording"] for a, _ in both}),
+                this=agreement([a["pred_hr"] for a, _ in both], [a["ref_hr"] for a, _ in both]),
+                other=agreement([b["pred_hr"] for _, b in both], [b["ref_hr"] for _, b in both]))
+        out[other] = sets
+    return out
+
+
+def print_common(common, label=""):
+    """Prints the like-for-like comparison of the primary set, one line per other estimator."""
+    def mae(a):
+        return f"{a['mae']:.2f}" if a.get("n", 0) else "-"
+
+    for other, sets in common.items():
+        m = sets["primary"]
+        print(f"  {label}vs {other:16} {m['n_both']:5d} windows both read, {m['n_this_only']:4d} only this, "
+              f"{m['n_other_only']:4d} only {other} | MAE {mae(m['this'])} against {mae(m['other'])}")
+        
+
 def strata(recordings, windows):
     """Breaks the primary window agreement down by reference SQI, sex and scenario."""
     by_recording = {r["recording"]: r for r in recordings}
@@ -338,6 +379,10 @@ def print_summary(summary):
                 print(f"  {key}: model mean {e['model_mean']:+.2f} (median {e['model_median']:+.2f}) | "
                       f"reference mean {e['reference_mean']:+.2f} (median {e['reference_median']:+.2f}) | "
                       f"mean |diff| {e['mean_abs_difference']:.2f}")
+    if summary.get("common_windows"):
+        print("\nlike for like, primary set, on the windows both estimators read:")
+        for task, common in summary["common_windows"].items():
+            print_common(common, label=f"{task} ")
 
 
 # -------------------------------------------------------------------- parity --
@@ -435,6 +480,12 @@ def main():
     for estimator in estimators:
         name = estimator.name
         summary = build_summary(estimator, recordings[name], windows[name], args, tasks)
+        if len(estimators) > 1:
+            summary["common_windows"] = {
+                t: common_windows([w for w in windows[name] if w["task"] == t],
+                                  {o.name: [w for w in windows[o.name] if w["task"] == t]
+                                   for o in estimators if o.name != name})
+                for t in tasks}
         summary["provenance"] = provenance(estimator)
         _write_csv(args.out_dir / f"windows_{name}{suffix}.csv", windows[name])
         _write_csv(args.out_dir / f"recordings_{name}{suffix}.csv", recordings[name])
