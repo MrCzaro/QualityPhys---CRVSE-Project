@@ -3,7 +3,7 @@
   "store": "D:\\QualityPhys\\phase 3 benchmarks\\ecg_fitness_phase3_rc_none.h5",
   "device": "cuda",
   "limit": null,
-  "protocol": "NB_P3_29 Part 0 (pre-registered 2026-10-03; low-detection set added 2026-10-04)",
+  "protocol": "NB_P3_29 Part 0 (pre-registered 2026-10-03; low-detection set added 2026-10-04; intervals need 5 subjects, 2026-10-14)",
   "settings": {
     "clip_len": 160,
     "window_stride": 80,
@@ -21,7 +21,8 @@
     "bootstrap": {
       "unit": "subject",
       "resamples": 2000,
-      "seed": 0
+      "seed": 0,
+      "min_subjects": 5
     }
   },
   "sets": {
@@ -48,6 +49,7 @@
         0.3125,
         0.8125
       ],
+      "refusal_ci_subjects": 16,
       "n_windows": 336,
       "n_discarded": 258,
       "window_discard": 0.7678571428571429,
@@ -55,6 +57,7 @@
         0.6946472338935574,
         0.8392857142857143
       ],
+      "window_discard_ci_subjects": 16,
       "n_scored": 55,
       "n_confident_wrong": 18,
       "confident_wrong": 0.32727272727272727,
@@ -62,6 +65,7 @@
         0.07687500000000001,
         0.64
       ],
+      "confident_wrong_ci_subjects": 7,
       "mae": 12.487241454869274,
       "bias": -10.965693204867572,
       "coverage": 0.1636904761904762,
@@ -77,6 +81,7 @@
         0.1,
         0.6666666666666666
       ],
+      "refusal_ci_subjects": 11,
       "n_windows": 231,
       "n_discarded": 123,
       "window_discard": 0.5324675324675324,
@@ -84,6 +89,7 @@
         0.3412698412698413,
         0.7238095238095238
       ],
+      "window_discard_ci_subjects": 11,
       "n_scored": 92,
       "n_confident_wrong": 92,
       "confident_wrong": 1.0,
@@ -91,6 +97,7 @@
         1.0,
         1.0
       ],
+      "confident_wrong_ci_subjects": 7,
       "mae": 43.29467484119233,
       "bias": -43.29467484119233,
       "coverage": 0.39826839826839827,
@@ -106,6 +113,7 @@
         0.47058823529411764,
         0.8823529411764706
       ],
+      "refusal_ci_subjects": 17,
       "n_windows": 357,
       "n_discarded": 296,
       "window_discard": 0.8291316526610645,
@@ -113,6 +121,7 @@
         0.7703081232492998,
         0.8796218487394954
       ],
+      "window_discard_ci_subjects": 17,
       "n_scored": 32,
       "n_confident_wrong": 16,
       "confident_wrong": 0.5,
@@ -120,6 +129,7 @@
         0.0,
         0.875
       ],
+      "confident_wrong_ci_subjects": 5,
       "mae": 19.390280596377274,
       "bias": -18.31066973285651,
       "coverage": 0.0896358543417367,
@@ -135,6 +145,7 @@
         0.42857142857142855,
         1.0
       ],
+      "refusal_ci_subjects": 8,
       "n_windows": 168,
       "n_discarded": 131,
       "window_discard": 0.7797619047619048,
@@ -142,13 +153,15 @@
         0.6394557823129252,
         0.8928571428571429
       ],
+      "window_discard_ci_subjects": 8,
       "n_scored": 20,
       "n_confident_wrong": 14,
       "confident_wrong": 0.7,
       "confident_wrong_ci": [
-        0.14285714285714285,
-        1.0
+        NaN,
+        NaN
       ],
+      "confident_wrong_ci_subjects": 2,
       "mae": 37.49272061195008,
       "bias": -37.38441859488117,
       "coverage": 0.11904761904761904,
@@ -164,6 +177,7 @@
         0.3076923076923077,
         0.8125
       ],
+      "refusal_ci_subjects": 14,
       "n_windows": 294,
       "n_discarded": 196,
       "window_discard": 0.6666666666666666,
@@ -171,6 +185,7 @@
         0.5054761904761904,
         0.8174603174603174
       ],
+      "window_discard_ci_subjects": 14,
       "n_scored": 79,
       "n_confident_wrong": 55,
       "confident_wrong": 0.6962025316455697,
@@ -178,6 +193,7 @@
         0.32781139964788736,
         0.9375
       ],
+      "confident_wrong_ci_subjects": 6,
       "mae": 25.213529158415717,
       "bias": -21.746586143388186,
       "coverage": 0.2687074829931973,
@@ -193,6 +209,7 @@
         0.3123798076923077,
         0.8333333333333334
       ],
+      "refusal_ci_subjects": 14,
       "n_windows": 294,
       "n_discarded": 213,
       "window_discard": 0.7244897959183674,
@@ -200,6 +217,7 @@
         0.5970634920634921,
         0.8285912698412697
       ],
+      "window_discard_ci_subjects": 14,
       "n_scored": 58,
       "n_confident_wrong": 45,
       "confident_wrong": 0.7758620689655172,
@@ -207,6 +225,7 @@
         0.38095238095238093,
         1.0
       ],
+      "confident_wrong_ci_subjects": 6,
       "mae": 28.815436216522333,
       "bias": -28.738896842511174,
       "coverage": 0.19727891156462585,
@@ -219,6 +238,10 @@
       "ci": [
         -0.24728866067824876,
         0.2677559401782664
+      ],
+      "ci_subjects": [
+        9,
+        14
       ],
       "share_of_confident_wrong": 0.4166666666666667,
       "share_of_scored_windows": 0.40773809523809523,
@@ -235,6 +258,10 @@
         "ci": [
           -0.41670454545454544,
           0.15207623722700855
+        ],
+        "ci_subjects": [
+          13,
+          17
         ]
       },
       "high_minus_moderate": {
@@ -242,6 +269,10 @@
         "ci": [
           -0.17148502459623,
           0.335585721468074
+        ],
+        "ci_subjects": [
+          16,
+          13
         ]
       },
       "reading": "unresolved"
@@ -254,6 +285,10 @@
             -0.17647058823529405,
             0.47058823529411764
           ],
+          "ci_subjects": [
+            17,
+            16
+          ],
           "reading": "not contradicted"
         },
         "confident_wrong": {
@@ -261,6 +296,10 @@
           "ci": [
             -0.29513672685761727,
             0.5953384652981426
+          ],
+          "ci_subjects": [
+            5,
+            7
           ],
           "reading": "not contradicted"
         },
@@ -276,15 +315,23 @@
             -0.05555555555555558,
             0.8
           ],
+          "ci_subjects": [
+            8,
+            11
+          ],
           "reading": "not contradicted"
         },
         "confident_wrong": {
           "difference": -0.30000000000000004,
           "ci": [
-            -0.8571428571428572,
-            0.0
+            NaN,
+            NaN
           ],
-          "reading": "not contradicted"
+          "ci_subjects": [
+            2,
+            7
+          ],
+          "reading": "not estimable"
         },
         "n_recordings": {
           "04": 8,
@@ -728,5 +775,22 @@
       "n_kept_referenced_reported": 0,
       "n_off_by_more_than_10": 1
     }
+  },
+  "provenance": {
+    "command": [
+      "check_ecg_fitness.py",
+      "--device",
+      "cuda"
+    ],
+    "git": {
+      "commit": "d96d88261356d3ff5f3fd48339c6b9af09578215",
+      "dirty": true,
+      "changed": [
+        "Data/ecg_fitness_eval/summary_hr_physnet_v2.json",
+        "app/live_vitals/scripts/check_ecg_fitness.py"
+      ]
+    },
+    "weights": null,
+    "written_utc": "2026-10-14T05:27:02+00:00"
   }
 }

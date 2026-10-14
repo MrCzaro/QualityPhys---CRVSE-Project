@@ -20,6 +20,13 @@ face was found in fewer than half the sampled frames; windows whose real span is
 5% off nominal. Hypotheses H1-H3 are read out at the end as numbers for review, with a
 mechanical first reading from subject-bootstrap intervals; the verdict is made in review.
 
+
+Amended 2026-10-14: an interval needs at least BOOT_MIN_SUBJECTS subjects behind its
+denominator, on each side of a difference, and is otherwise not estimable - one subject had
+collapsed an interval to a point that the readings took as decisive. The subject count is
+printed beside every interval.
+
+
 The store is evaluation only and its licence forbids redistribution. Nothing written here
 contains a frame.
 
@@ -57,7 +64,7 @@ REF_RECORDING_MIN = 0.80   # a recording enters the primary set at this referenc
 SPAN_TOLERANCE = 0.05      # a window whose real span is further off nominal is reported apart
 LOW_DETECTION = config.N_DETECT_FRAMES / 2  # fewer detections than this: reported apart
 NAN = float("nan")
-
+BOOT_MIN_SUBJECTS = 5      # fewer subjects behind an interval's denominator: not estimable
 
 # ------------------------------------------------------------------- reading --
 
@@ -266,6 +273,23 @@ class Bootstrap:
             return [NAN, NAN]
         return [float(np.percentile(finite, 2.5)), float(np.percentile(finite, 97.5))]
 
+    def ci(self, rows, num, den):
+        """95% interval of sum(num) / sum(den) over rows, and the subjects behind its denominator.
+
+        Amendment to Part 0 (2026-10-14): with fewer than BOOT_MIN_SUBJECTS such subjects the
+        interval is not estimable. With one, every resample that draws it gives the same ratio,
+        so the interval was a point - activity 04's confident-wrong rate read [0.429, 0.429].
+        """
+        n = contributing_subjects(rows, den)
+        if n < BOOT_MIN_SUBJECTS:
+            return [NAN, NAN], n
+        return self.interval(self.samples(rows, num, den)), n
+
+
+def contributing_subjects(rows, den):
+    """Subjects whose recordings add to sum(den): the only ones a resample can vary."""
+    return len({r["subject"] for r in rows if (r[den] > 0 if den else True)})
+
 
 # Each metric is a ratio of sums of two recording-row fields; None counts recordings.
 REFUSAL = ("refused", None)
@@ -283,19 +307,25 @@ def ratio(rows, num, den):
 def group_metrics(rows, boot):
     """The three primary metrics for one group of recordings, with subject-bootstrap CIs."""
     n_scored = sum(r["n_scored"] for r in rows)
+    refusal_ci, refusal_subjects = boot.ci(rows, *REFUSAL)
+    discard_ci, discard_subjects = boot.ci(rows, *DISCARD)
+    wrong_ci, wrong_subjects = boot.ci(rows, *CONFIDENT_WRONG)
     return dict(
         n_recordings=len(rows),
         n_reported=sum(r["reported"] for r in rows),
         refusal=ratio(rows, *REFUSAL),
-        refusal_ci=boot.interval(boot.samples(rows, *REFUSAL)),
+        refusal_ci=refusal_ci,
+        refusal_ci_subjects=refusal_subjects,
         n_windows=sum(r["n_evaluable"] for r in rows),
         n_discarded=sum(r["n_discarded"] for r in rows),
         window_discard=ratio(rows, *DISCARD),
-        window_discard_ci=boot.interval(boot.samples(rows, *DISCARD)),
+        window_discard_ci=discard_ci,
+        window_discard_ci_subjects=discard_subjects,
         n_scored=n_scored,
         n_confident_wrong=sum(r["n_confident_wrong"] for r in rows),
         confident_wrong=ratio(rows, *CONFIDENT_WRONG),
-        confident_wrong_ci=boot.interval(boot.samples(rows, *CONFIDENT_WRONG)),
+        confident_wrong_ci=wrong_ci,
+        confident_wrong_ci_subjects=wrong_subjects,
         mae=sum(r["abs_error_sum"] for r in rows) / n_scored if n_scored else NAN,
         bias=sum(r["error_sum"] for r in rows) / n_scored if n_scored else NAN,
         coverage=ratio(rows, *COVERAGE),
@@ -314,10 +344,18 @@ def per_activity(primary, boot):
 
 
 def difference(boot, rows_a, rows_b, metric):
-    """Point difference a - b of a ratio metric, with its paired bootstrap interval."""
+    """Point difference a - b of a ratio metric, with its paired bootstrap interval.
+
+    The interval needs BOOT_MIN_SUBJECTS subjects behind each side's denominator (amendment,
+    2026-10-14); the two counts are reported either way.
+    """
     point = ratio(rows_a, *metric) - ratio(rows_b, *metric)
-    samples = boot.samples(rows_a, *metric) - boot.samples(rows_b, *metric)
-    return dict(difference=point, ci=Bootstrap.interval(samples))
+    subjects = [contributing_subjects(rows_a, metric[1]), contributing_subjects(rows_b, metric[1])]
+    if min(subjects) < BOOT_MIN_SUBJECTS:
+        ci = [NAN, NAN]
+    else:
+        ci = Bootstrap.interval(boot.samples(rows_a, *metric) - boot.samples(rows_b, *metric))
+    return dict(difference=point, ci=ci, ci_subjects=subjects)
 
 
 def reading(ci, predicted_sign):
@@ -425,14 +463,16 @@ def build_summary(estimator, recordings, windows, args):
     fps_values = [r["fps"] for r in recordings]
     return dict(
         estimator=estimator.name, store=str(args.store), device=args.device, limit=args.limit,
-        protocol="NB_P3_29 Part 0 (pre-registered 2026-10-03; low-detection set added 2026-10-04)",
+        protocol=("NB_P3_29 Part 0 (pre-registered 2026-10-03; low-detection set added 2026-10-04; "
+                  f"intervals need {BOOT_MIN_SUBJECTS} subjects, 2026-10-14)"),
         settings=dict(clip_len=config.CLIP_LEN, window_stride=config.WINDOW_STRIDE,
                       min_confidence=config.MIN_CONFIDENCE, wrong_bpm=WRONG_BPM,
                       ref_min_agree=REF_MIN_AGREE, ref_recording_min=REF_RECORDING_MIN,
                       span_tolerance=SPAN_TOLERANCE, low_detection_below=LOW_DETECTION,
                       max_box_side_lost=config.MAX_BOX_SIDE_LOST,
                       fps_range=[min(fps_values), max(fps_values)] if fps_values else [],
-                      bootstrap=dict(unit="subject", resamples=args.boot, seed=args.seed)),
+                      bootstrap=dict(unit="subject", resamples=args.boot, seed=args.seed,
+                                     min_subjects=BOOT_MIN_SUBJECTS)),
         sets=dict(n_recordings=len(recordings), n_primary=len(primary),
                   primary_by_activity={a: sum(r["activity"] == a for r in primary)
                                        for a in ACTIVITIES},
@@ -450,10 +490,14 @@ def _pct(x):
     return f"{100 * x:5.1f}" if np.isfinite(x) else f"{'-':>5}"
 
 
-def _ci(ci):
-    return (f"[{100 * ci[0]:4.0f},{100 * ci[1]:4.0f}]" if np.isfinite(ci[0])
-            else f"{'[-]':>11}")
-
+def _ci(ci, subjects=None):
+    """A 95% interval in percent, with the subjects behind it: one count, or a pair for a difference."""
+    text = f"[{100 * ci[0]:4.0f},{100 * ci[1]:4.0f}]" if np.isfinite(ci[0]) else f"{'[-]':>11}"
+    if subjects is None:
+        return text
+    if isinstance(subjects, (list, tuple)):
+        return f"{text} n{'/'.join(str(k) for k in subjects)}"
+    return f"{text} n{subjects:<2}"
 
 def _num(x, fmt="6.2f"):
     return format(x, fmt) if isinstance(x, (int, float)) and np.isfinite(x) else "-"
@@ -465,34 +509,37 @@ def print_summary(s):
           f"{s['sets']['n_recordings']} recordings | protocol: {s['protocol']}")
     if s["sets"]["store_mismatches"]:
         print(f"!! store and script disagree on: {s['sets']['store_mismatches']}")
-    print(f"\n{'act':3} {'light':7} {'motion':8} {'rec':>3} {'rep':>3} {'refused%':>8} {'95% CI':>11} "
-          f"{'discard%':>8} {'CW k/n':>9} {'CW%':>5} {'95% CI':>11} {'MAE':>6} {'bias':>6} {'cover%':>6}")
+    print(f"\n{'act':3} {'light':7} {'motion':8} {'rec':>3} {'rep':>3} {'refused%':>8} "
+          f"{'95% CI   subj':>15} {'discard%':>8} {'CW k/n':>9} {'CW%':>5} {'95% CI   subj':>15} "
+          f"{'MAE':>6} {'bias':>6} {'cover%':>6}")
     for act, m in s["primary_by_activity"].items():
         if not m["n_recordings"]:
             print(f"{act:3} (no primary recordings)")
             continue
         print(f"{act:3} {m['lighting']:7} {m['motion_class']:8} {m['n_recordings']:3d} "
-              f"{m['n_reported']:3d} {_pct(m['refusal']):>8} {_ci(m['refusal_ci'])} "
+              f"{m['n_reported']:3d} {_pct(m['refusal']):>8} "
+              f"{_ci(m['refusal_ci'], m['refusal_ci_subjects'])} "
               f"{_pct(m['window_discard']):>8} {m['n_confident_wrong']:4d}/{m['n_scored']:<4d} "
-              f"{_pct(m['confident_wrong'])} {_ci(m['confident_wrong_ci'])} "
+              f"{_pct(m['confident_wrong'])} {_ci(m['confident_wrong_ci'], m['confident_wrong_ci_subjects'])} "
               f"{_num(m['mae'])} {_num(m['bias'], '+6.2f')} {_pct(m['coverage']):>6}")
     h = s["hypotheses"]
     h1 = h["H1"]
     print(f"\nH1 confident-wrong concentrates in 05/06: rate 05/06 minus 01-04 "
-          f"{_num(100 * h1['difference'], '+.1f')} pts {_ci(h1['ci'])} | 05/06 hold "
+          f"{_num(100 * h1['difference'], '+.1f')} pts {_ci(h1['ci'], h1['ci_subjects'])} | 05/06 hold "
           f"{_pct(h1['share_of_confident_wrong']).strip()}% of confident-wrong windows and "
           f"{_pct(h1['share_of_scored_windows']).strip()}% of scored windows -> {h1['reading']}")
     h2 = h["H2"]
     print(f"H2 refusal rises with motion: 01/03 {_pct(h2['refusal']['01/03']).strip()}%, "
           f"02/04 {_pct(h2['refusal']['02/04']).strip()}%, 05/06 {_pct(h2['refusal']['05/06']).strip()}% "
           f"| steps {_num(100 * h2['moderate_minus_low']['difference'], '+.1f')} "
-          f"{_ci(h2['moderate_minus_low']['ci'])} and "
+          f"{_ci(h2['moderate_minus_low']['ci'], h2['moderate_minus_low']['ci_subjects'])} and "
           f"{_num(100 * h2['high_minus_moderate']['difference'], '+.1f')} "
-          f"{_ci(h2['high_minus_moderate']['ci'])} -> {h2['reading']}")
+          f"{_ci(h2['high_minus_moderate']['ci'], h2['high_minus_moderate']['ci_subjects'])} "
+          f"-> {h2['reading']}")
     for key, entry in h["H3"].items():
         halogen, ambient = key.split("_vs_")
-        parts = [f"{label} {_num(100 * d['difference'], '+.1f')} pts {_ci(d['ci'])} {d['reading']}"
-                 for label, d in entry.items() if label != "n_recordings"]
+        parts = [f"{label} {_num(100 * d['difference'], '+.1f')} pts {_ci(d['ci'], d['ci_subjects'])} "
+                 f"{d['reading']}" for label, d in entry.items() if label != "n_recordings"]
         n = entry["n_recordings"]
         print(f"H3 halogen {halogen} vs ambient {ambient} (n {n[halogen]} vs {n[ambient]}): "
               + " | ".join(parts))
@@ -521,7 +568,6 @@ def print_summary(s):
     print(f"  off-span windows: {off['n_windows']} in {off['recordings']} | kept {off['n_kept']}, "
           f"kept+referenced in a reported recording {off['n_kept_referenced_reported']}, "
           f"of those >10 bpm off {off['n_off_by_more_than_10']}")
-
 
 # --------------------------------------------------------------------- utils --
 
