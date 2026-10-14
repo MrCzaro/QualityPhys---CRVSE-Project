@@ -1,0 +1,174 @@
+{
+  "format": 2,
+  "estimator": "hr_physnet_v3",
+  "mean_mae": 1.240065178365323,
+  "mean_error": -0.7980991845085637,
+  "subjects": {
+    "11": {
+      "value": 120.72986893839509,
+      "reference_hr": 123.33408793155658,
+      "error": -2.6042189931614956,
+      "mae": 2.2286299181690374,
+      "confidence": 0.8636669996668483,
+      "status": "ok",
+      "usable_fraction": 0.7916666666666666,
+      "n_frames": 2031,
+      "effective_fps": 29.700708000000002,
+      "verdict": "ACCEPT"
+    },
+    "13": {
+      "value": 108.50615967114541,
+      "reference_hr": 108.63116443245869,
+      "error": -0.12500476131327787,
+      "mae": 1.1080651461043842,
+      "confidence": 0.9191170448935599,
+      "status": "ok",
+      "usable_fraction": 1.0,
+      "n_frames": 2018,
+      "effective_fps": 29.790300000000002,
+      "verdict": "ACCEPT"
+    },
+    "24": {
+      "value": 106.30368451183446,
+      "reference_hr": 108.98006095483024,
+      "error": -2.6763764429957746,
+      "mae": 2.4773260230336613,
+      "confidence": 0.9062216327046702,
+      "status": "unstable",
+      "usable_fraction": 1.0,
+      "n_frames": 2009,
+      "effective_fps": 29.368114000000002,
+      "verdict": "ACCEPT"
+    },
+    "25": {
+      "value": 88.95418153194868,
+      "reference_hr": 90.42752487033854,
+      "error": -1.473343338389867,
+      "mae": 1.4196346948318999,
+      "confidence": 0.8849162978651488,
+      "status": "ok",
+      "usable_fraction": 0.9411764705882353,
+      "n_frames": 1448,
+      "effective_fps": 23.206781,
+      "verdict": "WARN"
+    },
+    "34": {
+      "value": 115.73746626177692,
+      "reference_hr": 115.79560620133583,
+      "error": -0.058139939558913056,
+      "mae": 0.4178240190701133,
+      "confidence": 0.9229407289512126,
+      "status": "ok",
+      "usable_fraction": 1.0,
+      "n_frames": 2035,
+      "effective_fps": 29.975690999999998,
+      "verdict": "ACCEPT"
+    },
+    "35": {
+      "value": 108.82663828524483,
+      "reference_hr": 108.22637339531865,
+      "error": 0.60026488992618,
+      "mae": 0.6455121578917323,
+      "confidence": 0.92437976900418,
+      "status": "ok",
+      "usable_fraction": 1.0,
+      "n_frames": 2051,
+      "effective_fps": 29.906009,
+      "verdict": "ACCEPT"
+    },
+    "42": {
+      "value": 97.34179866399998,
+      "reference_hr": 96.95884906262549,
+      "error": 0.3829496013744915,
+      "mae": 0.40973907029303014,
+      "confidence": 0.927019345575889,
+      "status": "ok",
+      "usable_fraction": 0.9166666666666666,
+      "n_frames": 2042,
+      "effective_fps": 29.948008999999995,
+      "verdict": "ACCEPT"
+    },
+    "47": {
+      "value": 110.9773776473387,
+      "reference_hr": 111.40830213928855,
+      "error": -0.4309244919498525,
+      "mae": 1.213790397528723,
+      "confidence": 0.9161979654268739,
+      "status": "ok",
+      "usable_fraction": 0.9583333333333334,
+      "n_frames": 2023,
+      "effective_fps": 29.789803000000003,
+      "verdict": "ACCEPT"
+    }
+  },
+  "conditions": {
+    "config": {
+      "CLIP_LEN": 160,
+      "CONFIDENCE_FLOOR_HZ": 0.15,
+      "CROP_PADDING": 0.6,
+      "FFT_PAD_FACTOR": 8,
+      "HARMONIC_GUARD_ENABLED": false,
+      "HR_HIGH_HZ": 3.0,
+      "HR_LOW_HZ": 0.66,
+      "MAD_FLOOR_BPM": 1.0,
+      "MAD_OUTLIER_K": 3.0,
+      "MAX_BOX_SIDE_LOST": 0.02,
+      "MAX_FPS_ACCEPT": 33.0,
+      "MAX_HR_SPREAD_BPM": 25.0,
+      "MIN_CONFIDENCE": 0.65,
+      "MIN_FPS_ACCEPT": 27.0,
+      "MIN_FPS_WARN": 20.0,
+      "MIN_REPORTABLE_FRACTION": 0.25,
+      "MIN_USABLE_FRACTION": 0.5,
+      "MIN_USABLE_WINDOWS": 3,
+      "N_DETECT_FRAMES": 12,
+      "SPECTRAL_FILTER_ORDER": 4,
+      "SPECTRAL_METHOD": "pos",
+      "SPECTRAL_ROI_FRACTION": 0.35,
+      "SPECTRAL_WINDOW_SECONDS": 1.6,
+      "SUBHARMONIC_RATIO": 0.2,
+      "TARGET_FPS": 30.0,
+      "TARGET_SIZE": 72,
+      "TRAIN_ASPECT_RANGE": [
+        1.2,
+        1.9
+      ],
+      "WINDOW_STRIDE": 80
+    },
+    "face_model_sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
+    "weights_sha256": "3fab82a89f4863a70c18ddb3d8f8f7cbc0d923adf65f85b2d0aeaa56895e0600",
+    "capture_code_sha256": "8341c21de770724282c547e81cf022f0c080b3209748363cff6a1235ddd0f6de",
+    "versions": {
+      "python": "3.14.7",
+      "numpy": "2.5.0",
+      "scipy": "1.18.0",
+      "torch": "2.14.0+cu130",
+      "opencv": "4.13.0",
+      "mediapipe": "0.10.35"
+    }
+  },
+  "provenance": {
+    "command": [
+      "check_ubfc_regression.py",
+      "--estimator",
+      "hr_physnet_v3",
+      "--update-baseline"
+    ],
+    "git": {
+      "commit": "c21a274c18fcb8c5f9fb02f9970a6c7d2c0d847b",
+      "dirty": true,
+      "changed": [
+        "README.md",
+        "app/live_vitals/config.py",
+        "app/live_vitals/estimators/hr_physnet.py",
+        "app/live_vitals/estimators/registry.py"
+      ]
+    },
+    "weights": {
+      "file": "phase_3_physnet_v3_A_seed42_last_bn.zip",
+      "sha256": "3fab82a89f4863a70c18ddb3d8f8f7cbc0d923adf65f85b2d0aeaa56895e0600",
+      "bytes": 3105630
+    },
+    "written_utc": "2026-10-14T10:15:34+00:00"
+  }
+}

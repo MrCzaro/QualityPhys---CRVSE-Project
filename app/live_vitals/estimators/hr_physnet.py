@@ -1,8 +1,14 @@
-"""Heart-rate estimator backed by the Phase-3 PhysNet v2 checkpoint."""
+"""Heart-rate estimators backed by the Phase-3 PhysNet checkpoints.
+
+`hr_physnet_v2` is the published model and the app's default. `hr_physnet_v3` is the
+candidate from NB_P3_31 (arm A, seed 42): the same architecture and input contract,
+trained with VitalVideos added. It runs through exactly the same code as v2, so the
+app-level battery compares the two models and nothing else.
+"""
 import numpy as np
 import torch
 
-from ..config import CLIP_LEN, WINDOW_STRIDE, PHYSNET_CKPT
+from ..config import CLIP_LEN, WINDOW_STRIDE, PHYSNET_CKPT, PHYSNET_V3_CKPT
 from ..preprocess.frames import clip_to_tensor
 from ..models.architectures.physnet import PhysNet
 from ..signal.hr import hr_from_bvp
@@ -61,3 +67,16 @@ class HRPhysNet(Estimator):
 
         return aggregate_windows(self.vital, self.unit, rates, confidences,
                                  waves, fps, len(starts), window_starts=kept_starts)
+
+
+class HRPhysNetV3(HRPhysNet):
+    """The v3 candidate: v2's estimator with NB_P3_31's arm-A weights.
+
+    Only the default checkpoint differs. Windowing, readout and gating are inherited, so
+    a difference between the two in any comparison comes from the weights.
+    """
+
+    name = "hr_physnet_v3"
+
+    def __init__(self, checkpoint=PHYSNET_V3_CKPT, device="cpu"):
+        super().__init__(checkpoint=checkpoint, device=device)

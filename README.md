@@ -91,6 +91,12 @@ weights:     https://huggingface.co/MrCzaro/hr_physnet_v2  (CC BY-NC-SA 4.0)
 The checkpoint is not committed here; `docs/model_card.md` Card 2 documents its input
 contract, evaluation, refusal behaviour and limitations in full.
 
+A candidate successor, `hr_physnet_v3`, is registered beside it: the same architecture
+and input contract, retrained on v2's corpora with 240 VitalVideos subjects added
+(NB_P3_31, arm A, seed 42). The app and the benchmark scripts can select it, but v2 stays
+the default until the app-level battery decides between them. Its checkpoint is not
+committed either.
+
 ### Why this one
 
 Seven architectures were trained on one fixed pipeline - five in the original screen,

@@ -23,6 +23,9 @@ HR_LOW_HZ, HR_HIGH_HZ = 0.66, 3.0
 #  checkpoints 
 CKPT_DIR = REPO_ROOT / "Data/Phase3"
 PHYSNET_CKPT = CKPT_DIR / "phase_3_physnet_v2_baseline_best.zip"
+# v3 candidate: NB_P3_31 arm A (v2's corpora plus VitalVideos-240), seed 42, its last
+# epoch with BatchNorm re-estimated. Registered beside v2; v2 stays the default.
+PHYSNET_V3_CKPT = CKPT_DIR / "phase_3_physnet_v3_A_seed42_last_bn.zip"
 RHYTHMFORMER_CKPT = CKPT_DIR / "phase_3_rhythmformer_best.zip"
 
 #  capture-quality gates (app-side; not part of the training contract) 

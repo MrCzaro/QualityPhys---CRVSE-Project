@@ -4,13 +4,15 @@ The app selects estimators by name so that adding a model, or comparing two on t
 same data, is a configuration change rather than a code change. Nothing outside this
 module should import a concrete estimator class directly.
 """
-from .hr_physnet import HRPhysNet
+from .hr_physnet import HRPhysNet, HRPhysNetV3
 from .hr_spectral import HRSpectral
 
 ESTIMATORS = {
     HRPhysNet.name: HRPhysNet,
+    HRPhysNetV3.name: HRPhysNetV3,
     HRSpectral.name: HRSpectral,
 }
+# v2 stays the default until the app-level battery decides between v2 and v3.
 DEFAULT_ESTIMATOR = HRPhysNet.name
 
 
