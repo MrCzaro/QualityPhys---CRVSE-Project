@@ -45,6 +45,7 @@ if str(_REPO_ROOT) not in sys.path:
 from app.live_vitals import config
 from app.live_vitals.capture.session import framing_verdict, rate_verdict, worst_verdict
 from app.live_vitals.estimators import registry
+from app.live_vitals.scripts.bench_outputs import provenance, subset_suffix, unique
 
 DEFAULT_STORE = Path(r"D:\QualityPhys\phase 3 benchmarks\ecg_fitness_phase3_rc_none.h5")
 DEFAULT_OUT_DIR = _REPO_ROOT / "Data" / "ecg_fitness_eval"
@@ -121,16 +122,22 @@ def read_recording(name, group):
 
 
 def predicted_windows(result):
-    """Returns the estimator's per-window readings keyed by window start frame."""
+    """Returns the estimator's per-window readings keyed by window start frame.
+
+    A result with no windows at all (too few frames) has nothing to pair. One that counted
+    windows but not their start frames cannot be paired with the reference, and scoring it
+    as all-missing would read as a model that never answers, so it stops instead.
+    """
     detail = result.detail or {}
     if "window_start" not in detail:
+        if detail.get("n_total"):
+            raise RuntimeError("estimator reports windows without their start frames")
         return {}
     if detail["n_total"] - detail["n_no_peak"] != len(detail["window_hr"]):
         raise RuntimeError("estimator per-window report is inconsistent")
     return {int(s): dict(pred_hr=float(h), pred_confidence=float(c), pred_kept=bool(k))
             for s, h, c, k in zip(detail["window_start"], detail["window_hr"],
                                   detail["window_confidence"], detail["window_kept"])}
-
 
 # ----------------------------------------------------------------------- run --
 
@@ -553,7 +560,8 @@ def main():
 
     if not args.store.exists():
         raise SystemExit(f"ERROR: no store at {args.store}")
-    names = args.estimator or registry.available()
+    names = unique(args.estimator or registry.available())
+    suffix = subset_suffix(("limit", args.limit or None, None))
     args.out_dir.mkdir(parents=True, exist_ok=True)
     print(f"store: {args.store}\nestimators: {', '.join(names)} | device: {args.device}"
           + (f" | limit {args.limit}" if args.limit else ""))
@@ -563,13 +571,14 @@ def main():
     for estimator in estimators:
         name = estimator.name
         summary = build_summary(estimator, recordings[name], windows[name], args)
-        _write_csv(args.out_dir / f"windows_{name}.csv", windows[name])
-        _write_csv(args.out_dir / f"recordings_{name}.csv", recordings[name])
-        (args.out_dir / f"summary_{name}.json").write_text(
+        summary["provenance"] = provenance(estimator)
+        _write_csv(args.out_dir / f"windows_{name}{suffix}.csv", windows[name])
+        _write_csv(args.out_dir / f"recordings_{name}{suffix}.csv", recordings[name])
+        (args.out_dir / f"summary_{name}{suffix}.json").write_text(
             json.dumps(summary, indent=2), encoding="utf-8")
         print_summary(summary)
 
-    print(f"\noutputs: {args.out_dir}")
+    print(f"\noutputs: {args.out_dir}" + (f" (subset run: names end in {suffix})" if suffix else ""))
     return 0
 
 

@@ -44,6 +44,7 @@ from app.live_vitals.estimators import registry
 from app.live_vitals.estimators.base import aggregate_windows
 from app.live_vitals.signal.hr import hr_from_bvp
 from app.live_vitals.scripts.check_ubfc_regression import window_starts
+from app.live_vitals.scripts.bench_outputs import provenance, subset_suffix, unique
 
 DEFAULT_STORE = Path(r"D:\QualityPhys\phase 3 datasets\ubfc_phys_phase3_rc_none.h5")
 DEFAULT_OUT_DIR = _REPO_ROOT / "Data" / "ubfc_phys_eval"
@@ -75,9 +76,16 @@ def reference_windows(bvp, fps, starts):
 
 
 def predicted_windows(result):
-    """Returns the estimator's per-window readings keyed by window start frame."""
+    """Returns the estimator's per-window readings keyed by window start frame.
+
+    A result with no windows at all (too few frames) has nothing to pair. One that counted
+    windows but not their start frames cannot be paired with the reference, and scoring it
+    as all-missing would read as a model that never answers, so it stops instead.
+    """
     detail = result.detail or {}
     if "window_start" not in detail:
+        if detail.get("n_total"):
+            raise RuntimeError("estimator reports windows without their start frames")
         return {}
     if detail["n_total"] - detail["n_no_peak"] != len(detail["window_hr"]):
         raise RuntimeError("estimator per-window report is inconsistent")
@@ -413,8 +421,10 @@ def main():
                         help="also compare app-path crops of these raw videos with the store")
     args = parser.parse_args()
 
-    names = args.estimator or registry.available()
+    names = unique(args.estimator or registry.available())
     tasks = [t for t in TASKS if t in args.tasks]
+    suffix = subset_suffix(("tasks-", "-".join(tasks), "-".join(TASKS)),
+                           ("limit", args.limit or None, None))
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"store: {args.store}\nestimators: {', '.join(names)} | tasks: {' '.join(tasks)} | "
@@ -425,9 +435,10 @@ def main():
     for estimator in estimators:
         name = estimator.name
         summary = build_summary(estimator, recordings[name], windows[name], args, tasks)
-        _write_csv(args.out_dir / f"windows_{name}.csv", windows[name])
-        _write_csv(args.out_dir / f"recordings_{name}.csv", recordings[name])
-        (args.out_dir / f"summary_{name}.json").write_text(
+        summary["provenance"] = provenance(estimator)
+        _write_csv(args.out_dir / f"windows_{name}{suffix}.csv", windows[name])
+        _write_csv(args.out_dir / f"recordings_{name}{suffix}.csv", recordings[name])
+        (args.out_dir / f"summary_{name}{suffix}.json").write_text(
             json.dumps(summary, indent=2), encoding="utf-8")
         print_summary(summary)
 
@@ -435,7 +446,7 @@ def main():
         rows = parity(args.parity_dir, args.store)
         _write_csv(args.out_dir / "parity.csv", rows)
 
-    print(f"\noutputs: {args.out_dir}")
+    print(f"\noutputs: {args.out_dir}" + (f" (subset run: names end in {suffix})" if suffix else ""))
     return 0
 
 

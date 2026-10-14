@@ -61,6 +61,7 @@ from app.live_vitals.scripts.check_ubfc_phys import (REPORTED, _plain, _write_cs
                                                      make_estimators, predicted_windows,
                                                      reference_windows, summarise_task,
                                                      window_set)
+from app.live_vitals.scripts.bench_outputs import provenance, subset_suffix, unique
 
 DEFAULT_STORE = Path(r"D:\QualityPhys\phase 3 datasets\vitalvideos_phase3_rc_none.h5")
 DEFAULT_OUT_DIR = _REPO_ROOT / "Data" / "vitalvideos_eval"
@@ -321,9 +322,10 @@ def main():
     args = parser.parse_args()
 
     decimation_for(args.speed)  # fail before loading anything if the speed is unusable
-    names = args.estimator or registry.available()
+    names = unique(args.estimator or registry.available())
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    suffix = "" if args.speed == 1.0 else f"_speed{args.speed:g}"
+    suffix = subset_suffix(("split-", args.split, "all"), ("speed", f"{args.speed:g}", "1"),
+                           ("limit", args.limit or None, None))
 
     print(f"store: {args.store}\nestimators: {', '.join(names)} | split: {args.split} | "
           f"speed: x{args.speed:g} | device: {args.device}"
@@ -334,13 +336,14 @@ def main():
     for estimator in estimators:
         name = estimator.name
         summary = build_summary(estimator, recordings[name], windows[name], args)
+        summary["provenance"] = provenance(estimator)
         _write_csv(args.out_dir / f"windows_{name}{suffix}.csv", windows[name])
         _write_csv(args.out_dir / f"recordings_{name}{suffix}.csv", recordings[name])
         (args.out_dir / f"summary_{name}{suffix}.json").write_text(
             json.dumps(summary, indent=2), encoding="utf-8")
         print_summary(summary)
 
-    print(f"\noutputs: {args.out_dir}")
+    print(f"\noutputs: {args.out_dir}" + (f" (subset run: names end in {suffix})" if suffix else ""))
     return 0
 
 
