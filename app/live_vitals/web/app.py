@@ -8,8 +8,8 @@ Uploaded video is written to a temporary file, analysed, and deleted in a
 `finally` block. No frame, crop or clip is ever persisted.
 
 Run:
-    python -m app.live_vitals.web.app
-    python -m app.live_vitals.web.app --https   # for phone testing on the LAN
+    python -m app.live_vitals.web.app             # this machine only, plain HTTP
+    python -m app.live_vitals.web.app --https     # on the LAN, for phone testing
 """
 import json
 import sys
@@ -24,11 +24,18 @@ from fasthtml.common import *
 from monsterui.all import *
 import fasthtml.common as fh
 from starlette.datastructures import UploadFile
+from starlette.staticfiles import StaticFiles
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
+# Run as a file (python app.py), Python puts this folder first on sys.path, and this
+# file - named app.py - then shadows the repository's `app` package, which has no
+# __init__.py: "'app' is not a package". Taking the folder off the path lets both
+# launches work; run as a module (-m), it was never on it.
+_HERE = Path(__file__).resolve().parent
+sys.path[:] = [p for p in sys.path if Path(p or ".").resolve() != _HERE]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
-
+    
 from app.live_vitals import config
 from app.live_vitals.capture.session import (crops_from_video, framing_verdict, stable_box)
 from app.live_vitals.estimators import registry
@@ -93,18 +100,29 @@ def lan_address():
         probe.close()
 
 
-def announce(scheme, port):
-    """Prints the URLs the server can be reached on."""
+def announce(scheme, port, lan=True):
+    """Prints the URLs the server can be reached on; the LAN one only when it listens there."""
     print(f"\nLink: {scheme}://localhost:{port}")
-    lan = lan_address()
-    if lan:
-        print(f"LAN : {scheme}://{lan}:{port}   (for phone testing)\n")
+    address = lan_address() if lan else None
+    if address:
+        print(f"LAN : {scheme}://{address}:{port}   (for phone testing)\n")
 
 app, rt = fast_app(
     hdrs=(*Theme.blue.headers(apex_charts=True),
           Link(rel="icon", type="image/x-icon", href="/static/favicon.ico")),
     live=False, static_path=str(Path(__file__).parent))
 
+
+
+# FastHTML's catch-all static route answers /{fname}.{ext} with the file at
+# f"{static_path}/{fname}.{ext}" and never checks that the path stays inside
+# static_path, so /../ (or %2e%2e%2f) reached any csv, video or yaml on the drive -
+# datasets included (FastHTML 0.14.3, still in 0.14.13). The page needs only
+# web/static, so the route is dropped and that one folder is mounted through
+# Starlette's StaticFiles, which refuses any path that leaves it.
+app.router.routes = [r for r in app.router.routes
+                     if "{fname:path}" not in getattr(r, "path", "")]
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 # These are deliberately MonsterUI/Tailwind utility classes, not a second CSS
 # system.  They make the dashboard feel like one clinical instrument in both
 # the light and dark variants that Theme.blue supplies.
@@ -558,20 +576,22 @@ def main():
     # This module is `app.live_vitals.web.app` inside a package also named
     # `app`, so resolving it by name finds the package instead of this module.
     if use_https and key.exists() and crt.exists():
+        # HTTPS is the phone-testing mode, so it listens on the LAN.
         announce("https", 8443)
         uvicorn.run(app, host="0.0.0.0", port=8443,
                     ssl_keyfile=str(key), ssl_certfile=str(crt),
                     timeout_graceful_shutdown=5)
     else:
         if use_https:
-            print(f"no certificates in {CERT_DIR}; serving HTTP")
-        announce("http", 8000)
-        # A phone left on the page holds a keep-alive connection open and polls
+            print(f"no certificates in {CERT_DIR}; serving HTTP on this machine only")
+        # Plain HTTP stays on this machine. A phone could not use it anyway - browsers
+        # allow the camera only over HTTPS or on localhost - and a server listening on
+        # the LAN answers everyone on it.
+        announce("http", 8000, lan=False)
+        # A browser left on the page holds a keep-alive connection open and polls
         # /api/framing every second. uvicorn's graceful shutdown waits for open
-        # connections indefinitely by default, so Ctrl+C hangs until the phone
+        # connections indefinitely by default, so Ctrl+C hangs until the browser
         # gives up. Five seconds is long enough for a real request to finish.
-        uvicorn.run(app, host="0.0.0.0", port=8000, timeout_graceful_shutdown=5)
-
-
+        uvicorn.run(app, host="127.0.0.1", port=8000, timeout_graceful_shutdown=5)
 if __name__ == "__main__":
     main()
