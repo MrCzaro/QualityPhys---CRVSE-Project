@@ -2,9 +2,9 @@
 
 Runs registered estimators over the VitalVideos Phase-3 store and scores their
 per-window heart rate against the reference BVP read out over the same windows. No
-model in this project has been trained on VitalVideos, so every figure here is
-cross-dataset. Each row carries its `split`, so once a model is trained on the 240
-training subjects the held-out 60 can be re-cut from the same outputs.
+model in this project had been trained on VitalVideos when it was written; v3 has since
+trained on the 240 training subjects. A model declares what it trained on (`trained_on`),
+and a run that would score it on its training subjects stops: run it with `--split val`.
 
 The two analysis sets are the ones check_ubfc_phys.py fixed, and both are decided by
 the reference alone, never by the estimator under test:
@@ -66,6 +66,7 @@ from app.live_vitals.scripts.bench_outputs import provenance, subset_suffix, uni
 
 DEFAULT_STORE = Path(r"D:\QualityPhys\phase 3 datasets\vitalvideos_phase3_rc_none.h5")
 DEFAULT_OUT_DIR = _REPO_ROOT / "Data" / "vitalvideos_eval"
+DATASET = "VitalVideos-WW"  # as the split file and the store's attributes name it
 SPLITS = ("all", "train", "val")
 AGE_BANDS = ((40, "<=40"), (60, "41-60"))  # anything above the last bound is ">60"
 CONFOUNDS = [
@@ -316,7 +317,7 @@ def main():
                         help="registered estimator name; repeat for several (default: all)")
     parser.add_argument("--store", type=Path, default=DEFAULT_STORE)
     parser.add_argument("--split", choices=SPLITS, default="all",
-                        help="all (every subject is zero-shot today), or one split")
+                        help="all, or one split; a model trained on VitalVideos runs on val only")
     parser.add_argument("--speed", type=float, default=1.0,
                         help="synthetic time warp, a multiple of 0.5 (1.0 = the stored video)")
     parser.add_argument("--device", default="cpu", help="torch device for learned estimators")
@@ -335,6 +336,11 @@ def main():
           f"speed: x{args.speed:g} | device: {args.device}"
           + (f" | limit {args.limit}" if args.limit else ""))
     estimators = make_estimators(names, args.device)
+    trained = [e.name for e in estimators if (DATASET, "train") in e.trained_on]
+    if trained and args.split != "val":
+        raise SystemExit(f"ERROR: {', '.join(trained)} trained on VitalVideos' train split; "
+                         f"run with --split val, or leave {'it' if len(trained) == 1 else 'them'} "
+                         f"out with --estimator")
     recordings, windows = evaluate(args.store, estimators, args.split, args.speed, args.limit)
 
     for estimator in estimators:

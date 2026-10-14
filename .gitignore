@@ -53,7 +53,8 @@ Data/ecg_fitness_eval/*
 !Data/ecg_fitness_eval/summary_*.json
 Data/motion_gate/*
 !Data/motion_gate/summary_*.json
-
+Data/phase3_eval/*
+!Data/phase3_eval/summary_*.json
 # smoke-test runs (--limit) are never results, whatever their summary is called
 Data/*_eval/summary_*_limit*.json
 

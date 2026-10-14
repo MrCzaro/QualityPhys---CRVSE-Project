@@ -31,6 +31,9 @@ class Estimator:
     name = "base"
     vital = "unknown"
     unit = ""
+    # The recordings a model learned from, as (dataset, split) pairs of Data/phase3_split.csv.
+    # Evaluation scripts refuse to score an estimator on them; empty when nothing was learned.
+    trained_on = frozenset()
 
     def is_available(self) -> bool:
         """Reports whether the estimator's model assets are present."""

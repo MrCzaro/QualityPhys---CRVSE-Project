@@ -26,6 +26,8 @@ class HRPhysNet(Estimator):
     name = "hr_physnet_v2"
     vital = "heart_rate"
     unit = "bpm"
+    # NB_P3_18: the training split of its three corpora.
+    trained_on = frozenset({("MCD", "train"), ("DLCN", "train"), ("UBFC-rPPG", "train")})
 
     def __init__(self, checkpoint=PHYSNET_CKPT, device="cpu"):
         self.checkpoint = checkpoint
@@ -77,6 +79,8 @@ class HRPhysNetV3(HRPhysNet):
     """
 
     name = "hr_physnet_v3"
+    # NB_P3_31 arm A: v2's training split with VitalVideos' 240 training subjects added.
+    trained_on = HRPhysNet.trained_on | {("VitalVideos-WW", "train")}
 
     def __init__(self, checkpoint=PHYSNET_V3_CKPT, device="cpu"):
         super().__init__(checkpoint=checkpoint, device=device)
