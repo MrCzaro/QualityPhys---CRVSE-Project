@@ -1,0 +1,310 @@
+{
+  "estimator": "hr_spectral",
+  "store": "D:\\QualityPhys\\phase 3 datasets\\ubfc_phys_phase3_rc_none.h5",
+  "device": "cuda",
+  "tasks_run": [
+    "T1"
+  ],
+  "limit": null,
+  "settings": {
+    "clip_len": 160,
+    "window_stride": 80,
+    "min_confidence": 0.65,
+    "fps": [
+      35.138
+    ],
+    "window_seconds": [
+      4.55
+    ],
+    "training_window_seconds": 5.33
+  },
+  "confounds": [
+    "35.138 fps is not decimated: windows span 4.55 s against 5.33 s in training",
+    "reference is a wrist Empatica E4 BVP"
+  ],
+  "analysis_sets": {
+    "primary": "windows kept by the reference's own gating, in recordings whose reference yields a reading",
+    "sensitivity": "every window with a finite reference reading"
+  },
+  "reference_accepted": {
+    "T1": {
+      "accepted": 54,
+      "total": 56
+    }
+  },
+  "tasks": {
+    "T1": {
+      "primary": {
+        "n_recordings": 54,
+        "n_windows_eligible": 3475,
+        "n_windows_model_no_peak": 0,
+        "window": {
+          "n": 3475,
+          "mae": 6.960908024425052,
+          "rmse": 12.343221126740676,
+          "mape": 9.079663467506458,
+          "bias": 2.7903787377353795,
+          "loa_low": -20.779426748887534,
+          "loa_high": 26.360184224358296,
+          "r": 0.6593842720564577
+        },
+        "coverage": 1.0,
+        "recording": {
+          "n": 54,
+          "mae": 3.6473916998975398,
+          "rmse": 8.133955890677406,
+          "mape": 4.957895252623349,
+          "bias": 3.287187953088009,
+          "loa_low": -11.432409399629407,
+          "loa_high": 18.006785305805426,
+          "r": 0.8265945188854348
+        },
+        "status_counts": {
+          "ok": 53,
+          "unstable": 1
+        },
+        "mean_usable_fraction": 0.8751187084520418
+      },
+      "sensitivity": {
+        "n_recordings": 56,
+        "n_windows_eligible": 4266,
+        "n_windows_model_no_peak": 1,
+        "window": {
+          "n": 4265,
+          "mae": 9.076764266729713,
+          "rmse": 15.526402114400378,
+          "mape": 12.744487227724779,
+          "bias": 3.8237139899953365,
+          "loa_low": -25.674219654508114,
+          "loa_high": 33.32164763449879,
+          "r": 0.5200628694156941
+        },
+        "coverage": 1.0,
+        "recording": {
+          "n": 56,
+          "mae": 3.847338343240286,
+          "rmse": 8.068721958438694,
+          "mape": 5.196637639160463,
+          "bias": 3.5783238572673697,
+          "loa_low": -10.724409913660297,
+          "loa_high": 17.881057628195038,
+          "r": 0.8332952517320447
+        },
+        "status_counts": {
+          "ok": 54,
+          "unstable": 1,
+          "degraded_capture": 1
+        },
+        "mean_usable_fraction": 0.8656135531135531
+      }
+    }
+  },
+  "strata": {
+    "T1": {
+      "cardiac_sqi_30s": {
+        "< 0.4": {
+          "n": 76,
+          "mae": 2.000792898992265,
+          "rmse": 2.6563324390435894,
+          "mape": 2.679421146764523,
+          "bias": 0.3653184963098333,
+          "loa_low": -4.8258873263112925,
+          "loa_high": 5.556524318930959,
+          "r": 0.9638506571849471,
+          "n_recordings": 2
+        },
+        ">= 0.4": {
+          "n": 3399,
+          "mae": 7.07181380539972,
+          "rmse": 12.474130167924313,
+          "mape": 9.22276979771428,
+          "bias": 2.8446019146545747,
+          "loa_low": -20.96399939626434,
+          "loa_high": 26.653203225573492,
+          "r": 0.6543124791227181,
+          "n_recordings": 52
+        }
+      },
+      "gender": {
+        "f": {
+          "n": 2860,
+          "mae": 7.203791487043014,
+          "rmse": 12.807281097121008,
+          "mape": 9.466790432253394,
+          "bias": 3.4197563594671276,
+          "loa_low": -20.77533001181459,
+          "loa_high": 27.61484273074884,
+          "r": 0.618317191368906,
+          "n_recordings": 45
+        },
+        "m": {
+          "n": 615,
+          "mae": 5.831401190136648,
+          "rmse": 9.903465363781429,
+          "mape": 7.279365712748355,
+          "bias": -0.13648304787892465,
+          "loa_low": -19.561230674803724,
+          "loa_high": 19.288264579045872,
+          "r": 0.8012959746199078,
+          "n_recordings": 9
+        }
+      },
+      "scenario": {
+        "ctrl": {
+          "n": 1877,
+          "mae": 6.025927197482042,
+          "rmse": 10.806050987745394,
+          "mape": 7.633901464633758,
+          "bias": 2.1182250989246088,
+          "loa_low": -18.656269084278986,
+          "loa_high": 22.8927192821282,
+          "r": 0.6960560168474735,
+          "n_recordings": 29
+        },
+        "test": {
+          "n": 1598,
+          "mae": 8.059130184732958,
+          "rmse": 13.933853311103821,
+          "mape": 10.77784574497333,
+          "bias": 3.579885859167055,
+          "loa_low": -22.821993195864373,
+          "loa_high": 29.981764914198486,
+          "r": 0.6278341083033783,
+          "n_recordings": 25
+        }
+      }
+    }
+  },
+  "common_windows": {
+    "T1": {
+      "hr_physnet_v2": {
+        "primary": {
+          "n_windows_eligible": 3475,
+          "n_both": 3474,
+          "n_this_only": 1,
+          "n_other_only": 0,
+          "n_recordings": 54,
+          "this": {
+            "n": 3474,
+            "mae": 6.962700324790095,
+            "rmse": 12.344991224183557,
+            "mape": 9.081927758838042,
+            "bias": 2.790970540320718,
+            "loa_low": -20.782128797067152,
+            "loa_high": 26.364069877708587,
+            "r": 0.659136585886066
+          },
+          "other": {
+            "n": 3474,
+            "mae": 6.974524256442428,
+            "rmse": 12.707585844272415,
+            "mape": 9.303137267140759,
+            "bias": 4.4641606865203345,
+            "loa_low": -18.858584696806485,
+            "loa_high": 27.786906069847152,
+            "r": 0.6620232347318281
+          }
+        },
+        "sensitivity": {
+          "n_windows_eligible": 4266,
+          "n_both": 4264,
+          "n_this_only": 1,
+          "n_other_only": 1,
+          "n_recordings": 56,
+          "this": {
+            "n": 4264,
+            "mae": 9.078720717881323,
+            "rmse": 15.528218572355874,
+            "mape": 12.747191489414774,
+            "bias": 3.8244384875173174,
+            "loa_low": -25.676808923873946,
+            "loa_high": 33.32568589890858,
+            "r": 0.5198252114293063
+          },
+          "other": {
+            "n": 4264,
+            "mae": 9.277540871814956,
+            "rmse": 16.255375927005012,
+            "mape": 13.406625403073788,
+            "bias": 6.070423102193715,
+            "loa_low": -23.48859608589135,
+            "loa_high": 35.629442290278774,
+            "r": 0.515290352658366
+          }
+        }
+      },
+      "hr_physnet_v3": {
+        "primary": {
+          "n_windows_eligible": 3475,
+          "n_both": 3475,
+          "n_this_only": 0,
+          "n_other_only": 0,
+          "n_recordings": 54,
+          "this": {
+            "n": 3475,
+            "mae": 6.960908024425052,
+            "rmse": 12.343221126740676,
+            "mape": 9.079663467506458,
+            "bias": 2.7903787377353795,
+            "loa_low": -20.779426748887534,
+            "loa_high": 26.360184224358296,
+            "r": 0.6593842720564577
+          },
+          "other": {
+            "n": 3475,
+            "mae": 6.813924637771469,
+            "rmse": 12.572040336983239,
+            "mape": 9.05315402141243,
+            "bias": 4.355718154204458,
+            "loa_low": -18.762642057241624,
+            "loa_high": 27.474078365650538,
+            "r": 0.6727184936691523
+          }
+        },
+        "sensitivity": {
+          "n_windows_eligible": 4266,
+          "n_both": 4264,
+          "n_this_only": 1,
+          "n_other_only": 1,
+          "n_recordings": 56,
+          "this": {
+            "n": 4264,
+            "mae": 9.076591918252214,
+            "rmse": 15.527495659820032,
+            "mape": 12.745126018136416,
+            "bias": 3.8223096878882092,
+            "loa_low": -25.6785357619642,
+            "loa_high": 33.32315513774062,
+            "r": 0.5198981990242607
+          },
+          "other": {
+            "n": 4264,
+            "mae": 9.165993339828573,
+            "rmse": 16.272713022380508,
+            "mape": 13.215549902539369,
+            "bias": 5.963712934645409,
+            "loa_low": -23.715184780846023,
+            "loa_high": 35.642610650136845,
+            "r": 0.5168773153482259
+          }
+        }
+      }
+    }
+  },
+  "provenance": {
+    "command": [
+      "check_ubfc_phys.py",
+      "--tasks",
+      "T1",
+      "--device",
+      "cuda"
+    ],
+    "git": {
+      "commit": "25ba5beb00a6c2b9ddebb08dcfb8299c89a89b8e",
+      "dirty": false,
+      "changed": []
+    },
+    "weights": null,
+    "written_utc": "2026-10-15T04:32:55+00:00"
+  }
+}

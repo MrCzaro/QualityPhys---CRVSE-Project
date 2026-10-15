@@ -783,14 +783,11 @@
       "cuda"
     ],
     "git": {
-      "commit": "d96d88261356d3ff5f3fd48339c6b9af09578215",
-      "dirty": true,
-      "changed": [
-        "Data/ecg_fitness_eval/summary_hr_physnet_v2.json",
-        "app/live_vitals/scripts/check_ecg_fitness.py"
-      ]
+      "commit": "25ba5beb00a6c2b9ddebb08dcfb8299c89a89b8e",
+      "dirty": false,
+      "changed": []
     },
     "weights": null,
-    "written_utc": "2026-10-14T05:27:02+00:00"
+    "written_utc": "2026-10-15T06:12:45+00:00"
   }
 }
