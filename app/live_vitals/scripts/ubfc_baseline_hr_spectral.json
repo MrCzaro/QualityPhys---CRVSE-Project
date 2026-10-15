@@ -14,6 +14,7 @@
       "usable_fraction": 0.8333333333333334,
       "n_frames": 2031,
       "effective_fps": 29.700708000000002,
+      "motion_px": 0.17778652794746486,
       "verdict": "ACCEPT"
     },
     "13": {
@@ -26,6 +27,7 @@
       "usable_fraction": 0.9583333333333334,
       "n_frames": 2018,
       "effective_fps": 29.790300000000002,
+      "motion_px": 0.04685930328801306,
       "verdict": "ACCEPT"
     },
     "24": {
@@ -38,6 +40,7 @@
       "usable_fraction": 0.875,
       "n_frames": 2009,
       "effective_fps": 29.368114000000002,
+      "motion_px": 0.04838734181136875,
       "verdict": "ACCEPT"
     },
     "25": {
@@ -50,6 +53,7 @@
       "usable_fraction": 0.8823529411764706,
       "n_frames": 1448,
       "effective_fps": 23.206781,
+      "motion_px": 0.030158324719427396,
       "verdict": "WARN"
     },
     "34": {
@@ -62,6 +66,7 @@
       "usable_fraction": 1.0,
       "n_frames": 2035,
       "effective_fps": 29.975690999999998,
+      "motion_px": 0.05321016871000335,
       "verdict": "ACCEPT"
     },
     "35": {
@@ -74,6 +79,7 @@
       "usable_fraction": 1.0,
       "n_frames": 2051,
       "effective_fps": 29.906009,
+      "motion_px": 0.05165246665693464,
       "verdict": "ACCEPT"
     },
     "42": {
@@ -86,6 +92,7 @@
       "usable_fraction": 0.9583333333333334,
       "n_frames": 2042,
       "effective_fps": 29.948008999999995,
+      "motion_px": 0.05550952714005028,
       "verdict": "ACCEPT"
     },
     "47": {
@@ -98,6 +105,7 @@
       "usable_fraction": 0.9583333333333334,
       "n_frames": 2023,
       "effective_fps": 29.789803000000003,
+      "motion_px": 0.035784033928481604,
       "verdict": "ACCEPT"
     }
   },
@@ -121,6 +129,9 @@
       "MIN_REPORTABLE_FRACTION": 0.25,
       "MIN_USABLE_FRACTION": 0.5,
       "MIN_USABLE_WINDOWS": 3,
+      "MOTION_PERIODIC_PX": 0.9,
+      "MOTION_PERIODIC_SHARE": 0.5,
+      "MOTION_REJECT_PX": 1.7,
       "N_DETECT_FRAMES": 12,
       "SPECTRAL_FILTER_ORDER": 4,
       "SPECTRAL_METHOD": "pos",
@@ -137,7 +148,7 @@
     },
     "face_model_sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
     "weights_sha256": null,
-    "capture_code_sha256": "8341c21de770724282c547e81cf022f0c080b3209748363cff6a1235ddd0f6de",
+    "capture_code_sha256": "efd4204bf06a5a7a7027260b9caf8927bd3e255279719b65de394c97c75fb1de",
     "versions": {
       "python": "3.14.7",
       "numpy": "2.5.0",
@@ -155,15 +166,14 @@
       "--update-baseline"
     ],
     "git": {
-      "commit": "dcac1981474d0596b80d5319dbf26cc02fd62b87",
+      "commit": "4cd73ef7bdbc39c1289aabe28cde5480b1ce28ef",
       "dirty": true,
       "changed": [
-        "README.md",
-        "app/live_vitals/scripts/check_ubfc_regression.py",
-        "app/live_vitals/scripts/ubfc_baseline_hr_physnet_v2.json"
+        "app/live_vitals/scripts/ubfc_baseline_hr_physnet_v2.json",
+        "app/live_vitals/scripts/ubfc_baseline_hr_physnet_v3.json"
       ]
     },
     "weights": null,
-    "written_utc": "2026-10-14T08:26:49+00:00"
+    "written_utc": "2026-10-15T15:03:42+00:00"
   }
 }
