@@ -36,7 +36,10 @@ def report(result, quality, model_name, source):
           f"{quality.effective_fps:.2f} fps  (crop aspect {quality.crop_aspect:.3f})")
     print(f"detections : {quality.detections}/{quality.detections_attempted} "
           f"sampled frames")
-    print(f"framing    : {quality.verdict}")
+    print(f"capture    : {quality.verdict}")
+    if quality.motion_px == quality.motion_px:  # NaN when the clip was too short to judge
+        print(f"motion     : {quality.motion_px:.2f} px per window in the crop, "
+              f"rhythmic in {quality.motion_periodic:.0%} of windows")
     for note in quality.notes:
         print(f"             - {note}")
 
@@ -130,14 +133,15 @@ def main():
     p_analyze.add_argument("--model", default=registry.DEFAULT_ESTIMATOR,
                            choices=registry.available())
     p_analyze.add_argument("--force", action="store_true",
-                           help="report a reading even when framing is rejected")
+                           help="report a reading even when the capture is rejected")
 
     p_camera = sub.add_parser("camera", help="capture from a webcam and estimate")
     p_camera.add_argument("--seconds", type=float, default=60.0)
     p_camera.add_argument("--device", type=int, default=0)
     p_camera.add_argument("--model", default=registry.DEFAULT_ESTIMATOR,
                           choices=registry.available())
-    p_camera.add_argument("--force", action="store_true")
+    p_camera.add_argument("--force", action="store_true",
+                          help="report a reading even when the capture is rejected")
 
     args = parser.parse_args()
     return {"models": cmd_models, "analyze": cmd_analyze,

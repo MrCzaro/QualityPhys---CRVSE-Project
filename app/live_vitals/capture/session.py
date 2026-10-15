@@ -14,6 +14,7 @@ from .. import config
 from ..preprocess.face_box import (
     make_landmarker, landmark_box, square_padded_box, box_clamp_report)
 from ..preprocess.frames import crop_resize
+from .motion import motion_verdict
 
 
 @dataclass
@@ -30,7 +31,11 @@ class CaptureQuality:
     crop_aspect: float
     frac_side_lost: float
     notes: list = field(default_factory=list)
-
+    # Head motion in the crop (capture/motion.py): the median in-band displacement in crop
+    # pixels and the share of windows with a clear rhythm. NaN when the clip is too short to judge.
+    motion_px: float = float("nan")
+    motion_periodic: float = float("nan")
+    
     @property
     def usable(self):
         return self.verdict != "REJECT"
@@ -102,6 +107,13 @@ def rate_verdict(effective_fps):
                         f"{config.TARGET_FPS:.0f} fps training rate, so each window "
                         f"spans less time than in training; treat as indicative")
     return "ACCEPT", None
+
+
+def motion_fields(summary):
+    """The CaptureQuality motion fields from a motion_verdict summary (None: not judged)."""
+    if summary is None:
+        return {}
+    return dict(motion_px=summary["amp_median"], motion_periodic=summary["clear_frac"])
 
 
 def worst_verdict(*verdicts):
@@ -185,15 +197,20 @@ def crops_from_video(video_path, landmarker=None):
     rate, rate_note = rate_verdict(effective_fps)
     if rate_note:
         notes.append(rate_note)
-    verdict = worst_verdict(verdict, rate)
+    clip = np.asarray(clip, dtype=np.uint8)
+    motion, motion_note, motion_summary = motion_verdict(clip, effective_fps)
+    if motion_note:
+        notes.append(motion_note)
+    verdict = worst_verdict(verdict, rate, motion)
 
     quality = CaptureQuality(
         width=width, height=height, source_fps=source_fps,
         effective_fps=effective_fps, n_frames=len(clip),
         detections=detections, detections_attempted=len(sample_at),
         verdict=verdict, crop_aspect=report["expected_aspect"],
-        frac_side_lost=report["frac_side_lost"], notes=notes)
-    return np.asarray(clip, dtype=np.uint8), effective_fps, quality
+        frac_side_lost=report["frac_side_lost"], notes=notes,
+        **motion_fields(motion_summary))
+    return clip, effective_fps, quality
 
 
 def crops_from_camera(camera, seconds, landmarker=None, on_progress=None):
@@ -253,12 +270,17 @@ def crops_from_camera(camera, seconds, landmarker=None, on_progress=None):
     rate, rate_note = rate_verdict(effective_fps)
     if rate_note:
         notes.append(f"camera delivered {rate_note}")
-    verdict = worst_verdict(verdict, rate)
+    clip = np.asarray(clip, dtype=np.uint8)
+    motion, motion_note, motion_summary = motion_verdict(clip, effective_fps)
+    if motion_note:
+        notes.append(motion_note)
+    verdict = worst_verdict(verdict, rate, motion)
 
     quality = CaptureQuality(
         width=width, height=height, source_fps=effective_fps,
         effective_fps=effective_fps, n_frames=len(clip),
         detections=detections, detections_attempted=config.N_DETECT_FRAMES,
         verdict=verdict, crop_aspect=report["expected_aspect"],
-        frac_side_lost=report["frac_side_lost"], notes=notes)
-    return np.asarray(clip, dtype=np.uint8), effective_fps, quality
+        frac_side_lost=report["frac_side_lost"], notes=notes,
+        **motion_fields(motion_summary))
+    return clip, effective_fps, quality

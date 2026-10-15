@@ -6,7 +6,8 @@ rhythm, and that one number - the median in-band displacement of the crop - sepa
 the exercise recordings from the resting ones there. A gate on that number is honest
 only if its threshold is set somewhere else. This script measures it, with the
 diagnostic's own functions, on the still corpora and on your own captures, and proposes
-a threshold by a rule fixed before the run. It never reads ECG-Fitness.
+a threshold by a rule fixed before the run. It never reads ECG-Fitness. Those functions now
+live in app/live_vitals/capture/motion.py, where the app's gate uses them unchanged.
 
 Per recording, over the app's analysis windows (CLIP_LEN frames, WINDOW_STRIDE apart):
   amp_median   median in-band (cardiac band) rms displacement of the crop, crop pixels
@@ -58,8 +59,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from app.live_vitals import config
-from app.live_vitals.scripts.diagnose_ecg_fitness_motion import crop_shifts, window_rhythms
+from app.live_vitals.capture.motion import crop_motion
 
 DEFAULT_STORE_DIR = Path(r"D:\QualityPhys\phase 3 datasets")
 DEFAULT_VIDEO_DIR = Path(r"D:\QualityPhys\demo_data")
@@ -75,32 +75,6 @@ REC_FIELDS = ["source", "stratum", "recording", "usable", "fps", "n_frames", "n_
               "amp_median", "amp_p90", "clear_frac", "rhythm_when_clear", "verdict"]
 WIN_FIELDS = ["source", "recording", "start", "crop_rhythm", "crop_periodicity",
               "crop_channel", "crop_amp"]
-NAN = float("nan")
-
-
-# ----------------------------------------------------------------- measure --
-
-def crop_motion(frames, fps):
-    """Per-window crop rhythm, periodicity and in-band displacement, as the diagnostic
-    computes them for its crop source, plus the per-recording summary. None if the
-    recording is shorter than one analysis window."""
-    n = len(frames)
-    if n < config.CLIP_LEN:
-        return None, None
-    starts = list(range(0, n - config.CLIP_LEN + 1, config.WINDOW_STRIDE))
-    shift = crop_shifts(frames)
-    position = np.cumsum(shift, axis=0)
-    rows = window_rhythms(dict(crop_x=shift[:, 0], crop_y=shift[:, 1]),
-                          [position[:, 0], position[:, 1]], 1.0, fps, starts, "crop")
-    amp = np.array([r["crop_amp"] for r in rows], dtype=float)
-    periodicity = np.array([r["crop_periodicity"] for r in rows], dtype=float)
-    clear = np.nan_to_num(periodicity, nan=0.0) >= config.MIN_CONFIDENCE
-    rhythm = np.array([r["crop_rhythm"] for r in rows], dtype=float)
-    summary = dict(n_frames=n, n_windows=len(rows),
-                   amp_median=float(np.median(amp)), amp_p90=float(np.percentile(amp, 90)),
-                   clear_frac=float(clear.mean()),
-                   rhythm_when_clear=float(np.median(rhythm[clear])) if clear.any() else NAN)
-    return rows, summary
 
 
 def _text(value):

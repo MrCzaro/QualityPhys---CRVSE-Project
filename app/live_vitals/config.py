@@ -37,6 +37,18 @@ MAX_BOX_SIDE_LOST = 0.02  # reject if the padded box is clamped by more than thi
 # otherwise identical resting capture, so it is flagged even when nothing is clamped.
 TRAIN_ASPECT_RANGE = (1.20, 1.90)
 
+
+# Periodic-motion gate. During exercise the estimators read the head's movement rhythm as a
+# pulse, with full confidence (ECG-Fitness, NB_P3_29). The statistic is the median, over the
+# analysis windows, of the crop's in-band (cardiac band) rms displacement in crop pixels
+# (capture/motion.py). Calibrated by calibrate_motion_gate.py on 2478 still recordings and
+# never on exercise data: 1.7 px sits just above the most-moving talker (UBFC-Phys T2), and
+# 0.9 px with a clear rhythm above the resting range. Neither refuses a still recording, a
+# PhysDrive drive or an own capture.
+MOTION_REJECT_PX = 1.7       # refuse at this displacement, rhythmic or not
+MOTION_PERIODIC_PX = 0.9     # refuse from this displacement when the motion is rhythmic,
+MOTION_PERIODIC_SHARE = 0.5  # i.e. clear (MIN_CONFIDENCE) in at least this share of windows
+
 # HR readout (app-side; not part of the training contract) 
 FFT_PAD_FACTOR = 8 # zero-pad before the FFT to escape coarse bin spacing
 SUBHARMONIC_RATIO = 0.20  # adopt f/2 when its power exceeds this fraction of the peak

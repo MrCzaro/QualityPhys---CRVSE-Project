@@ -83,6 +83,12 @@ def quality_payload(quality):
                 verdict=quality.verdict,
                 crop_aspect=round(quality.crop_aspect, 3),
                 frac_side_lost=round(quality.frac_side_lost, 3),
+                # Head motion in the crop, as the motion gate measured it; None when the
+                # clip was too short to judge.
+                motion_px=(round(float(quality.motion_px), 2)
+                           if np.isfinite(quality.motion_px) else None),
+                motion_periodic=(round(float(quality.motion_periodic), 2)
+                                 if np.isfinite(quality.motion_periodic) else None),
                 notes=list(quality.notes))
 
 

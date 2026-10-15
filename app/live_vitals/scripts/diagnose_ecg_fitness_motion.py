@@ -14,7 +14,8 @@ same band, resolution and units as a heart rate:
   resolution, read from the copy that the tools script ecg_fitness_subset.py keeps. It is
   independent of the colour signal.
 - crop: the frame-to-frame shift of the stored 72x72 crop, by cross-correlation. The app
-  has the crop too, so this is what a gate could use.
+    has the crop too; its periodic-motion gate now measures it with these same functions,
+    which live in app/live_vitals/capture/motion.py.
 In each window the rhythm is that of the channel the readout finds most periodic, and its
 periodicity is the readout's spectral concentration - the quantity the app calls
 confidence when the signal is a pulse.
@@ -46,8 +47,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from app.live_vitals import config
-from app.live_vitals.signal.hr import hr_from_bvp
-from app.live_vitals.signal.spectral import bandpass
+from app.live_vitals.capture.motion import crop_shifts, window_rhythms
 
 DEFAULT_STORE = Path(r"D:\QualityPhys\phase 3 benchmarks\ecg_fitness_phase3_rc_none.h5")
 DEFAULT_BBOX_ROOT = Path(r"D:\QualityPhys\demo_data\ecg_fitness_subset\bbox")
@@ -127,69 +127,6 @@ def box_tracks(path, n_frames):
     size = np.sqrt(np.clip(w, 0, None) * np.clip(h, 0, None))
     tracks = dict(box_x=fill(x + w / 2), box_y=fill(y + h / 2), box_size=fill(size))
     return tracks, float(np.median(size[found]))
-
-
-def crop_shifts(frames):
-    """Frame-to-frame shift of the crop's content (crop px), by cross-correlation.
-
-    Plain cross-correlation of the mean-removed, Hann-weighted grey crop, peak refined to
-    sub-pixel by a parabola on each axis. The Hann weight favours the centre, where the
-    face is, over the padded border. OpenCV's phaseCorrelate was tried first: its
-    whitening hands the decision to sensor noise wherever the crop has little texture,
-    and on synthetic crops it returned shifts of thousands of pixels.
-    """
-    gray = np.asarray(frames, dtype=np.float64).mean(axis=3)
-    n, h, w = gray.shape
-    weight = np.outer(np.hanning(h), np.hanning(w))
-    spectra = np.fft.rfft2((gray - gray.mean(axis=(1, 2), keepdims=True)) * weight)
-    shift = np.zeros((n, 2))
-    for lo in range(1, n, 256):  # in blocks, to bound memory
-        hi = min(n, lo + 256)
-        corr = np.fft.irfft2(spectra[lo:hi] * np.conj(spectra[lo - 1:hi - 1]), s=(h, w))
-        corr = np.fft.fftshift(corr, axes=(1, 2))
-        peak = corr.reshape(len(corr), -1).argmax(axis=1)
-        iy, ix = np.unravel_index(peak, (h, w))
-        iy, ix = np.clip(iy, 1, h - 2), np.clip(ix, 1, w - 2)
-        k = np.arange(len(corr))
-        shift[lo:hi, 0] = ix - w // 2 + _vertex(corr[k, iy, ix - 1], corr[k, iy, ix],
-                                                 corr[k, iy, ix + 1])
-        shift[lo:hi, 1] = iy - h // 2 + _vertex(corr[k, iy - 1, ix], corr[k, iy, ix],
-                                                 corr[k, iy + 1, ix])
-    return shift
-
-
-def _vertex(left, centre, right):
-    """Sub-sample offset of a parabola's vertex through three points; 0 if not a peak."""
-    curvature = left - 2.0 * centre + right
-    safe = np.where(np.abs(curvature) > 1e-12, curvature, 1.0)
-    offset = np.where(np.abs(curvature) > 1e-12, 0.5 * (left - right) / safe, 0.0)
-    return np.where(np.abs(offset) <= 0.5, offset, 0.0)
-
-
-# ----------------------------------------------------------------- readout --
-
-def window_rhythms(read_tracks, amp_tracks, amp_scale, fps, starts, source):
-    """Per window: the rhythm (bpm), periodicity and channel of the most periodic channel
-    in `read_tracks`, and the in-band rms displacement of `amp_tracks` times `amp_scale`.
-
-    Every channel is band-passed over the whole recording with the app's cardiac band-pass,
-    as POS is, then read on each analysis window with the app's own readout.
-    """
-    readable = {k: bandpass(v - v.mean(), fps) for k, v in read_tracks.items()}
-    moving = [bandpass(v - v.mean(), fps) for v in amp_tracks]
-    rows = []
-    for s in starts:
-        best_hr, best_conf, best_channel = NAN, -1.0, ""
-        for channel, signal in readable.items():
-            reading = hr_from_bvp(signal[s:s + config.CLIP_LEN], fps)
-            if np.isfinite(reading["hr_bpm"]) and reading["confidence"] > best_conf:
-                best_hr, best_conf, best_channel = (reading["hr_bpm"], reading["confidence"],
-                                                    channel)
-        amp = np.sqrt(sum(np.mean(v[s:s + config.CLIP_LEN] ** 2) for v in moving)) * amp_scale
-        rows.append({"start": s, f"{source}_rhythm": best_hr,
-                     f"{source}_periodicity": best_conf if best_channel else NAN,
-                     f"{source}_channel": best_channel, f"{source}_amp": amp})
-    return rows
 
 
 def _text(value):

@@ -9,11 +9,11 @@ drawn from the screen's validation split, not v2's, and six of the eight were in
 training data: this check catches drift, it does not measure held-out accuracy.
 
 Compared per subject: the reported value, window MAE, usable fraction and status, and the
-capture path's frame count, measured rate and verdict. The baseline also records the
-conditions it was taken under. The config constants, the face model and the weights are
-part of what it certifies, so a run under different ones fails until a new baseline is
-recorded, even if its figures happen to match. The capture code's hash and the library
-versions are recorded for diagnosis only: an edit or upgrade that changes no figure
+capture path's frame count, measured rate, head motion and verdict. The baseline also
+records the conditions it was taken under. The config constants, the face model and the
+weights are part of what it certifies, so a run under different ones fails until a new
+baseline is recorded, even if its figures happen to match. The capture code's hash and the
+library versions are recorded for diagnosis only: an edit or upgrade that changes no figure
 passes, with a note.
 
 Usage:
@@ -44,7 +44,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from app.live_vitals import config
-from app.live_vitals.capture import session
+from app.live_vitals.capture import motion, session
 from app.live_vitals.estimators import registry
 from app.live_vitals.preprocess import face_box, frames
 from app.live_vitals.signal.hr import hr_from_bvp
@@ -57,10 +57,13 @@ BASELINE_FORMAT = 2  # 2 (2026-10-14): capture-path fields, recorded conditions,
 TOLERANCE_BPM = 0.05
 TOLERANCE_FRACTION = 0.01
 TOLERANCE_FPS = 0.001
-# Compared per subject, with the tolerance of each; None compares exactly.
+TOLERANCE_MOTION_PX = 0.01
+# Compared per subject, with the tolerance of each; None compares exactly. A field the
+# baseline does not hold is not compared (motion_px came with the motion gate, 2026-10-15).
 COMPARED = (("mae", TOLERANCE_BPM), ("value", TOLERANCE_BPM),
             ("usable_fraction", TOLERANCE_FRACTION), ("status", None),
-            ("n_frames", None), ("effective_fps", TOLERANCE_FPS), ("verdict", None))
+            ("n_frames", None), ("effective_fps", TOLERANCE_FPS),
+            ("motion_px", TOLERANCE_MOTION_PX), ("verdict", None))
 # Config settings that never reach a recorded video's reading, so they are not recorded.
 RUNTIME_ONLY = ("CAMERA_STALL_SECONDS", "DEBUG_REPORT")
 # Recorded conditions whose change fails the check; the rest only add a note.
@@ -85,7 +88,7 @@ def conditions(estimator):
     whole, comments included, which is why that hash only ever adds a note.
     """
     source = hashlib.sha256()
-    for module in (session, face_box, frames):
+    for module in (session, motion, face_box, frames):
         source.update(inspect.getsource(module).encode("utf-8"))
     checkpoint = getattr(estimator, "checkpoint", None)
     recorded = dict(
@@ -169,6 +172,7 @@ def evaluate_subject(subject_dir, estimator, landmarker):
                                                         float("nan"))),
                 n_frames=int(len(clip)),
                 effective_fps=float(fps),
+                motion_px=float(quality.motion_px),
                 verdict=quality.verdict)
 
 
@@ -248,8 +252,8 @@ def compare(run, baseline_file):
         print("  NOT COMPARABLE: the baseline predates the capture-path fields (frame count, "
               "measured rate,\n  verdict); record a new one with --update-baseline")
         return 2
-    print("  PASS: value, MAE, usable fraction, status, frame count, measured rate and "
-          "verdict all match baseline")
+    print("  PASS: value, MAE, usable fraction, status, frame count, measured rate, motion "
+          "and verdict all match baseline")
     if noted:
         print("  note - differs from the baseline's run, with no effect on the figures:")
         for change in noted:
@@ -283,7 +287,7 @@ def main():
     print(f"estimator: {args.estimator}   subjects: {len(subjects)}")
     landmarker = face_box.make_landmarker()
     print(f"{'subj':>5} {'value':>7} {'ref':>7} {'err':>6} {'MAE':>6} {'conf':>6} "
-          f"{'frac':>5} {'frames':>6} {'fps':>7}  {'verdict':7} status")
+            f"{'frac':>5} {'frames':>6} {'fps':>7} {'motion':>6}  {'verdict':7} status")
 
     results = {}
     for subject in subjects:
@@ -291,8 +295,8 @@ def main():
         results[str(subject)] = row
         print(f"{subject:5d} {row['value']:7.2f} {row['reference_hr']:7.2f} "
               f"{row['error']:+6.2f} {row['mae']:6.2f} {row['confidence']:6.3f} "
-              f"{row['usable_fraction']:5.2f} {row['n_frames']:6d} {row['effective_fps']:7.3f}  "
-              f"{row['verdict']:7} {row['status']}")
+              f"{row['usable_fraction']:5.2f} {row['n_frames']:6d} {row['effective_fps']:7.3f} "
+              f"{row['motion_px']:6.2f}  {row['verdict']:7} {row['status']}")
 
     mean_mae = float(np.mean([r["mae"] for r in results.values()]))
     mean_error = float(np.mean([r["error"] for r in results.values()]))
