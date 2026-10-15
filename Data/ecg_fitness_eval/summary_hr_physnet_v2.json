@@ -14,6 +14,9 @@
     "span_tolerance": 0.05,
     "low_detection_below": 6.0,
     "max_box_side_lost": 0.02,
+    "motion_reject_px": 1.7,
+    "motion_periodic_px": 0.9,
+    "motion_periodic_share": 0.5,
     "fps_range": [
       28.158211898761913,
       30.015850504713438
@@ -35,6 +38,20 @@
       "04": 8,
       "05": 14,
       "06": 14
+    },
+    "capture_rejected": {
+      "framing": {
+        "all": 4,
+        "primary": 0
+      },
+      "rate": {
+        "all": 0,
+        "primary": 0
+      },
+      "motion": {
+        "all": 59,
+        "primary": 40
+      }
     },
     "store_mismatches": {}
   },
@@ -75,10 +92,10 @@
       "lighting": "ambient",
       "motion_class": "moderate",
       "n_recordings": 11,
-      "n_reported": 2,
-      "refusal": 0.8181818181818182,
+      "n_reported": 1,
+      "refusal": 0.9090909090909091,
       "refusal_ci": [
-        0.5555555555555556,
+        0.7139285714285715,
         1.0
       ],
       "refusal_ci_subjects": 11,
@@ -90,18 +107,18 @@
         0.9567099567099567
       ],
       "window_discard_ci_subjects": 11,
-      "n_scored": 22,
-      "n_confident_wrong": 21,
-      "confident_wrong": 0.9545454545454546,
+      "n_scored": 18,
+      "n_confident_wrong": 18,
+      "confident_wrong": 1.0,
       "confident_wrong_ci": [
         NaN,
         NaN
       ],
-      "confident_wrong_ci_subjects": 2,
-      "mae": 40.086404961511136,
-      "bias": -40.086404961511136,
-      "coverage": 0.09523809523809523,
-      "n_kept_unreferenced": 2
+      "confident_wrong_ci_subjects": 1,
+      "mae": 45.73824801168642,
+      "bias": -45.73824801168642,
+      "coverage": 0.07792207792207792,
+      "n_kept_unreferenced": 0
     },
     "03": {
       "lighting": "halogen",
@@ -139,10 +156,10 @@
       "lighting": "halogen",
       "motion_class": "moderate",
       "n_recordings": 8,
-      "n_reported": 1,
-      "refusal": 0.875,
+      "n_reported": 0,
+      "refusal": 1.0,
       "refusal_ci": [
-        0.6,
+        1.0,
         1.0
       ],
       "refusal_ci_subjects": 8,
@@ -154,28 +171,28 @@
         0.9788548752834466
       ],
       "window_discard_ci_subjects": 8,
-      "n_scored": 7,
-      "n_confident_wrong": 3,
-      "confident_wrong": 0.42857142857142855,
+      "n_scored": 0,
+      "n_confident_wrong": 0,
+      "confident_wrong": NaN,
       "confident_wrong_ci": [
         NaN,
         NaN
       ],
-      "confident_wrong_ci_subjects": 1,
-      "mae": 12.11388311525045,
-      "bias": -12.11388311525045,
-      "coverage": 0.041666666666666664,
+      "confident_wrong_ci_subjects": 0,
+      "mae": NaN,
+      "bias": NaN,
+      "coverage": 0.0,
       "n_kept_unreferenced": 0
     },
     "05": {
       "lighting": "ambient",
       "motion_class": "high",
       "n_recordings": 14,
-      "n_reported": 8,
-      "refusal": 0.42857142857142855,
+      "n_reported": 0,
+      "refusal": 1.0,
       "refusal_ci": [
-        0.16666666666666666,
-        0.6923076923076923
+        1.0,
+        1.0
       ],
       "refusal_ci_subjects": 14,
       "n_windows": 294,
@@ -186,28 +203,28 @@
         0.7993197278911565
       ],
       "window_discard_ci_subjects": 14,
-      "n_scored": 75,
-      "n_confident_wrong": 40,
-      "confident_wrong": 0.5333333333333333,
+      "n_scored": 0,
+      "n_confident_wrong": 0,
+      "confident_wrong": NaN,
       "confident_wrong_ci": [
-        0.2161679536679537,
-        0.8181818181818182
+        NaN,
+        NaN
       ],
-      "confident_wrong_ci_subjects": 8,
-      "mae": 18.078218398956707,
-      "bias": 12.255618048926989,
-      "coverage": 0.25510204081632654,
-      "n_kept_unreferenced": 8
+      "confident_wrong_ci_subjects": 0,
+      "mae": NaN,
+      "bias": NaN,
+      "coverage": 0.0,
+      "n_kept_unreferenced": 0
     },
     "06": {
       "lighting": "ambient",
       "motion_class": "high",
       "n_recordings": 14,
-      "n_reported": 8,
-      "refusal": 0.42857142857142855,
+      "n_reported": 1,
+      "refusal": 0.9285714285714286,
       "refusal_ci": [
-        0.16666666666666666,
-        0.6923076923076923
+        0.7692307692307693,
+        1.0
       ],
       "refusal_ci_subjects": 14,
       "n_windows": 294,
@@ -218,46 +235,46 @@
         0.7440611471861471
       ],
       "window_discard_ci_subjects": 14,
-      "n_scored": 96,
-      "n_confident_wrong": 53,
-      "confident_wrong": 0.5520833333333334,
+      "n_scored": 9,
+      "n_confident_wrong": 6,
+      "confident_wrong": 0.6666666666666666,
       "confident_wrong_ci": [
-        0.3380149647887324,
-        0.8472222222222222
+        NaN,
+        NaN
       ],
-      "confident_wrong_ci_subjects": 8,
-      "mae": 13.830699483227127,
-      "bias": -0.5497567504784215,
-      "coverage": 0.32653061224489793,
-      "n_kept_unreferenced": 6
+      "confident_wrong_ci_subjects": 1,
+      "mae": 11.595331021990905,
+      "bias": -11.369224588785874,
+      "coverage": 0.030612244897959183,
+      "n_kept_unreferenced": 0
     }
   },
   "hypotheses": {
     "H1": {
-      "difference": 0.3414056613927457,
+      "difference": 0.4890350877192982,
       "ci": [
-        -0.005068184887470307,
-        0.6488312605827057
+        NaN,
+        NaN
       ],
       "ci_subjects": [
-        12,
+        1,
         10
       ],
-      "share_of_confident_wrong": 0.7380952380952381,
-      "share_of_scored_windows": 0.5119760479041916,
-      "reading": "unresolved"
+      "share_of_confident_wrong": 0.18181818181818182,
+      "share_of_scored_windows": 0.055900621118012424,
+      "reading": "not estimable"
     },
     "H2": {
       "refusal": {
         "01/03": 0.5757575757575758,
-        "02/04": 0.8421052631578947,
-        "05/06": 0.42857142857142855
+        "02/04": 0.9473684210526315,
+        "05/06": 0.9642857142857143
       },
       "moderate_minus_low": {
-        "difference": 0.2663476874003189,
+        "difference": 0.3716108452950557,
         "ci": [
-          0.0625,
-          0.5
+          0.17110799438990176,
+          0.5795729472140762
         ],
         "ci_subjects": [
           13,
@@ -265,17 +282,17 @@
         ]
       },
       "high_minus_moderate": {
-        "difference": -0.41353383458646614,
+        "difference": 0.016917293233082775,
         "ci": [
-          -0.6896551724137931,
-          -0.11275187969924833
+          -0.10792483660130714,
+          0.1578947368421053
         ],
         "ci_subjects": [
           16,
           13
         ]
       },
-      "reading": "contradicted"
+      "reading": "unresolved"
     },
     "H3": {
       "03_vs_01": {
@@ -310,10 +327,10 @@
       },
       "04_vs_02": {
         "refusal": {
-          "difference": 0.05681818181818177,
+          "difference": 0.09090909090909094,
           "ci": [
-            -0.11904761904761907,
-            0.2727272727272727
+            0.0,
+            0.2860714285714266
           ],
           "ci_subjects": [
             8,
@@ -322,14 +339,14 @@
           "reading": "not contradicted"
         },
         "confident_wrong": {
-          "difference": -0.525974025974026,
+          "difference": NaN,
           "ci": [
             NaN,
             NaN
           ],
           "ci_subjects": [
-            1,
-            2
+            0,
+            1
           ],
           "reading": "not estimable"
         },
@@ -343,12 +360,12 @@
   "supplementary_not_preregistered": {
     "confident_wrong_by_recording_status": {
       "flagged (degraded/unstable)": {
-        "n_scored": 145,
-        "n_confident_wrong": 52
+        "n_scored": 80,
+        "n_confident_wrong": 14
       },
       "ok": {
-        "n_scored": 189,
-        "n_confident_wrong": 74
+        "n_scored": 81,
+        "n_confident_wrong": 19
       }
     },
     "recordings_reported_off_by_more_than_10_bpm": {
@@ -358,7 +375,7 @@
         "n_ok_status_off_by_more_than_10": 0
       },
       "02": {
-        "n_reported": 2,
+        "n_reported": 1,
         "n_off_by_more_than_10": 1,
         "n_ok_status_off_by_more_than_10": 1
       },
@@ -368,19 +385,19 @@
         "n_ok_status_off_by_more_than_10": 0
       },
       "04": {
-        "n_reported": 1,
-        "n_off_by_more_than_10": 1,
+        "n_reported": 0,
+        "n_off_by_more_than_10": 0,
         "n_ok_status_off_by_more_than_10": 0
       },
       "05": {
-        "n_reported": 8,
-        "n_off_by_more_than_10": 4,
-        "n_ok_status_off_by_more_than_10": 2
+        "n_reported": 0,
+        "n_off_by_more_than_10": 0,
+        "n_ok_status_off_by_more_than_10": 0
       },
       "06": {
-        "n_reported": 8,
-        "n_off_by_more_than_10": 6,
-        "n_ok_status_off_by_more_than_10": 3
+        "n_reported": 1,
+        "n_off_by_more_than_10": 1,
+        "n_ok_status_off_by_more_than_10": 0
       }
     }
   },
@@ -394,12 +411,12 @@
         "face_detections": 3,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "ok",
-        "value": 83.06773483282072,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
         "forced_status": "ok",
         "forced_value": 83.06773483282072,
-        "error_vs_reference": -68.9473103331949
+        "error_vs_reference": NaN
       },
       {
         "recording": "00_04",
@@ -409,12 +426,12 @@
         "face_detections": 5,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "degraded_capture",
-        "value": 93.24065126779321,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
         "forced_status": "degraded_capture",
         "forced_value": 93.24065126779321,
-        "error_vs_reference": -66.0603512346482
+        "error_vs_reference": NaN
       },
       {
         "recording": "00_05",
@@ -424,12 +441,12 @@
         "face_detections": 12,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "ok",
-        "value": 136.16233530739777,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
         "forced_status": "ok",
         "forced_value": 136.16233530739777,
-        "error_vs_reference": 37.181363017358706
+        "error_vs_reference": NaN
       },
       {
         "recording": "01_04",
@@ -439,8 +456,8 @@
         "face_detections": 11,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "insufficient_quality",
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
         "value": NaN,
         "forced_status": "insufficient_quality",
         "forced_value": NaN,
@@ -454,8 +471,8 @@
         "face_detections": 12,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "insufficient_quality",
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
         "value": NaN,
         "forced_status": "insufficient_quality",
         "forced_value": NaN,
@@ -469,8 +486,8 @@
         "face_detections": 8,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "insufficient_quality",
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
         "value": NaN,
         "forced_status": "insufficient_quality",
         "forced_value": NaN,
@@ -484,8 +501,8 @@
         "face_detections": 8,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "insufficient_quality",
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
         "value": NaN,
         "forced_status": "insufficient_quality",
         "forced_value": NaN,
@@ -529,12 +546,12 @@
         "face_detections": 11,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "degraded_capture",
-        "value": 114.10969794398267,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
         "forced_status": "degraded_capture",
         "forced_value": 114.10969794398267,
-        "error_vs_reference": -39.45994316929858
+        "error_vs_reference": NaN
       },
       {
         "recording": "09_04",
@@ -544,8 +561,8 @@
         "face_detections": 10,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "insufficient_quality",
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
         "value": NaN,
         "forced_status": "insufficient_quality",
         "forced_value": NaN,
@@ -559,8 +576,8 @@
         "face_detections": 12,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "insufficient_quality",
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
         "value": NaN,
         "forced_status": "insufficient_quality",
         "forced_value": NaN,
@@ -574,12 +591,12 @@
         "face_detections": 9,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "degraded_capture",
-        "value": 113.6539964633225,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
         "forced_status": "degraded_capture",
         "forced_value": 113.6539964633225,
-        "error_vs_reference": 2.4033555941818747
+        "error_vs_reference": NaN
       },
       {
         "recording": "14_02",
@@ -604,8 +621,8 @@
         "face_detections": 7,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "insufficient_quality",
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
         "value": NaN,
         "forced_status": "insufficient_quality",
         "forced_value": NaN,
@@ -619,8 +636,8 @@
         "face_detections": 7,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "insufficient_quality",
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
         "value": NaN,
         "forced_status": "insufficient_quality",
         "forced_value": NaN,
@@ -634,12 +651,12 @@
         "face_detections": 5,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "ok",
-        "value": 104.59454444585977,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
         "forced_status": "ok",
         "forced_value": 104.59454444585977,
-        "error_vs_reference": -51.55107017816367
+        "error_vs_reference": NaN
       }
     ],
     "clamped": [
@@ -713,12 +730,12 @@
         "face_detections": 3,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "ok",
-        "value": 83.06773483282072,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
         "forced_status": "ok",
         "forced_value": 83.06773483282072,
-        "error_vs_reference": -68.9473103331949
+        "error_vs_reference": NaN
       },
       {
         "recording": "00_04",
@@ -728,12 +745,12 @@
         "face_detections": 5,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "degraded_capture",
-        "value": 93.24065126779321,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
         "forced_status": "degraded_capture",
         "forced_value": 93.24065126779321,
-        "error_vs_reference": -66.0603512346482
+        "error_vs_reference": NaN
       },
       {
         "recording": "01_06",
@@ -743,8 +760,8 @@
         "face_detections": 3,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "insufficient_quality",
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
         "value": NaN,
         "forced_status": "insufficient_quality",
         "forced_value": NaN,
@@ -758,12 +775,12 @@
         "face_detections": 5,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "ok",
-        "value": 104.59454444585977,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
         "forced_status": "ok",
         "forced_value": 104.59454444585977,
-        "error_vs_reference": -51.55107017816367
+        "error_vs_reference": NaN
       }
     ],
     "off_span_windows": {
@@ -783,7 +800,7 @@
       "cuda"
     ],
     "git": {
-      "commit": "25ba5beb00a6c2b9ddebb08dcfb8299c89a89b8e",
+      "commit": "6ab72373ede98281ad10e4970f9bc37deecfe9b0",
       "dirty": false,
       "changed": []
     },
@@ -792,6 +809,6 @@
       "sha256": "f30fae250fb948e2aaece9aae5ec2d77fcc438d7ef1abbe54ae878a7eecee6b8",
       "bytes": 3106459
     },
-    "written_utc": "2026-10-15T06:12:45+00:00"
+    "written_utc": "2026-10-15T15:14:39+00:00"
   }
 }
