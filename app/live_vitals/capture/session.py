@@ -133,42 +133,73 @@ def stable_box(frames_rgb, landmarker):
     return square_padded_box(boxes), len(boxes)
 
 
+def detection_positions(n_frames):
+    """Returns the indices of the detection samples, spread evenly over n_frames."""
+    return sorted(set(np.linspace(0, max(n_frames - 1, 0),
+                                  config.N_DETECT_FRAMES).astype(int)))
+
+
+def read_through(video_path, sample_at):
+    """Reads a video front to back: every frame's timestamp and the frames at sample_at.
+
+    Returns (timestamps_ms, samples_rgb). Frames that are not sampled are only grabbed,
+    never converted, so the pass costs little more than the decode itself.
+    """
+    cap = cv2.VideoCapture(str(video_path))
+    wanted = set(sample_at)
+    stamps, samples = [], []
+    while cap.grab():
+        if len(stamps) in wanted:
+            ok, bgr = cap.retrieve()
+            if ok:
+                samples.append(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
+        stamps.append(cap.get(cv2.CAP_PROP_POS_MSEC))
+    cap.release()
+    return stamps, samples
+
+
 def crops_from_video(video_path, landmarker=None):
-    """Returns (clip, effective_fps, quality) for a recorded video."""
+    """Returns (clip, effective_fps, quality) for a recorded video.
+
+    The file is only ever read front to back, never seeked. A browser recording
+    (MediaRecorder WebM) has no seek index and declares neither a frame rate nor
+    a frame count: OpenCV reports ffmpeg's guess from the first timestamps as the
+    rate (1000 fps, the 1 ms timebase, when they jitter) and derives a count from
+    it, and a seek into the file can return the wrong frame or end the stream.
+    So a first pass counts the frames and reads their timestamps, the detection
+    samples are spread over the frames that exist, and the decimation stride
+    follows the rate the frames were delivered at.
+    """
     landmarker = landmarker or make_landmarker()
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise FileNotFoundError(video_path)
-
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     source_fps = cap.get(cv2.CAP_PROP_FPS)
-    n_total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    if n_total <= 0:
-        probe = cv2.VideoCapture(str(video_path))
-        n_total = 0
-        while probe.grab():
-            n_total += 1
-        probe.release()
+    n_declared = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
 
-    sample_at = sorted(set(np.linspace(0, max(n_total - 1, 0),
-                                       config.N_DETECT_FRAMES).astype(int)))
-    samples = []
-    for index in sample_at:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, int(index))
-        ok, bgr = cap.read()
-        if ok:
-            samples.append(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
+    sample_at = detection_positions(n_declared)
+    all_stamps, samples = read_through(video_path, sample_at)
+    count_held = len(all_stamps) == n_declared
+    if not count_held:
+        # The samples were placed by a count the file does not hold; a second pass
+        # places them over the frames it has.
+        sample_at = detection_positions(len(all_stamps))
+        _, samples = read_through(video_path, sample_at)
 
     box, detections = stable_box(samples, landmarker)
     if box is None:
-        cap.release()
         raise RuntimeError(f"no face detected in {video_path}")
 
     verdict, report, notes = framing_verdict(box, width, height)
-    stride = decimation_stride(source_fps)
+    # The stride follows the delivered rate: from a guessed 1000 fps, a WebM capture
+    # would keep one frame in 33.
+    delivered_fps, _ = measured_rate(all_stamps, source_fps)
+    stride = decimation_stride(delivered_fps)
 
-    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+    cap = cv2.VideoCapture(str(video_path))
     clip, stamps, index = [], [], 0
     while True:
         ok, bgr = cap.read()
@@ -188,7 +219,9 @@ def crops_from_video(video_path, landmarker=None):
     effective_fps, stamp_note = measured_rate(stamps, declared_fps)
     if stamp_note:
         notes.append(stamp_note)
-    if declared_fps > 0 and np.isfinite(effective_fps):
+    # Only a container whose frame count held is held to its rate: a MediaRecorder
+    # WebM miscounts because it declares neither, and its rate is only a guess.
+    if count_held and declared_fps > 0 and np.isfinite(effective_fps):
         drift = abs(effective_fps - declared_fps) / declared_fps
         if drift > 0.02:
             notes.append(f"container declares {declared_fps:.2f} fps but "
