@@ -60,6 +60,7 @@ measurement, not taste:
 | Usable fraction | Below 0.25 surviving, no value is reported |
 | Acquisition rate | Below 20 fps refused outright; below 27 fps flagged |
 | Framing | A face box clamped by more than 2% of its side is refused |
+| Head motion | A capture whose face crop moves 1.7 px or more per window, or 0.9 px or more with a regular rhythm in at least half the windows, is refused |
 
 Acquisition rate is a hard gate because spectral confidence cannot detect a wrong time
 base: a 10 fps capture once produced a confident reading about 7 bpm below a known
@@ -93,9 +94,10 @@ contract, evaluation, refusal behaviour and limitations in full.
 
 A candidate successor, `hr_physnet_v3`, is registered beside it: the same architecture
 and input contract, retrained on v2's corpora with 240 VitalVideos subjects added
-(NB_P3_31, arm A, seed 42). The app and the benchmark scripts can select it, but v2 stays
-the default until the app-level battery decides between them. Its checkpoint is not
-committed either.
+(NB_P3_31, arm A, seed 42). The app and the benchmark scripts can select it. The
+app-level battery (NB_P3_32, 2026-10-15) kept v2 as the default: v3 reads more
+accurately where both report, but did not report enough more often at Fitzpatrick 5-6
+to meet the pre-registered rule. Its checkpoint is not committed either.
 
 ### Why this one
 
@@ -153,11 +155,23 @@ The remaining lever is a timing-aware training objective.
 r = 0.11 - not tracking at all. Training on PhysDrive repaired that corpus and destroyed
 the other three.
 
-**Skin tone.** Not characterised. No stratified evaluation has been run and rPPG is
-known to degrade on darker skin. An unquantified gap, not an absence of risk.
+**Skin tone.** Measured on VitalVideos-WW (300 recordings, zero-shot), within a site
+confound. On the darkest skin the app withholds readings rather than reporting wrong
+ones: recordings reported at Fitzpatrick 1-6 were 100/100/100/100/96/61%, and reported
+values were 0.3-0.6 bpm off on average at types 1-5 and 2.1 bpm at type 6. Window error
+at type 6 is 10.5 bpm against 0.5-1.0 at types 1-4; the gates keep it out of the
+reported values. Type 6 is almost entirely the one outdoor site (79% reported there,
+98-99% indoors), so this is a joint skin-tone, site and lighting result. The v3
+candidate, trained with VitalVideos, reads types 5-6 more accurately but reports barely
+more often (NB_P3_32).
 
-**Elevated heart rate.** Untested, and the trend is unfavourable: UBFC-rPPG is the
-fastest corpus at 90–123 bpm and carries the only negative validation bias.
+**Elevated heart rate.** Still untested. Every held-out corpus is resting: VitalVideos
+references stay below 120 bpm (13 of 296 above 100), and the training corpora hold only
+23 recordings above 120. ECG-Fitness has 18 recordings above 120 bpm in its primary set,
+but 15 are during exercise, and the app now reports none of them: the motion gate
+refuses 14 and the quality gates the other 4. What evidence exists is unfavourable:
+UBFC-rPPG, the fastest resting corpus at 90-123 bpm, carries the only negative
+validation bias, and the regression set's largest error is on its fastest subject.
 
 **MCD-rPPG remains an unexplained ceiling** - roughly 7 bpm against 3 on the other
 corpora, for every architecture screened. Frame rate and crop aspect were each tested as
@@ -166,6 +180,15 @@ explanations and eliminated.
 Also: motion, poor light and backlighting degrade the signal; the face box is frozen per
 capture, so a subject who moves leaves their own crop; and single-operator testing is
 not validation.
+
+**Exercise.** Not for use during exercise. Both estimators read the head's movement
+rhythm - pedalling, rowing - as a heart rate, with full confidence. A motion gate
+refuses such captures: on the ECG-Fitness benchmark it refuses 27 of 28 bike and
+elliptical recordings and 12 of 19 rowing ones, and keeps every right reading at rest.
+For the default model one wrong answer with status `ok` remains, in rowing, whose
+forward-back motion the gate does not measure. The gate was calibrated on still
+recordings only; ECG-Fitness shaped its design, so it confirms the gate rather than
+testing it.
 
 ## Running It
 

@@ -389,11 +389,12 @@ Intended use:
 Not intended for:
 
 - diagnosis, treatment, triage or monitoring decisions
-- exercise or elevated-HR conditions, which are untested
+- exercise, which the motion gate refuses, or elevated heart rate, which is untested
+- claims of equal performance across skin tones, which the evidence does not support
+  (see Limitations)
 - speech or other movement during capture, where accuracy degrades sharply
   (measured on UBFC-Phys, see Evaluation)
 - heart-rate **variability**, which was measured and found out of reach
-- skin tones outside the training corpora, which have not been characterised
 - respiratory rate or blood pressure, which the app shows as unavailable
 
 ### Input Contract
@@ -620,6 +621,8 @@ minimum usable fraction  below 0.25 surviving, no value is reported at all
 acquisition rate         below 20 fps refused outright, below 27 fps flagged
 framing                  a box clamped by more than 2% of its side is refused
 frame aspect             outside 1.20-1.90 the capture is flagged off-distribution
+head motion              median crop displacement >= 1.7 px per window, or >= 0.9 px
+                         with a regular rhythm in half the windows, is refused
 ```
 
 Statuses surfaced to the user: `ok`, `degraded_capture`, `unstable`,
@@ -650,18 +653,39 @@ wrong time base: a 10 fps webcam capture once produced a confident reading about
   27.79 bpm MAE with +24.82 bpm bias and Pearson r of 0.11 — it is not tracking the
   reference at all. Training on PhysDrive repaired that corpus while destroying the
   other three, so no version of this model is usable in a moving vehicle.
-- **Elevated heart rate is untested, and the trend is unfavourable.** The MCD
-  post-exercise recordings begin after the subject has settled, so they do not serve as
-  an exertion test. What evidence exists points one way: UBFC-rPPG is the fastest corpus
-  at 90-123 bpm and carries the only negative validation bias, and the largest error in
-  its regression set is on its fastest subject.
-- **Skin tone has not been characterised.** No stratified evaluation has been run,
-  and rPPG is known to degrade on darker skin. This is an unquantified gap, not an
-  absence of risk.
+- **Elevated heart rate is still untested.** Every held-out corpus is resting:
+  VitalVideos references stay below 120 bpm (13 of 296 above 100), the training corpora
+  hold 23 recordings above 120, and the MCD post-exercise recordings begin after the
+  subject has settled. ECG-Fitness has 18 primary recordings above 120 bpm, but 15 are
+  during exercise. Before the motion gate PhysNet reported 3 of them and 2 were more
+  than 10 bpm off; with the gate it reports none (14 refused for motion, 4 by the
+  quality gates). What evidence exists points one way: UBFC-rPPG is the fastest resting
+  corpus at 90-123 bpm and carries the only negative validation bias, and the largest
+  error in its regression set is on its fastest subject.
+- **Skin tone is characterised only within a site confound** (VitalVideos-WW, 300
+  recordings, zero-shot). On the darkest skin the model withholds readings rather than
+  reporting wrong ones: recordings reported at Fitzpatrick 1-6 were 100/100/100/100/96/61%
+  (POS 100/100/100/97/77/28%), the mean error of reported values was 0.3-0.6 bpm at
+  types 1-5 and 2.1 bpm at type 6 (one reading more than 10 bpm off), and window MAE at
+  type 6 is 10.45 bpm against 0.47-1.02 at types 1-4. Type 6 is almost entirely the one
+  outdoor site, where 79% of recordings were reported against 98-99% indoors, so skin
+  tone, site and lighting cannot be separated here. Retraining with VitalVideos (v3,
+  NB_P3_31) lowered the window error at types 5-6, but the app-level battery (NB_P3_32)
+  found barely more readings reported there; a claim about skin tone needs an
+  independent set.
 - **Agreement with the classical cross-check is not corroboration.** PhysNet and POS
   read the same face video and can fail together. In 7.4% of UBFC-Phys T1 windows they
   agree within 5 bpm while both miss the reference by more than 20 bpm. The
   cross-check cannot flag those failures, so a value it confirms can still be wrong.
+- **Exercise is out of scope.** During exercise both estimators lock onto the head's
+  movement rhythm and report it as a heart rate with full confidence (ECG-Fitness,
+  NB_P3_29). Since 2026-10-15 a periodic-motion capture gate refuses such captures. On
+  the benchmark's primary set it refuses 27 of 28 bike and elliptical recordings, 12 of
+  19 rowing and 1 of 33 speaking, and keeps every right reading at rest; wrong readings
+  fall from 14 to 4 and wrong `ok` readings from 6 to 1 - a rowing session whose
+  forward-back motion is mostly scale, which the gate's shift measure does not see. The
+  thresholds were set on still recordings only; ECG-Fitness shaped the gate's design,
+  so it confirms the gate rather than testing it.
 - **Motion, lighting and backlighting** degrade the signal. The framing gate catches
   gross faults of position but not a badly lit face. On UBFC-Phys, window MAE is 6.97
   bpm at rest and 22.26 bpm during the speech task, with Pearson r of 0.66 and 0.22
