@@ -293,26 +293,62 @@ function buzz(pattern) {
 }
 
 /* ---------- capture and analyse ---------- */
+/* The screen has to stay on through the countdown, the minute of recording and the
+   analysis: a phone that dims and locks part-way stops the camera and cuts the capture
+   short. Resolves to the lock, or to null where the browser lacks the API or refuses. */
+function holdScreenOn() {
+  if (!('wakeLock' in navigator)) return Promise.resolve(null);
+  return navigator.wakeLock.request('screen').catch(() => null);
+}
+
 $('record').onclick = async () => {
   if (!stream || capturing) return;
   capturing = true;
   $('record').disabled = true;
+  // Restarting the camera mid-capture would end the recording and upload a fragment.
+  $('start').disabled = true;
+  const screenLock = holdScreenOn();
 
   // Framing guidance stops for the whole capture, countdown included. Polling it
   // competes with the encoder for CPU, and dropped frames would violate the rate
   // contract the reading depends on. The box is frozen by now in any case.
   clearInterval(framingTimer);
+  // The last reading leaves the screen now, so it never sits beside a capture it did
+  // not come from.
+  clearResults('Waiting for this capture.', 'capturing');
+  $('state').textContent = 'get ready \u2014 sit still and face the camera';
 
-  // Returns the page to a usable state from any failure below. Without it a
-  // browser that cannot build a MediaRecorder left the button disabled and the
-  // framing poll stopped, with nothing on screen saying why -- dead until reload.
-  const abort = message => {
-    capturing = false;
+  let rec = null, tick = null, left = SETTINGS.seconds;
+  let finished = false, aborted = false, stopping = false;
+
+  // Returns the page to a usable state exactly once, however the capture ended: the
+  // countdown timer stopped, the framing poll restarted once, buttons and screen released.
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    clearInterval(tick);
     stage(null);
     recordingHud(false);
-    $('state').textContent = message;
+    screenLock.then(lock => lock && lock.release().catch(() => {}));
+    capturing = false;
     $('record').disabled = false;
+    $('start').disabled = false;
+    clearInterval(framingTimer);
     framingTimer = setInterval(checkFraming, 1000);
+  };
+
+  // Ends a capture that cannot produce a reading, and says why. Without it a browser
+  // that cannot build a MediaRecorder left the button disabled and the framing poll
+  // stopped, with nothing on screen saying why -- dead until reload. Whatever was
+  // recorded is discarded, never analysed as if it were the whole capture.
+  const abort = message => {
+    aborted = true;
+    if (rec && rec.state !== 'inactive') {
+      try { rec.stop(); } catch (_) { /* already stopping */ }
+    }
+    finish();
+    clearResults('No reading for this capture.', 'no reading', 'REJECT');
+    $('state').textContent = message;
   };
 
   const mime = pickMime();
@@ -332,7 +368,6 @@ $('record').onclick = async () => {
   stage(null);
 
   const chunks = [];
-  let rec;
   try {
     rec = new MediaRecorder(stream,
       { mimeType: mime, videoBitsPerSecond: SETTINGS.mbps * 1e6 });
@@ -341,10 +376,19 @@ $('record').onclick = async () => {
     return;
   }
 
+  // A recorder that fails still fires stop, with whatever it had recorded.
   rec.onerror = event => abort('Recording failed: '
     + ((event.error && event.error.message) || 'unknown recorder error'));
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   rec.onstop = async () => {
+    if (aborted) return;
+    // Only the countdown stops the recorder. A stop it did not ask for means the camera
+    // ended: unplugged, taken by another application, or the page hidden on a phone.
+    if (!stopping) {
+      abort(`Recording stopped after ${SETTINGS.seconds - left} s because the camera `
+        + 'stopped delivering. Nothing was analysed; capture again.');
+      return;
+    }
     recordingHud(false);
     buzz([80, 60, 80]);
     stage(SPINNER, 'Recording complete \u2014 analysing, this takes a moment');
@@ -366,12 +410,10 @@ $('record').onclick = async () => {
     try {
       render(await (await fetch('/api/analyze', { method: 'POST', body })).json());
     } catch (err) {
+      clearResults('No reading for this capture.', 'error', 'REJECT');
       $('state').textContent = 'analysis failed: ' + err;
     }
-    stage(null);
-    capturing = false;
-    $('record').disabled = false;
-    framingTimer = setInterval(checkFraming, 1000);
+    finish();
     // The reading is below the fold on a phone, so bring it into view rather
     // than leaving the user looking at their own face wondering if it finished.
     $('model-hr').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -384,19 +426,72 @@ $('record').onclick = async () => {
     return;
   }
   buzz(120);
-  let left = SETTINGS.seconds;
   recordingHud(true, left, SETTINGS.seconds);
   $('state').textContent = `capturing ${left}s — sit still, face the camera`;
-  const tick = setInterval(() => {
+  tick = setInterval(() => {
     left -= 1;
     recordingHud(true, left, SETTINGS.seconds);
     $('state').textContent = `capturing ${left}s — sit still, face the camera`;
-    if (left <= 0) { clearInterval(tick); rec.stop(); }
+    if (left <= 0) {
+      clearInterval(tick);
+      // A recorder that already stopped on its own is left for onstop to report.
+      if (rec.state !== 'inactive') {
+        stopping = true;
+        rec.stop();
+      }
+    }
   }, 1000);
 };
 
 /* ---------- rendering ---------- */
 let lastResult = null;
+
+/* Puts every result panel back to an empty state. A capture clears them when it starts,
+   so a reading never sits on screen beside a capture it did not come from, and a capture
+   that ends without a reading leaves them saying so. */
+function clearResults(message, chipText, verdict) {
+  lastResult = null;
+  const hero = $('model-hr');
+  hero.textContent = '—';
+  hero.classList.add('text-muted-foreground');
+  $('model-hr-note').textContent = message;
+  ['model-status', 'quality-chip', 'trend-chip', 'diag-chip', 'spec-status']
+    .forEach(id => setChip($(id), chipText, verdict));
+  const bar = $('model-conf');
+  if (bar) bar.value = 0;
+  $('model-conf-text').textContent = '—';
+  ['stat-windows', 'stat-spread', 'stat-rate', 'spec-hr']
+    .forEach(id => { $(id).textContent = '—'; });
+  $('spec-hr').classList.add('text-muted-foreground');
+  ['trend', 'diag-quality', 'diag-gates', 'diag-windows', 'diag-spectral', 'diag-wave']
+    .forEach(id => drawChart(id, null, message));
+}
+
+/* Why a capture produced no value, in the terms of the gate that refused it. */
+function refusalReason(d) {
+  const q = d.quality || {};
+  switch (d.status) {
+    case 'capture_rejected':
+      return (q.reasons && q.reasons.length) ? q.reasons.join('; ')
+        : 'the capture gates refused it';
+    case 'insufficient_frames':
+      return `the capture was too short (${d.message})`;
+    case 'no_estimate':
+      return 'no analysis window found a cardiac peak';
+    case 'insufficient_quality': {
+      // Too few windows survived, or too small a share of them. When every window
+      // survived there were simply too few: the capture was too short.
+      const kept = d.n_windows ?? 0, total = d.n_total ?? 0;
+      return kept === total
+        ? `the capture was too short (only ${total} analysis `
+          + `window${total === 1 ? '' : 's'})`
+        : `only ${kept} of ${total} analysis windows passed the quality gates; `
+          + 'more light on the face usually helps';
+    }
+    default:
+      return d.status || d.message || 'unknown';
+  }
+}
 
 /* A chart drawn inside a collapsed accordion measures zero width and comes out
    blank, so the waveform is drawn on demand and redrawn whenever the panel is
@@ -429,8 +524,14 @@ const AGREEMENT_BPM = 5;
 
 function renderCrossCheck(d) {
   const spec = d.spectral;
-  if (!spec) return;
   const hr = $('spec-hr');
+  if (!spec) {
+    // A refused capture never reaches the estimators, so there is nothing to compare.
+    hr.textContent = '—';
+    hr.classList.add('text-muted-foreground');
+    setChip($('spec-status'), 'not run');
+    return;
+  }
   hr.textContent = spec.value == null ? '—' : spec.value.toFixed(1);
   hr.classList.toggle('text-muted-foreground', spec.value == null);
 
@@ -484,7 +585,11 @@ function renderSpectralDiagnostics(d) {
 }
 
 function render(d) {
-  if (!d.ok) { $('state').textContent = 'error: ' + d.message; return; }
+  if (!d.ok) {
+    clearResults('No reading for this capture.', 'error', 'REJECT');
+    $('state').textContent = 'error: ' + d.message;
+    return;
+  }
   lastResult = d;
 
   const hero = $('model-hr'), q = d.quality || {};
@@ -500,21 +605,24 @@ function render(d) {
   setChip($('quality-chip'), statusText, level);
   setChip($('trend-chip'), `${d.n_windows ?? 0}/${d.n_total ?? 0} windows`, level);
   setChip($('diag-chip'), statusText, level);
-  setConfidence('model', d.confidence);
+  // A capture refused before analysis carries no confidence; the bar stays cleared.
+  if (d.confidence != null) setConfidence('model', d.confidence);
 
+  // The state line gives the reason behind the verdict: the gate that refused the
+  // capture, or the one that qualified the reading. Informational notes, such as a
+  // container's rate, stay in Diagnostics.
   if (d.value == null) {
     hero.textContent = '—';
     hero.classList.add('text-muted-foreground');
     $('model-hr-note').textContent = 'refused by the quality gates';
-    $('state').textContent = 'No reading: ' + (d.status || d.message || 'unknown') +
-      '. Open Diagnostics to see which gate refused it.';
+    $('state').textContent = `No reading: ${refusalReason(d)}. Open Diagnostics for the details.`;
   } else {
     hero.textContent = d.value.toFixed(1);
     hero.classList.remove('text-muted-foreground');
     $('model-hr-note').textContent =
       d.status === 'ok' ? 'model estimate' : 'model estimate — treat as indicative';
     $('state').textContent = `Reading complete — ${d.value.toFixed(1)} ${d.unit}.`
-      + ((q.notes && q.notes.length) ? ` ${q.notes[0]}.` : '');
+      + ((q.reasons && q.reasons.length) ? ` ${q.reasons.join('; ')}.` : '');
   }
 
   $('stat-windows').textContent = `${d.n_windows ?? 0} / ${d.n_total ?? 0}`;
@@ -533,13 +641,16 @@ function render(d) {
             'No windows to plot.');
   drawWaveform();
 
+  // A refused capture carries no window figures; they read as a dash, not "undefined".
   const formatStats = entries => `<dl class="grid grid-cols-[auto_1fr] gap-x-5 gap-y-1 text-xs">` +
     entries.map(([key, value]) => `<dt class="text-muted-foreground">${key}</dt>` +
-      `<dd class="font-medium tabular-nums">${Array.isArray(value) ? value.join('; ') : value}</dd>`)
+      `<dd class="font-medium tabular-nums">${value == null ? '—'
+        : Array.isArray(value) ? value.join('; ') : value}</dd>`)
       .join('') + '</dl>';
   $('diag-quality').innerHTML = formatStats(Object.entries(q));
   $('diag-gates').innerHTML = formatStats([
-    ['usable fraction', d.usable_fraction], ['windows kept', `${d.n_windows} / ${d.n_total}`],
+    ['usable fraction', d.usable_fraction],
+    ['windows kept', `${d.n_windows ?? '—'} / ${d.n_total ?? '—'}`],
     ['no cardiac peak', `${d.n_no_peak ?? 0} windows`],
     ['IQR spread', d.spread_bpm == null ? '—' : `${d.spread_bpm} bpm`],
     ['status', d.status]
@@ -551,8 +662,9 @@ function render(d) {
        <td class="pr-6">${i}</td><td class="pr-6">${hr.toFixed(2)}</td>
        <td class="pr-6">${(d.window_confidence[i] ?? 0).toFixed(3)}</td>
        <td>${d.window_kept[i] ? 'kept' : 'dropped'}</td></tr>`).join('');
-  $('diag-windows').innerHTML =
-    `<table class="uk-table uk-table-small uk-table-divider text-sm"><thead><tr class="text-left">
+  $('diag-windows').innerHTML = rows
+    ? `<table class="uk-table uk-table-small uk-table-divider text-sm"><thead><tr class="text-left">
        <th class="pr-6">#</th><th class="pr-6">HR</th>
-       <th class="pr-6">conf</th><th>gate</th></tr></thead><tbody>${rows}</tbody></table>`;
+       <th class="pr-6">conf</th><th>gate</th></tr></thead><tbody>${rows}</tbody></table>`
+    : '<p class="uk-text-muted uk-text-small">No analysis windows for this capture.</p>';
 }

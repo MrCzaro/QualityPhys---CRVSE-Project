@@ -89,7 +89,10 @@ def quality_payload(quality):
                            if np.isfinite(quality.motion_px) else None),
                 motion_periodic=(round(float(quality.motion_periodic), 2)
                                  if np.isfinite(quality.motion_periodic) else None),
-                notes=list(quality.notes))
+                notes=list(quality.notes),
+                # The notes behind the verdict, which the page gives as the reason for a
+                # refusal or a qualified reading; the rest stay in Diagnostics.
+                reasons=list(quality.reasons))
 
 
 def lan_address():
@@ -567,7 +570,7 @@ def index():
                       multiple=False),
             cls="space-y-6 pt-2"),
         P(DISCLAIMER, cls=(TextPresets.muted_sm, "pt-8 pb-4")),
-        Script(src="/static/capture.js?v=20261004-1"),
+        Script(src="/static/capture.js?v=20261016-1"),
         cls=("space-y-4", ContainerT.xl))
 
 def main():

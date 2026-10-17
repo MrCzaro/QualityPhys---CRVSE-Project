@@ -31,11 +31,15 @@ class CaptureQuality:
     crop_aspect: float
     frac_side_lost: float
     notes: list = field(default_factory=list)
+    # The notes behind the verdict: why the capture was refused (REJECT) or flagged
+    # (WARN). Empty when it was accepted; the other notes (frame timestamps, the
+    # container's rate) inform without deciding anything.
+    reasons: list = field(default_factory=list)
     # Head motion in the crop (capture/motion.py): the median in-band displacement in crop
     # pixels and the share of windows with a clear rhythm. NaN when the clip is too short to judge.
     motion_px: float = float("nan")
     motion_periodic: float = float("nan")
-    
+
     @property
     def usable(self):
         return self.verdict != "REJECT"
@@ -194,6 +198,9 @@ def crops_from_video(video_path, landmarker=None):
         raise RuntimeError(f"no face detected in {video_path}")
 
     verdict, report, notes = framing_verdict(box, width, height)
+    # Each gate's notes beside its level, so the ones behind the final verdict can be
+    # told apart from those that only inform.
+    gate_notes = [(verdict, note) for note in notes]
     # The stride follows the delivered rate: from a guessed 1000 fps, a WebM capture
     # would keep one frame in 33.
     delivered_fps, _ = measured_rate(all_stamps, source_fps)
@@ -230,10 +237,12 @@ def crops_from_video(video_path, landmarker=None):
     rate, rate_note = rate_verdict(effective_fps)
     if rate_note:
         notes.append(rate_note)
+        gate_notes.append((rate, rate_note))
     clip = np.asarray(clip, dtype=np.uint8)
     motion, motion_note, motion_summary = motion_verdict(clip, effective_fps)
     if motion_note:
         notes.append(motion_note)
+        gate_notes.append((motion, motion_note))
     verdict = worst_verdict(verdict, rate, motion)
 
     quality = CaptureQuality(
@@ -242,6 +251,7 @@ def crops_from_video(video_path, landmarker=None):
         detections=detections, detections_attempted=len(sample_at),
         verdict=verdict, crop_aspect=report["expected_aspect"],
         frac_side_lost=report["frac_side_lost"], notes=notes,
+        reasons=[note for level, note in gate_notes if level == verdict],
         **motion_fields(motion_summary))
     return clip, effective_fps, quality
 
@@ -269,6 +279,7 @@ def crops_from_camera(camera, seconds, landmarker=None, on_progress=None):
         raise RuntimeError("no face detected; check lighting and position")
 
     verdict, report, notes = framing_verdict(box, width, height)
+    gate_notes = [(verdict, note) for note in notes]
 
     clip, stamps = [], []
     start = None
@@ -303,10 +314,12 @@ def crops_from_camera(camera, seconds, landmarker=None, on_progress=None):
     rate, rate_note = rate_verdict(effective_fps)
     if rate_note:
         notes.append(f"camera delivered {rate_note}")
+        gate_notes.append((rate, notes[-1]))
     clip = np.asarray(clip, dtype=np.uint8)
     motion, motion_note, motion_summary = motion_verdict(clip, effective_fps)
     if motion_note:
         notes.append(motion_note)
+        gate_notes.append((motion, motion_note))
     verdict = worst_verdict(verdict, rate, motion)
 
     quality = CaptureQuality(
@@ -315,5 +328,6 @@ def crops_from_camera(camera, seconds, landmarker=None, on_progress=None):
         detections=detections, detections_attempted=config.N_DETECT_FRAMES,
         verdict=verdict, crop_aspect=report["expected_aspect"],
         frac_side_lost=report["frac_side_lost"], notes=notes,
+        reasons=[note for level, note in gate_notes if level == verdict],
         **motion_fields(motion_summary))
     return clip, effective_fps, quality
