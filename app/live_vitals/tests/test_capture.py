@@ -1,6 +1,9 @@
 """The capture path, crops_from_video, on synthetic videos in each container the app
 receives: OpenCV-written AVI and MP4, and WebM written the way browser MediaRecorder
 writes it."""
+import itertools
+
+import cv2
 import numpy as np
 import pytest
 
@@ -116,3 +119,54 @@ def test_no_face_is_an_error(video, landmarker):
 def test_a_missing_file_is_an_error(tmp_path, landmarker):
     with pytest.raises(FileNotFoundError):
         session.crops_from_video(tmp_path / "absent.mp4", landmarker)
+
+
+def test_every_video_opened_is_released_when_a_read_fails(video, landmarker, monkeypatch):
+    """A decode that raises must not leave the file open: on Windows the web app could
+    not then delete its copy of the upload."""
+    real_capture = cv2.VideoCapture
+    counts = dict(opened=0, released=0)
+
+    class Counted:
+        def __init__(self, *args):
+            self._cap = real_capture(*args)
+            counts["opened"] += 1
+
+        def release(self):
+            counts["released"] += 1
+            self._cap.release()
+
+        def __getattr__(self, name):
+            return getattr(self._cap, name)
+
+    calls = itertools.count()
+    real_crop = session.crop_resize
+
+    def failing(frame, box):
+        if next(calls) == 20:
+            raise RuntimeError("read failed")
+        return real_crop(frame, box)
+
+    monkeypatch.setattr(session.cv2, "VideoCapture", Counted)
+    monkeypatch.setattr(session, "crop_resize", failing)
+    with pytest.raises(RuntimeError, match="read failed"):
+        session.crops_from_video(video("still_avi"), landmarker)
+    assert counts["opened"] >= 3 and counts["released"] == counts["opened"]
+
+
+def test_a_video_longer_than_max_frames_is_refused_before_cropping(video, landmarker,
+                                                                    frame_count, monkeypatch):
+    n = frame_count("short_avi")
+    crops = itertools.count()
+    real_crop = session.crop_resize
+
+    def counting(frame, box):
+        next(crops)
+        return real_crop(frame, box)
+
+    monkeypatch.setattr(session, "crop_resize", counting)
+    with pytest.raises(ValueError, match=f"has more than {n - 1} frames"):
+        session.crops_from_video(video("short_avi"), landmarker, max_frames=n - 1)
+    assert next(crops) == 0
+    clip, _, _ = session.crops_from_video(video("short_avi"), landmarker, max_frames=n)
+    assert len(clip) == n

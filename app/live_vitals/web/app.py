@@ -5,17 +5,20 @@ The browser captures a clip and uploads it once; this server runs the same
 parity with the training notebooks is structural rather than reimplemented.
 
 Uploaded video is written to a temporary file, analysed, and deleted in a
-`finally` block. No frame, crop or clip is ever persisted.
+`finally` block; a copy left behind by a server stopped mid-analysis is deleted by
+a later start. No frame, crop or clip is ever persisted.
 
 Run:
     python -m app.live_vitals.web.app             # this machine only, plain HTTP
     python -m app.live_vitals.web.app --https     # on the LAN, for phone testing
 """
 import json
+import logging
 import sys
 import tempfile
 import threading
 import socket
+import time
 from pathlib import Path
 
 import numpy as np
@@ -24,6 +27,7 @@ from fasthtml.common import *
 from monsterui.all import *
 import fasthtml.common as fh
 from starlette.datastructures import UploadFile
+from starlette.responses import JSONResponse
 from starlette.staticfiles import StaticFiles
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -132,6 +136,103 @@ app, rt = fast_app(
 app.router.routes = [r for r in app.router.routes
                      if "{fname:path}" not in getattr(r, "path", "")]
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+# Request bodies past these sizes are refused before they are read. A 60 s capture at
+# the page's 6 Mbit/s is about 45 MB and a framing frame a JPEG of tens of kilobytes.
+# No other route takes a body, but FastHTML reads any body that is not a form into
+# memory whatever the route, so every route has a limit.
+MB = 1024 * 1024
+UPLOAD_LIMITS = {"/api/analyze": 150 * MB, "/api/framing": 5 * MB}
+OTHER_BODY_LIMIT = 1 * MB
+# A capture costs memory in proportion to its length, about 16 kB per frame once
+# cropped, and a still scene compresses to almost nothing: the size limit alone does
+# not bound it. Ten minutes at 30 fps, five at 60.
+MAX_CAPTURE_FRAMES = 18_000
+# Uploads are copied to files named with this prefix, so a later start can find what a
+# stopped one left behind without touching anything else in the temporary folder.
+CAPTURE_PREFIX = "live_vitals_capture_"
+STALE_CAPTURE_SECONDS = 15 * 60
+log = logging.getLogger("live_vitals.web")
+
+
+class BodyTooLarge(Exception):
+    """A request body passed its route's limit while it was being read."""
+
+
+class BodyLimit:
+    """ASGI middleware that refuses a request body over its route's limit.
+
+    A body that declares its length is refused before any of it is read; one sent in
+    chunks is counted as it arrives and refused at the limit. Either way the reply is
+    the JSON the page renders, with status 413, and the connection is closed.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        limit = UPLOAD_LIMITS.get(scope["path"], OTHER_BODY_LIMIT)
+        declared = dict(scope["headers"]).get(b"content-length", b"")
+        if declared.isdigit() and int(declared) > limit:
+            return await refuse(scope, receive, send, limit, int(declared))
+        received, started = 0, False
+
+        async def counted():
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > limit:
+                    raise BodyTooLarge
+            return message
+
+        async def tracked(message):
+            nonlocal started
+            started = started or message["type"] == "http.response.start"
+            await send(message)
+
+        try:
+            await self.app(scope, counted, tracked)
+        except BodyTooLarge:
+            if started:
+                raise
+            await refuse(scope, receive, send, limit, None)
+
+
+async def refuse(scope, receive, send, limit, size):
+    """Sends the 413 reply, and logs what was refused and from where."""
+    client = (scope.get("client") or ("an unknown client",))[0]
+    body = "a body sent in chunks" if size is None else f"a body of {size / MB:.1f} MB"
+    log.warning("refused %s to %s from %s: the limit is %.0f MB",
+                body, scope["path"], client, limit / MB)
+    reply = JSONResponse(dict(ok=False, message=f"the upload is over the {limit / MB:.0f} MB limit"),
+                         status_code=413, headers={"Connection": "close"})
+    await reply(scope, receive, send)
+
+
+app.add_middleware(BodyLimit)
+
+
+def sweep_stale_captures(folder=None, older_than_s=STALE_CAPTURE_SECONDS):
+    """Deletes capture files an earlier run left behind, and returns how many.
+
+    Every capture is deleted when its request ends, but a server stopped mid-analysis
+    (a crash, a closed terminal, a power cut) leaves its copy in the temporary folder.
+    Only this app's files are touched, and only once they are old enough that no
+    analysis in another running instance can still be reading them.
+    """
+    folder = Path(folder or tempfile.gettempdir())
+    cutoff = time.time() - older_than_s
+    removed = 0
+    for path in folder.glob(f"{CAPTURE_PREFIX}*"):
+        try:
+            if path.is_file() and path.stat().st_mtime < cutoff:
+                path.unlink()
+                removed += 1
+        except OSError:
+            pass  # gone already, or still open in another process
+    return removed
 # These are deliberately MonsterUI/Tailwind utility classes, not a second CSS
 # system.  They make the dashboard feel like one clinical instrument in both
 # the light and dark variants that Theme.blue supplies.
@@ -289,6 +390,11 @@ def api_models():
     return dict(models=models)
 
 
+# The last framing failure logged. The page asks once a second, so a failure is
+# logged when it begins, not every second it lasts; a check that succeeds ends it.
+_FRAMING_FAILURE = None
+
+
 @rt("/api/framing", methods=["POST"])
 async def api_framing(frame: UploadFile):
     """Classifies framing from a single preview frame.
@@ -296,6 +402,7 @@ async def api_framing(frame: UploadFile):
     Used for live guidance before a capture starts. The frame is decoded in
     memory and discarded; nothing is written to disk.
     """
+    global _FRAMING_FAILURE
     try:
         raw = np.frombuffer(await frame.read(), dtype=np.uint8)
         bgr = cv2.imdecode(raw, cv2.IMREAD_COLOR)
@@ -307,38 +414,52 @@ async def api_framing(frame: UploadFile):
         with _LANDMARKER_LOCK:
             box, detections = stable_box([rgb], landmarker())
         if box is None:
-            return dict(ok=True, verdict="NO_FACE", width=width, height=height,
-                        notes=["no face detected"])
-
-        verdict, report, notes = framing_verdict(box, width, height)
-        return dict(ok=True, verdict=verdict, width=width, height=height,
-                    crop_aspect=round(report["expected_aspect"], 3),
-                    frac_side_lost=round(report["frac_side_lost"], 3),
-                    box=[round(v, 4) for v in box], notes=notes)
+            result = dict(ok=True, verdict="NO_FACE", width=width, height=height,
+                          notes=["no face detected"])
+        else:
+            verdict, report, notes = framing_verdict(box, width, height)
+            result = dict(ok=True, verdict=verdict, width=width, height=height,
+                          crop_aspect=round(report["expected_aspect"], 3),
+                          frac_side_lost=round(report["frac_side_lost"], 3),
+                          box=[round(v, 4) for v in box], notes=notes)
     except Exception as exc:
-        return dict(ok=False, message=f"{type(exc).__name__}: {exc}")
+        message = f"{type(exc).__name__}: {exc}"
+        if message != _FRAMING_FAILURE:
+            log.exception("framing check failed")
+            _FRAMING_FAILURE = message
+        return dict(ok=False, message=message)
+    _FRAMING_FAILURE = None
+    return result
 
 
 @rt("/api/analyze", methods=["POST"])
 async def api_analyze(video: UploadFile, model: str = None, client: str = None):
     """Analyses one uploaded capture and returns a vital-sign reading.
 
-    The upload is written to a temporary file only because video decoding needs a
-    seekable path, and it is removed before this returns under every outcome.
+    The upload is copied to a temporary file only because video decoding needs a
+    path. The copy is deleted before this returns, whatever the outcome, and the
+    upload's own spooled copy is closed as soon as it has been copied. A failure is
+    logged here with its traceback and returned to the page as one line.
     """
     name = model or registry.DEFAULT_ESTIMATOR
     if name not in registry.available():
         return dict(ok=False, message=f"unknown model {name!r}")
 
     suffix = Path(video.filename or "capture.mp4").suffix or ".mp4"
-    handle = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+    handle = tempfile.NamedTemporaryFile(prefix=CAPTURE_PREFIX, suffix=suffix, delete=False)
     temp_path = Path(handle.name)
+    size = 0
     try:
-        handle.write(await video.read())
+        # A piece at a time: read in one go, the capture would sit in memory as well.
+        while chunk := await video.read(MB):
+            handle.write(chunk)
+            size += len(chunk)
         handle.close()
+        await video.close()
 
         with _LANDMARKER_LOCK:
-            clip, fps, quality = crops_from_video(temp_path, landmarker())
+            clip, fps, quality = crops_from_video(temp_path, landmarker(),
+                                                  max_frames=MAX_CAPTURE_FRAMES)
 
         payload = dict(ok=True, model=name, quality=quality_payload(quality),
                        disclaimer=DISCLAIMER)
@@ -353,7 +474,7 @@ async def api_analyze(video: UploadFile, model: str = None, client: str = None):
 
         result = estimator(name).estimate(clip, fps)
         detail = result.detail or {}
-        
+
         # The classical estimator shares no weights and no training data with a
         # neural one, so agreement between them is evidence that the model is not
         # simply confirming itself. It is not proof: both read the same video, and on
@@ -389,14 +510,23 @@ async def api_analyze(video: UploadFile, model: str = None, client: str = None):
             print_capture_report(payload, client)
         return payload
     except Exception as exc:
-        return dict(ok=False, message=f"{type(exc).__name__}: {exc}")
+        log.exception("analysis failed (model %s, %.1f MB %s upload)", name, size / MB, suffix)
+        # The temporary file's path names this machine's user folder, which the page
+        # has no use for.
+        message = str(exc).replace(str(temp_path), "the capture")
+        return dict(ok=False, message=f"{type(exc).__name__}: {message}")
     finally:
-        # The capture never outlives the request, whatever happened above.
+        # The capture never outlives the request: it is deleted here whatever happened
+        # above or, if something still holds it open, by a later start.
         try:
             handle.close()
         except Exception:
             pass
-        temp_path.unlink(missing_ok=True)
+        try:
+            temp_path.unlink(missing_ok=True)
+        except OSError:
+            log.exception("could not delete the capture %s", temp_path)
+
 
 @rt("/")
 def index():
@@ -573,9 +703,19 @@ def index():
         Script(src="/static/capture.js?v=20261016-1"),
         cls=("space-y-4", ContainerT.xl))
 
+
 def main():
     """Runs the server, over HTTPS when certificates are available and requested."""
     import uvicorn
+
+    # This server's own messages - refused uploads, failed analyses with their
+    # tracebacks - go to the terminal alongside uvicorn's.
+    logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    log.setLevel(logging.INFO)
+    removed = sweep_stale_captures()
+    if removed:
+        log.info("removed %d capture file(s) an earlier run left in %s",
+                 removed, tempfile.gettempdir())
 
     use_https = "--https" in sys.argv
     key = CERT_DIR / "qualityphys-local-key.pem"
@@ -602,5 +742,7 @@ def main():
         # connections indefinitely by default, so Ctrl+C hangs until the browser
         # gives up. Five seconds is long enough for a real request to finish.
         uvicorn.run(app, host="127.0.0.1", port=8000, timeout_graceful_shutdown=5)
+
+
 if __name__ == "__main__":
     main()

@@ -4,6 +4,7 @@ A single face box is computed once per capture and held for its duration, which
 matches how the Phase-3 models were trained: the preprocessing notebooks derived
 one box per recording rather than tracking per frame.
 """
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 import time
 
@@ -143,26 +144,43 @@ def detection_positions(n_frames):
                                   config.N_DETECT_FRAMES).astype(int)))
 
 
-def read_through(video_path, sample_at):
+@contextmanager
+def opened(video_path):
+    """Opens a video for reading, and releases it however the block is left.
+
+    A read that raises would otherwise leave the file open until the capture object
+    was collected, and on Windows an open file cannot be deleted: the web app's copy
+    of an upload would outlive its request.
+    """
+    cap = cv2.VideoCapture(str(video_path))
+    try:
+        yield cap
+    finally:
+        cap.release()
+
+
+def read_through(video_path, sample_at, max_frames=None):
     """Reads a video front to back: every frame's timestamp and the frames at sample_at.
 
     Returns (timestamps_ms, samples_rgb). Frames that are not sampled are only grabbed,
-    never converted, so the pass costs little more than the decode itself.
+    never converted, so the pass costs little more than the decode itself. A video
+    longer than max_frames raises ValueError when its next frame is reached.
     """
-    cap = cv2.VideoCapture(str(video_path))
     wanted = set(sample_at)
     stamps, samples = [], []
-    while cap.grab():
-        if len(stamps) in wanted:
-            ok, bgr = cap.retrieve()
-            if ok:
-                samples.append(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
-        stamps.append(cap.get(cv2.CAP_PROP_POS_MSEC))
-    cap.release()
+    with opened(video_path) as cap:
+        while cap.grab():
+            if max_frames is not None and len(stamps) == max_frames:
+                raise ValueError(f"{video_path} has more than {max_frames} frames")
+            if len(stamps) in wanted:
+                ok, bgr = cap.retrieve()
+                if ok:
+                    samples.append(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
+            stamps.append(cap.get(cv2.CAP_PROP_POS_MSEC))
     return stamps, samples
 
 
-def crops_from_video(video_path, landmarker=None):
+def crops_from_video(video_path, landmarker=None, max_frames=None):
     """Returns (clip, effective_fps, quality) for a recorded video.
 
     The file is only ever read front to back, never seeked. A browser recording
@@ -173,25 +191,28 @@ def crops_from_video(video_path, landmarker=None):
     So a first pass counts the frames and reads their timestamps, the detection
     samples are spread over the frames that exist, and the decimation stride
     follows the rate the frames were delivered at.
+
+    With max_frames, a longer video is refused (ValueError) by the first pass,
+    before any frame is cropped: a clip costs memory in proportion to its length,
+    whatever the size of its file.
     """
     landmarker = landmarker or make_landmarker()
-    cap = cv2.VideoCapture(str(video_path))
-    if not cap.isOpened():
-        raise FileNotFoundError(video_path)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    source_fps = cap.get(cv2.CAP_PROP_FPS)
-    n_declared = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    cap.release()
+    with opened(video_path) as cap:
+        if not cap.isOpened():
+            raise FileNotFoundError(video_path)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        source_fps = cap.get(cv2.CAP_PROP_FPS)
+        n_declared = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
     sample_at = detection_positions(n_declared)
-    all_stamps, samples = read_through(video_path, sample_at)
+    all_stamps, samples = read_through(video_path, sample_at, max_frames)
     count_held = len(all_stamps) == n_declared
     if not count_held:
         # The samples were placed by a count the file does not hold; a second pass
         # places them over the frames it has.
         sample_at = detection_positions(len(all_stamps))
-        _, samples = read_through(video_path, sample_at)
+        _, samples = read_through(video_path, sample_at, max_frames)
 
     box, detections = stable_box(samples, landmarker)
     if box is None:
@@ -206,19 +227,18 @@ def crops_from_video(video_path, landmarker=None):
     delivered_fps, _ = measured_rate(all_stamps, source_fps)
     stride = decimation_stride(delivered_fps)
 
-    cap = cv2.VideoCapture(str(video_path))
     clip, stamps, index = [], [], 0
-    while True:
-        ok, bgr = cap.read()
-        if not ok:
-            break
-        if index % stride == 0:
-            crop = crop_resize(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB), box)
-            if crop is not None:
-                clip.append(crop)
-                stamps.append(cap.get(cv2.CAP_PROP_POS_MSEC))
-        index += 1
-    cap.release()
+    with opened(video_path) as cap:
+        while True:
+            ok, bgr = cap.read()
+            if not ok:
+                break
+            if index % stride == 0:
+                crop = crop_resize(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB), box)
+                if crop is not None:
+                    clip.append(crop)
+                    stamps.append(cap.get(cv2.CAP_PROP_POS_MSEC))
+            index += 1
 
     # The rate verdict waits for the decode: until the frames have been read
     # there is nothing to judge but the container's own claim about them.
