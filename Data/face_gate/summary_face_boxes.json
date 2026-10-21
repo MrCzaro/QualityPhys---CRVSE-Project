@@ -1,0 +1,203 @@
+{
+  "settings": {
+    "n_detect_frames": 12,
+    "crop_padding": 0.6,
+    "outside_share": 0.05,
+    "near_second": 0.5,
+    "face_model_sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff"
+  },
+  "roots": [
+    "D:\\QualityPhys\\demo_data"
+  ],
+  "n_videos": 84,
+  "groups": {
+    "ecg_fitness_subset": {
+      "n_videos": 8,
+      "n_unreadable": 0,
+      "faces_by_count": {
+        "12": 5,
+        "11": 1,
+        "7": 1,
+        "5": 1
+      },
+      "all_samples_found": 5,
+      "faces_differ_from_app": 0,
+      "with_second_face": 0,
+      "with_near_second_face": 0,
+      "app_took_other_face": 0,
+      "with_face_partly_outside": 1,
+      "inside_min": {
+        "p00": 0.0381,
+        "p05": 0.3676,
+        "p50": 1.0
+      },
+      "shift_max": {
+        "p50": 0.2122,
+        "p95": 1.1604,
+        "p100": 1.5361
+      },
+      "width_ratio": {
+        "p50": 1.2575,
+        "p95": 2.0866,
+        "p100": 2.3882
+      }
+    },
+    "(files in the root)": {
+      "n_videos": 6,
+      "n_unreadable": 0,
+      "faces_by_count": {
+        "12": 5,
+        "11": 1
+      },
+      "all_samples_found": 5,
+      "faces_differ_from_app": 0,
+      "with_second_face": 0,
+      "with_near_second_face": 0,
+      "app_took_other_face": 0,
+      "with_face_partly_outside": 0,
+      "inside_min": {
+        "p00": 1.0,
+        "p05": 1.0,
+        "p50": 1.0
+      },
+      "shift_max": {
+        "p50": 0.0561,
+        "p95": 0.202,
+        "p100": 0.23
+      },
+      "width_ratio": {
+        "p50": 1.0198,
+        "p95": 1.0396,
+        "p100": 1.0439
+      }
+    },
+    "mcd_rppg_subset": {
+      "n_videos": 12,
+      "n_unreadable": 0,
+      "faces_by_count": {
+        "12": 11,
+        "11": 1
+      },
+      "all_samples_found": 11,
+      "faces_differ_from_app": 0,
+      "with_second_face": 0,
+      "with_near_second_face": 0,
+      "app_took_other_face": 0,
+      "with_face_partly_outside": 0,
+      "inside_min": {
+        "p00": 1.0,
+        "p05": 1.0,
+        "p50": 1.0
+      },
+      "shift_max": {
+        "p50": 0.0818,
+        "p95": 0.266,
+        "p100": 0.2827
+      },
+      "width_ratio": {
+        "p50": 1.0394,
+        "p95": 1.0764,
+        "p100": 1.0962
+      }
+    },
+    "ubfc_phys_subset": {
+      "n_videos": 26,
+      "n_unreadable": 0,
+      "faces_by_count": {
+        "12": 26
+      },
+      "all_samples_found": 26,
+      "faces_differ_from_app": 0,
+      "with_second_face": 0,
+      "with_near_second_face": 0,
+      "app_took_other_face": 0,
+      "with_face_partly_outside": 4,
+      "inside_min": {
+        "p00": 0.6586,
+        "p05": 0.7256,
+        "p50": 1.0
+      },
+      "shift_max": {
+        "p50": 0.2872,
+        "p95": 0.7738,
+        "p100": 0.8206
+      },
+      "width_ratio": {
+        "p50": 1.1158,
+        "p95": 1.3275,
+        "p100": 1.3468
+      }
+    },
+    "ubfc_rppg_subset": {
+      "n_videos": 8,
+      "n_unreadable": 0,
+      "faces_by_count": {
+        "12": 8
+      },
+      "all_samples_found": 8,
+      "faces_differ_from_app": 0,
+      "with_second_face": 0,
+      "with_near_second_face": 0,
+      "app_took_other_face": 0,
+      "with_face_partly_outside": 0,
+      "inside_min": {
+        "p00": 1.0,
+        "p05": 1.0,
+        "p50": 1.0
+      },
+      "shift_max": {
+        "p50": 0.0655,
+        "p95": 0.108,
+        "p100": 0.1149
+      },
+      "width_ratio": {
+        "p50": 1.0184,
+        "p95": 1.0404,
+        "p100": 1.0493
+      }
+    },
+    "vitalvideos_subset": {
+      "n_videos": 24,
+      "n_unreadable": 0,
+      "faces_by_count": {
+        "12": 22,
+        "11": 2
+      },
+      "all_samples_found": 22,
+      "faces_differ_from_app": 0,
+      "with_second_face": 1,
+      "with_near_second_face": 1,
+      "app_took_other_face": 0,
+      "with_face_partly_outside": 0,
+      "inside_min": {
+        "p00": 1.0,
+        "p05": 1.0,
+        "p50": 1.0
+      },
+      "shift_max": {
+        "p50": 0.0243,
+        "p95": 0.2539,
+        "p100": 0.302
+      },
+      "width_ratio": {
+        "p50": 1.0208,
+        "p95": 1.082,
+        "p100": 1.1335
+      }
+    }
+  },
+  "provenance": {
+    "command": [
+      "check_face_boxes.py"
+    ],
+    "git": {
+      "commit": "45f7591452b9c6bd19c54bc1acd3bcc8f4cd7aaa",
+      "dirty": true,
+      "changed": [
+        ".gitignore"
+      ]
+    },
+    "weights": null,
+    "written_utc": "2026-10-21T04:19:17+00:00"
+  }
+}
