@@ -129,6 +129,12 @@ def test_framing_flags_a_portrait_frame(client):
     assert result["verdict"] == "WARN" and "record in landscape" in result["notes"][0]
 
 
+def test_framing_warns_of_a_second_face(client):
+    result = post_frame(client, jpeg(synth.Scene(second_face=0.9).frame(0)))
+    assert result["ok"] and result["verdict"] == "WARN"
+    assert result["notes"] == ["a second face is in view; only one person should face the camera"]
+
+
 def test_framing_refuses_bytes_that_are_not_an_image(client):
     assert post_frame(client, b"not an image")["ok"] is False
 
@@ -168,6 +174,7 @@ def test_a_still_face_is_read(client, video):
     quality = payload["quality"]
     assert quality["verdict"] == "ACCEPT" and quality["reasons"] == []
     assert quality["n_frames"] == 480 and quality["detections"] == config.N_DETECT_FRAMES
+    assert quality["second_face_samples"] == 0 and quality["face_inside_min"] == 1.0
     assert payload["n_total"] == WINDOWS_IN_480_FRAMES
     assert payload["spectral"]["value"] == pytest.approx(72.0, abs=2.0)
 
@@ -189,7 +196,15 @@ def test_a_moving_head_is_refused_with_its_reason(client, video):
     reasons = payload["quality"]["reasons"]
     assert len(reasons) == 1 and reasons[0].startswith("the head moved")
 
+def test_a_second_face_qualifies_the_reading(client, video):
+    payload = analyze(client, video("two_faces_avi"))
+    assert payload["ok"] and payload["status"] == "ok"
+    quality = payload["quality"]
+    assert quality["verdict"] == "WARN" and quality["second_face_samples"] == 12
+    assert quality["reasons"] == ["a second face was in view in 12 of 12 sample frames; "
+                                  "only one person should face the camera"]
 
+    
 def test_a_capture_too_short_to_read(client, video):
     payload = analyze(client, video("short_avi"))
     assert payload["status"] == "insufficient_frames" and payload["value"] is None

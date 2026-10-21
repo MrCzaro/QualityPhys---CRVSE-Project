@@ -7,24 +7,46 @@ from mediapipe.tasks.python import vision as mp_vision
 from ..config import MP_MODEL, CROP_PADDING, TRAIN_ASPECT_RANGE
 
 
-def make_landmarker(model_path=MP_MODEL):
-    """Creates a MediaPipe FaceLandmarker in single-image mode."""
+def make_landmarker(model_path=MP_MODEL, num_faces=2):
+    """Creates a MediaPipe FaceLandmarker in single-image mode.
+
+    It looks for two faces, so that a second person in view can be noticed; the subject
+    is the larger of the two (landmark_box). A face alone in the frame gets the same
+    landmarks whichever number is asked for.
+    """
     opts = mp_vision.FaceLandmarkerOptions(
         base_options=mp_python.BaseOptions(model_asset_path=str(model_path)),
-        running_mode=mp_vision.RunningMode.IMAGE, num_faces=1)
+        running_mode=mp_vision.RunningMode.IMAGE, num_faces=num_faces)
     return mp_vision.FaceLandmarker.create_from_options(opts)
 
 
-def landmark_box(frame_rgb, landmarker):
-    """Returns the relative (x0, y0, x1, y1) landmark bounding box, or None."""
+def face_boxes(frame_rgb, landmarker):
+    """Returns every face's relative (x0, y0, x1, y1) landmark box, largest first."""
     img = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(frame_rgb))
-    res = landmarker.detect(img)
-    if not res.face_landmarks:
-        return None
-    pts = res.face_landmarks[0]
-    xs = np.fromiter((p.x for p in pts), dtype=np.float64)
-    ys = np.fromiter((p.y for p in pts), dtype=np.float64)
-    return (xs.min(), ys.min(), xs.max(), ys.max())
+    boxes = []
+    for pts in landmarker.detect(img).face_landmarks:
+        xs = np.fromiter((p.x for p in pts), dtype=np.float64)
+        ys = np.fromiter((p.y for p in pts), dtype=np.float64)
+        boxes.append((xs.min(), ys.min(), xs.max(), ys.max()))
+    return sorted(boxes, key=box_area, reverse=True)
+
+
+def landmark_box(frame_rgb, landmarker):
+    """Returns the subject's relative landmark box - the largest face's - or None."""
+    boxes = face_boxes(frame_rgb, landmarker)
+    return boxes[0] if boxes else None
+
+
+def box_area(box):
+    """The area of a relative (x0, y0, x1, y1) box."""
+    return max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1])
+
+
+def share_inside(face, box):
+    """Returns the share of a face box's area that lies inside another box."""
+    shared = box_area((max(face[0], box[0]), max(face[1], box[1]),
+                       min(face[2], box[2]), min(face[3], box[3])))
+    return float(shared / max(box_area(face), 1e-12))
 
 
 def square_padded_box(boxes, padding=CROP_PADDING):

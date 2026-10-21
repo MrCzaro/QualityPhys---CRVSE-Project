@@ -114,6 +114,10 @@
       "CLIP_LEN": 160,
       "CONFIDENCE_FLOOR_HZ": 0.15,
       "CROP_PADDING": 0.6,
+      "FACE_INSIDE_REJECT": 0.5,
+      "FACE_OUTSIDE_WARN": 0.05,
+      "FACE_SAMPLES_REJECT": 0.8,
+      "FACE_SAMPLES_WARN": 1.0,
       "FFT_PAD_FACTOR": 8,
       "HARMONIC_GUARD_ENABLED": false,
       "HR_HIGH_HZ": 3.0,
@@ -133,6 +137,7 @@
       "MOTION_PERIODIC_SHARE": 0.5,
       "MOTION_REJECT_PX": 1.7,
       "N_DETECT_FRAMES": 12,
+      "SECOND_FACE_MIN_WIDTH": 0.5,
       "SPECTRAL_FILTER_ORDER": 4,
       "SPECTRAL_METHOD": "pos",
       "SPECTRAL_ROI_FRACTION": 0.35,
@@ -148,7 +153,7 @@
     },
     "face_model_sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
     "weights_sha256": null,
-    "capture_code_sha256": "efd4204bf06a5a7a7027260b9caf8927bd3e255279719b65de394c97c75fb1de",
+    "capture_code_sha256": "b9790bb09726fbd1d40fefa89eda22d0ea18826074741e64c1a3d41b3e86efc4",
     "versions": {
       "python": "3.14.7",
       "numpy": "2.5.0",
@@ -166,14 +171,22 @@
       "--update-baseline"
     ],
     "git": {
-      "commit": "4cd73ef7bdbc39c1289aabe28cde5480b1ce28ef",
+      "commit": "3e287dc02f6aed5b856aaf07537d99de634db915",
       "dirty": true,
       "changed": [
-        "app/live_vitals/scripts/ubfc_baseline_hr_physnet_v2.json",
-        "app/live_vitals/scripts/ubfc_baseline_hr_physnet_v3.json"
+        "app/live_vitals/capture/session.py",
+        "app/live_vitals/config.py",
+        "app/live_vitals/preprocess/face_box.py",
+        "app/live_vitals/scripts/check_face_boxes.py",
+        "app/live_vitals/tests/conftest.py",
+        "app/live_vitals/tests/synth.py",
+        "app/live_vitals/tests/test_capture.py",
+        "app/live_vitals/tests/test_gates.py",
+        "app/live_vitals/tests/test_web.py",
+        "app/live_vitals/web/app.py"
       ]
     },
     "weights": null,
-    "written_utc": "2026-10-15T15:03:42+00:00"
+    "written_utc": "2026-10-21T12:44:47+00:00"
   }
 }

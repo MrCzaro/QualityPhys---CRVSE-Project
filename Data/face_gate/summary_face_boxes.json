@@ -2,8 +2,11 @@
   "settings": {
     "n_detect_frames": 12,
     "crop_padding": 0.6,
-    "outside_share": 0.05,
-    "near_second": 0.5,
+    "face_samples_warn": 1.0,
+    "face_samples_reject": 0.8,
+    "second_face_min_width": 0.5,
+    "face_outside_warn": 0.05,
+    "face_inside_reject": 0.5,
     "face_model_sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff"
   },
   "roots": [
@@ -20,12 +23,17 @@
         "7": 1,
         "5": 1
       },
-      "all_samples_found": 5,
-      "faces_differ_from_app": 0,
+      "all_read_samples_found": 5,
+      "faces_differ_from_one_face": 0,
       "with_second_face": 0,
       "with_near_second_face": 0,
-      "app_took_other_face": 0,
+      "one_face_took_other_face": 0,
       "with_face_partly_outside": 1,
+      "verdicts": {
+        "ACCEPT": 5,
+        "WARN": 0,
+        "REJECT": 3
+      },
       "inside_min": {
         "p00": 0.0381,
         "p05": 0.3676,
@@ -49,12 +57,17 @@
         "12": 5,
         "11": 1
       },
-      "all_samples_found": 5,
-      "faces_differ_from_app": 0,
+      "all_read_samples_found": 5,
+      "faces_differ_from_one_face": 0,
       "with_second_face": 0,
       "with_near_second_face": 0,
-      "app_took_other_face": 0,
+      "one_face_took_other_face": 0,
       "with_face_partly_outside": 0,
+      "verdicts": {
+        "ACCEPT": 5,
+        "WARN": 1,
+        "REJECT": 0
+      },
       "inside_min": {
         "p00": 1.0,
         "p05": 1.0,
@@ -78,12 +91,17 @@
         "12": 11,
         "11": 1
       },
-      "all_samples_found": 11,
-      "faces_differ_from_app": 0,
+      "all_read_samples_found": 11,
+      "faces_differ_from_one_face": 0,
       "with_second_face": 0,
       "with_near_second_face": 0,
-      "app_took_other_face": 0,
+      "one_face_took_other_face": 0,
       "with_face_partly_outside": 0,
+      "verdicts": {
+        "ACCEPT": 11,
+        "WARN": 1,
+        "REJECT": 0
+      },
       "inside_min": {
         "p00": 1.0,
         "p05": 1.0,
@@ -106,12 +124,17 @@
       "faces_by_count": {
         "12": 26
       },
-      "all_samples_found": 26,
-      "faces_differ_from_app": 0,
+      "all_read_samples_found": 26,
+      "faces_differ_from_one_face": 0,
       "with_second_face": 0,
       "with_near_second_face": 0,
-      "app_took_other_face": 0,
+      "one_face_took_other_face": 0,
       "with_face_partly_outside": 4,
+      "verdicts": {
+        "ACCEPT": 22,
+        "WARN": 4,
+        "REJECT": 0
+      },
       "inside_min": {
         "p00": 0.6586,
         "p05": 0.7256,
@@ -134,12 +157,17 @@
       "faces_by_count": {
         "12": 8
       },
-      "all_samples_found": 8,
-      "faces_differ_from_app": 0,
+      "all_read_samples_found": 8,
+      "faces_differ_from_one_face": 0,
       "with_second_face": 0,
       "with_near_second_face": 0,
-      "app_took_other_face": 0,
+      "one_face_took_other_face": 0,
       "with_face_partly_outside": 0,
+      "verdicts": {
+        "ACCEPT": 8,
+        "WARN": 0,
+        "REJECT": 0
+      },
       "inside_min": {
         "p00": 1.0,
         "p05": 1.0,
@@ -163,12 +191,17 @@
         "12": 22,
         "11": 2
       },
-      "all_samples_found": 22,
-      "faces_differ_from_app": 0,
+      "all_read_samples_found": 24,
+      "faces_differ_from_one_face": 0,
       "with_second_face": 1,
       "with_near_second_face": 1,
-      "app_took_other_face": 0,
+      "one_face_took_other_face": 0,
       "with_face_partly_outside": 0,
+      "verdicts": {
+        "ACCEPT": 23,
+        "WARN": 1,
+        "REJECT": 0
+      },
       "inside_min": {
         "p00": 1.0,
         "p05": 1.0,
@@ -191,13 +224,25 @@
       "check_face_boxes.py"
     ],
     "git": {
-      "commit": "45f7591452b9c6bd19c54bc1acd3bcc8f4cd7aaa",
+      "commit": "3e287dc02f6aed5b856aaf07537d99de634db915",
       "dirty": true,
       "changed": [
-        ".gitignore"
+        "app/live_vitals/capture/session.py",
+        "app/live_vitals/config.py",
+        "app/live_vitals/preprocess/face_box.py",
+        "app/live_vitals/scripts/check_face_boxes.py",
+        "app/live_vitals/scripts/ubfc_baseline_hr_physnet_v2.json",
+        "app/live_vitals/scripts/ubfc_baseline_hr_physnet_v3.json",
+        "app/live_vitals/scripts/ubfc_baseline_hr_spectral.json",
+        "app/live_vitals/tests/conftest.py",
+        "app/live_vitals/tests/synth.py",
+        "app/live_vitals/tests/test_capture.py",
+        "app/live_vitals/tests/test_gates.py",
+        "app/live_vitals/tests/test_web.py",
+        "app/live_vitals/web/app.py"
       ]
     },
     "weights": null,
-    "written_utc": "2026-10-21T04:19:17+00:00"
+    "written_utc": "2026-10-21T12:46:43+00:00"
   }
 }

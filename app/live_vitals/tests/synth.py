@@ -39,14 +39,29 @@ class Scene:
     frame shifts vertically by `bob_px` at `bob_hz`, the way a head moves during
     exercise. Frames are a pure function of their index, so every writer receives
     identical frames.
+
+    With `second_face`, two people sit side by side: the subject at the left, half the
+    shorter side tall, and a second face at the right, that fraction of its size.
+    `hidden` lists frame ranges [start, stop) in which the background shows without
+    the face, as if the person had turned away or stepped out.
     """
 
     def __init__(self, width=640, height=480, fps=30.0, bpm=72.0, bob_px=0.0,
-                 bob_hz=1.5, face=True):
+                 bob_hz=1.5, face=True, second_face=0.0, hidden=()):
         self.width, self.height, self.fps = width, height, float(fps)
         self.bpm, self.bob_px, self.bob_hz = bpm, bob_px, bob_hz
+        self.hidden = tuple(hidden)
         background = np.full((height, width, 3), 96.0, dtype=np.float32)
-        if face:
+        self.empty = background.copy()
+        if face and second_face:
+            image = portrait()
+            for scale, centre_x in ((0.5, 0.28), (0.5 * second_face, 0.75)):
+                face_h = int(scale * min(height, width))
+                face_w = int(face_h * image.shape[1] / image.shape[0])
+                resized = cv2.resize(image, (face_w, face_h), interpolation=cv2.INTER_AREA)
+                y0, x0 = (height - face_h) // 2, int(centre_x * width - face_w / 2)
+                background[y0:y0 + face_h, x0:x0 + face_w] = resized
+        elif face:
             image = portrait()
             face_h = int(0.7 * min(height, width))
             face_w = int(face_h * image.shape[1] / image.shape[0])
@@ -61,7 +76,8 @@ class Scene:
         f = self.bpm / 60.0
         ppg = np.sin(2 * np.pi * f * t) + 0.3 * np.sin(4 * np.pi * f * t + 0.8)
         gain = tuple(float(g) for g in 1.0 - PULSE_GAIN * ppg) + (0.0,)
-        image = cv2.convertScaleAbs(cv2.multiply(self.base, gain))
+        base = self.empty if any(start <= i < stop for start, stop in self.hidden) else self.base
+        image = cv2.convertScaleAbs(cv2.multiply(base, gain))
         if self.bob_px:
             shift = np.float32([[1, 0, 0],
                                 [0, 1, self.bob_px * np.sin(2 * np.pi * self.bob_hz * t)]])

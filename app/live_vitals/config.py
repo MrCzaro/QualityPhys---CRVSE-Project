@@ -49,6 +49,18 @@ MOTION_REJECT_PX = 1.7       # refuse at this displacement, rhythmic or not
 MOTION_PERIODIC_PX = 0.9     # refuse from this displacement when the motion is rhythmic,
 MOTION_PERIODIC_SHARE = 0.5  # i.e. clear (MIN_CONFIDENCE) in at least this share of windows
 
+
+# Face checks over the N_DETECT_FRAMES sample frames (capture/session.py, face_verdict).
+# Set 2026-10-21 from check_face_boxes.py on 84 raw videos and from the ECG-Fitness
+# benchmark: no resting video is refused and at most three of 58 are warned, while a
+# rowing capture with 4% of its face inside the held box at one sample - read 44 bpm off
+# and passed by every other gate - is refused.
+FACE_SAMPLES_WARN = 1.0      # warn when fewer than this share of the samples find the face,
+FACE_SAMPLES_REJECT = 0.8    # refuse below this share (9 of 12 or fewer)
+SECOND_FACE_MIN_WIDTH = 0.5  # a second face at least this wide beside the subject's warns
+FACE_OUTSIDE_WARN = 0.05     # warn when more of the face than this lies outside the held box,
+FACE_INSIDE_REJECT = 0.5     # refuse when less than this lies inside it, at any sample
+
 # HR readout (app-side; not part of the training contract) 
 FFT_PAD_FACTOR = 8 # zero-pad before the FFT to escape coarse bin spacing
 SUBHARMONIC_RATIO = 0.20  # adopt f/2 when its power exceeds this fraction of the peak

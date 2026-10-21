@@ -25,6 +25,15 @@ VIDEOS = {
     "short_avi": ("opencv", {}, 100, {}),
     "browser_vp8": ("webm", {}, 480, {}),
     "browser_vp9": ("webm", {}, 360, {"codec": "libvpx-vp9"}),
+    # The face checks. Two people; the face gone around one sample of 900 frames (a
+    # longer clip, so the short gap leaves the motion gate's median alone) and around
+    # three of 480; a slow drift - half a cycle over the clip, far below the motion
+    # gate's band - that takes part of the face, then most of it, out of the held box.
+    "two_faces_avi": ("opencv", {"second_face": 0.9}, 360, {}),
+    "one_missed_avi": ("opencv", {"hidden": ((406, 411),)}, 900, {}),
+    "three_missed_avi": ("opencv", {"hidden": ((83, 92), (213, 222), (344, 353))}, 480, {}),
+    "drift_avi": ("opencv", {"bob_px": 90, "bob_hz": 1 / 32}, 480, {}),
+    "big_drift_avi": ("opencv", {"bob_px": 180, "bob_hz": 1 / 32}, 480, {}),
 }
 
 

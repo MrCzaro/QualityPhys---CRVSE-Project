@@ -13,7 +13,7 @@ import cv2
 
 from .. import config
 from ..preprocess.face_box import (
-    make_landmarker, landmark_box, square_padded_box, box_clamp_report)
+    make_landmarker, face_boxes, square_padded_box, box_clamp_report, share_inside)
 from ..preprocess.frames import crop_resize
 from .motion import motion_verdict
 
@@ -40,6 +40,11 @@ class CaptureQuality:
     # pixels and the share of windows with a clear rhythm. NaN when the clip is too short to judge.
     motion_px: float = float("nan")
     motion_periodic: float = float("nan")
+    # The face over the detection samples (face_verdict): how many samples showed a second
+    # face at least SECOND_FACE_MIN_WIDTH of the subject's width, and the smallest share of
+    # the subject's face inside the held box. NaN when not judged.
+    second_face_samples: int = 0
+    face_inside_min: float = float("nan")
 
     @property
     def usable(self):
@@ -130,12 +135,73 @@ def worst_verdict(*verdicts):
 
 
 def stable_box(frames_rgb, landmarker):
-    """Returns the median square face box over sample frames, or None."""
-    boxes = [b for b in (landmark_box(f, landmarker) for f in frames_rgb)
-             if b is not None]
-    if not boxes:
-        return None, 0
-    return square_padded_box(boxes), len(boxes)
+    """Returns (box, detections, faces) over sample frames.
+
+    faces holds every face found in each frame, largest first (an empty list where none
+    was). The subject is the largest face: box is the median square box of its landmark
+    boxes, or None when no frame found a face, and detections how many frames found it.
+    """
+    faces = [face_boxes(frame, landmarker) for frame in frames_rgb]
+    subjects = [boxes[0] for boxes in faces if boxes]
+    if not subjects:
+        return None, 0, faces
+    return square_padded_box(subjects), len(subjects), faces
+
+
+def second_faces(faces):
+    """Counts the samples whose second face is at least SECOND_FACE_MIN_WIDTH as wide as
+    the subject's. A smaller one - a face in a picture, someone far behind - is ignored."""
+    count = 0
+    for boxes in faces:
+        if len(boxes) > 1:
+            subject, other = boxes[0], boxes[1]
+            count += int(other[2] - other[0]
+                         >= config.SECOND_FACE_MIN_WIDTH * (subject[2] - subject[0]))
+    return count
+
+
+def face_verdict(faces, box):
+    """Judges the face over a capture's sample frames; returns (verdict, gate_notes, summary).
+
+    faces holds every face found in each sample, largest first, and box is the box held
+    for the capture (stable_box). Three checks, each at its own level, so gate_notes pairs
+    every note with its level:
+      found    the share of samples that found the face: below FACE_SAMPLES_WARN warns,
+               below FACE_SAMPLES_REJECT refuses. A sample without it caught the face
+               turned away, covered or out of view, and the box rests on fewer samples.
+      second   a second face at least SECOND_FACE_MIN_WIDTH of the subject's width warns.
+               The box follows the larger face, but another person in view can move into
+               the crop or change its light.
+      outside  the share of the subject's face inside the held box, at each sample: more
+               than FACE_OUTSIDE_WARN outside warns, less than FACE_INSIDE_REJECT inside
+               refuses. The motion gate reads movement in the cardiac band only, so a face
+               drifting out of the crop passes it.
+    """
+    n = len(faces)
+    subjects = [boxes[0] for boxes in faces if boxes]
+    gate_notes = []
+    share_found = len(subjects) / max(n, 1)
+    if share_found < config.FACE_SAMPLES_REJECT:
+        gate_notes.append(("REJECT", f"the face was found in only {len(subjects)} of {n} "
+                                     f"sample frames; keep your whole face in view"))
+    elif share_found < config.FACE_SAMPLES_WARN:
+        gate_notes.append(("WARN", f"the face was missed in {n - len(subjects)} of {n} "
+                                   f"sample frames; treat as indicative"))
+    second = second_faces(faces)
+    if second:
+        gate_notes.append(("WARN", f"a second face was in view in {second} of {n} sample "
+                                   f"frames; only one person should face the camera"))
+    inside = [share_inside(face, box) for face in subjects]
+    inside_min = min(inside) if inside else float("nan")
+    outside = sum(share < 1.0 - config.FACE_OUTSIDE_WARN for share in inside)
+    if inside and inside_min < config.FACE_INSIDE_REJECT:
+        gate_notes.append(("REJECT", f"the face moved out of the analysed area (at worst "
+                                     f"{inside_min:.0%} of it inside); keep still and centred"))
+    elif outside:
+        gate_notes.append(("WARN", f"part of the face left the analysed area in {outside} of "
+                                   f"{n} sample frames; treat as indicative"))
+    verdict = worst_verdict(*(level for level, _ in gate_notes))
+    return verdict, gate_notes, dict(second_face_samples=second, face_inside_min=inside_min)
 
 
 def detection_positions(n_frames):
@@ -214,7 +280,7 @@ def crops_from_video(video_path, landmarker=None, max_frames=None):
         sample_at = detection_positions(len(all_stamps))
         _, samples = read_through(video_path, sample_at, max_frames)
 
-    box, detections = stable_box(samples, landmarker)
+    box, detections, faces = stable_box(samples, landmarker)
     if box is None:
         raise RuntimeError(f"no face detected in {video_path}")
 
@@ -222,6 +288,9 @@ def crops_from_video(video_path, landmarker=None, max_frames=None):
     # Each gate's notes beside its level, so the ones behind the final verdict can be
     # told apart from those that only inform.
     gate_notes = [(verdict, note) for note in notes]
+    face, face_notes, face_summary = face_verdict(faces, box)
+    notes.extend(note for _, note in face_notes)
+    gate_notes.extend(face_notes)
     # The stride follows the delivered rate: from a guessed 1000 fps, a WebM capture
     # would keep one frame in 33.
     delivered_fps, _ = measured_rate(all_stamps, source_fps)
@@ -263,7 +332,7 @@ def crops_from_video(video_path, landmarker=None, max_frames=None):
     if motion_note:
         notes.append(motion_note)
         gate_notes.append((motion, motion_note))
-    verdict = worst_verdict(verdict, rate, motion)
+    verdict = worst_verdict(verdict, face, rate, motion)
 
     quality = CaptureQuality(
         width=width, height=height, source_fps=source_fps,
@@ -272,7 +341,7 @@ def crops_from_video(video_path, landmarker=None, max_frames=None):
         verdict=verdict, crop_aspect=report["expected_aspect"],
         frac_side_lost=report["frac_side_lost"], notes=notes,
         reasons=[note for level, note in gate_notes if level == verdict],
-        **motion_fields(motion_summary))
+        **motion_fields(motion_summary), **face_summary)
     return clip, effective_fps, quality
 
 
@@ -294,12 +363,15 @@ def crops_from_camera(camera, seconds, landmarker=None, on_progress=None):
         ok, rgb, _ = camera.read()
         if ok:
             preroll.append(rgb)
-    box, detections = stable_box(preroll, landmarker)
+    box, detections, faces = stable_box(preroll, landmarker)
     if box is None:
         raise RuntimeError("no face detected; check lighting and position")
 
     verdict, report, notes = framing_verdict(box, width, height)
     gate_notes = [(verdict, note) for note in notes]
+    face, face_notes, face_summary = face_verdict(faces, box)
+    notes.extend(note for _, note in face_notes)
+    gate_notes.extend(face_notes)
 
     clip, stamps = [], []
     start = None
@@ -340,7 +412,7 @@ def crops_from_camera(camera, seconds, landmarker=None, on_progress=None):
     if motion_note:
         notes.append(motion_note)
         gate_notes.append((motion, motion_note))
-    verdict = worst_verdict(verdict, rate, motion)
+    verdict = worst_verdict(verdict, face, rate, motion)
 
     quality = CaptureQuality(
         width=width, height=height, source_fps=effective_fps,
@@ -349,5 +421,5 @@ def crops_from_camera(camera, seconds, landmarker=None, on_progress=None):
         verdict=verdict, crop_aspect=report["expected_aspect"],
         frac_side_lost=report["frac_side_lost"], notes=notes,
         reasons=[note for level, note in gate_notes if level == verdict],
-        **motion_fields(motion_summary))
+        **motion_fields(motion_summary), **face_summary)
     return clip, effective_fps, quality

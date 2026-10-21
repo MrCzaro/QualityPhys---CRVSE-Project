@@ -20,6 +20,7 @@ def test_a_still_capture_is_read_whole(captured, frame_count):
     assert fps == pytest.approx(30.0, abs=0.01)
     assert quality.detections == quality.detections_attempted == config.N_DETECT_FRAMES
     assert quality.notes == [] and quality.reasons == []
+    assert quality.second_face_samples == 0 and quality.face_inside_min == pytest.approx(1.0)
     assert clip.shape[1:] == (config.TARGET_SIZE, config.TARGET_SIZE, 3)
     assert clip.dtype == np.uint8
 
@@ -54,9 +55,9 @@ def test_the_clip_is_every_strideth_frame_of_a_plain_decode(video, landmarker, m
     real_stable_box = session.stable_box
 
     def recording_stable_box(frames, lm):
-        box, detections = real_stable_box(frames, lm)
+        box, detections, faces = real_stable_box(frames, lm)
         seen["box"] = box
-        return box, detections
+        return box, detections, faces
 
     monkeypatch.setattr(session, "stable_box", recording_stable_box)
     clip, _, _ = session.crops_from_video(video(name), landmarker)
@@ -170,3 +171,54 @@ def test_a_video_longer_than_max_frames_is_refused_before_cropping(video, landma
     assert next(crops) == 0
     clip, _, _ = session.crops_from_video(video("short_avi"), landmarker, max_frames=n)
     assert len(clip) == n
+
+
+# ------------------------------------------------------------- face checks --
+
+def test_a_missed_sample_is_flagged(captured):
+    _, _, quality = captured("one_missed_avi")
+    assert quality.detections == config.N_DETECT_FRAMES - 1
+    assert quality.verdict == "WARN"
+    assert quality.reasons == ["the face was missed in 1 of 12 sample frames; treat as indicative"]
+
+
+def test_a_face_missing_from_a_quarter_of_the_samples_is_refused(captured):
+    _, _, quality = captured("three_missed_avi")
+    assert quality.detections == 9 and quality.verdict == "REJECT"
+    assert ("the face was found in only 9 of 12 sample frames; keep your whole face in view"
+            in quality.reasons)
+
+
+def test_the_box_follows_the_larger_of_two_faces(landmarker):
+    box, detections, faces = session.stable_box([synth.Scene(second_face=0.9).frame(0)],
+                                                landmarker)
+    assert detections == 1 and len(faces[0]) == 2
+    subject, other = faces[0]
+    assert subject[2] - subject[0] > other[2] - other[0]
+    # The subject sits left of centre and the second face right of it.
+    assert (box[0] + box[2]) / 2 < 0.5 < (other[0] + other[2]) / 2
+
+
+def test_a_second_face_is_flagged(captured):
+    _, _, quality = captured("two_faces_avi")
+    assert quality.verdict == "WARN" and quality.second_face_samples == 12
+    assert quality.reasons == ["a second face was in view in 12 of 12 sample frames; "
+                               "only one person should face the camera"]
+
+
+def test_a_face_drifting_partly_out_of_the_box_is_flagged(captured):
+    """A slow drift is invisible to the motion gate, which reads the cardiac band only."""
+    _, _, quality = captured("drift_avi")
+    assert quality.motion_px < 0.1
+    assert quality.verdict == "WARN" and 0.5 < quality.face_inside_min < 0.95
+    assert len(quality.reasons) == 1
+    assert quality.reasons[0].startswith("part of the face left the analysed area in ")
+
+
+def test_a_face_that_leaves_the_box_is_refused(captured):
+    _, _, quality = captured("big_drift_avi")
+    assert quality.motion_px < 0.1
+    assert quality.verdict == "REJECT" and quality.face_inside_min < 0.5
+    assert quality.reasons == [f"the face moved out of the analysed area (at worst "
+                               f"{quality.face_inside_min:.0%} of it inside); keep still and "
+                               f"centred"]

@@ -41,7 +41,8 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
     
 from app.live_vitals import config
-from app.live_vitals.capture.session import (crops_from_video, framing_verdict, stable_box)
+from app.live_vitals.capture.session import (crops_from_video, framing_verdict, second_faces,
+                                             stable_box, worst_verdict)
 from app.live_vitals.estimators import registry
 from app.live_vitals.preprocess.face_box import make_landmarker
 
@@ -93,6 +94,11 @@ def quality_payload(quality):
                            if np.isfinite(quality.motion_px) else None),
                 motion_periodic=(round(float(quality.motion_periodic), 2)
                                  if np.isfinite(quality.motion_periodic) else None),
+                # The face checks: samples with a second face, and the smallest share of
+                # the face inside the held box (None when not judged).
+                second_face_samples=quality.second_face_samples,
+                face_inside_min=(round(float(quality.face_inside_min), 3)
+                                 if np.isfinite(quality.face_inside_min) else None),
                 notes=list(quality.notes),
                 # The notes behind the verdict, which the page gives as the reason for a
                 # refusal or a qualified reading; the rest stay in Diagnostics.
@@ -412,12 +418,18 @@ async def api_framing(frame: UploadFile):
         height, width = rgb.shape[:2]
 
         with _LANDMARKER_LOCK:
-            box, detections = stable_box([rgb], landmarker())
+            box, detections, faces = stable_box([rgb], landmarker())
         if box is None:
             result = dict(ok=True, verdict="NO_FACE", width=width, height=height,
                           notes=["no face detected"])
         else:
             verdict, report, notes = framing_verdict(box, width, height)
+            # Said here as well as after the capture, so it can be put right before
+            # recording. One frame cannot show a missed or drifting face.
+            if second_faces(faces):
+                verdict = worst_verdict(verdict, "WARN")
+                notes = notes + ["a second face is in view; only one person should face "
+                                 "the camera"]
             result = dict(ok=True, verdict=verdict, width=width, height=height,
                           crop_aspect=round(report["expected_aspect"], 3),
                           frac_side_lost=round(report["frac_side_lost"], 3),

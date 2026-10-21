@@ -6,6 +6,7 @@ import pytest
 from app.live_vitals import config
 from app.live_vitals.capture import session
 from app.live_vitals.capture.motion import motion_verdict
+from app.live_vitals.preprocess.face_box import share_inside, square_padded_box
 from app.live_vitals.tests import synth
 
 NAN = float("nan")
@@ -75,6 +76,7 @@ def test_capture_quality_defaults():
     quality = session.CaptureQuality(640, 480, 30.0, 30.0, 600, 12, 12, "ACCEPT", 1.333, 0.0)
     assert quality.notes == [] and quality.reasons == []
     assert np.isnan(quality.motion_px) and quality.usable
+    assert quality.second_face_samples == 0 and np.isnan(quality.face_inside_min)
     refused = session.CaptureQuality(640, 480, 30.0, 30.0, 600, 12, 12, "REJECT", 1.333, 0.0)
     assert not refused.usable
 
@@ -143,3 +145,72 @@ def test_a_large_movement_is_refused():
 @pytest.mark.parametrize("n, fps", [(100, 30.0), (360, NAN), (360, 0.0)])
 def test_motion_is_not_judged_without_a_window_or_a_rate(n, fps):
     assert motion_verdict(shifting_crops(4.0, n=n), fps) == ("ACCEPT", None, None)
+
+
+# ------------------------------------------------------------- face checks --
+
+# A subject's landmark box, and the box a capture would hold for it: 1.6 times its longer
+# side, square, around its centre - (0.18, 0.18, 0.82, 0.82).
+SUBJECT = (0.40, 0.30, 0.60, 0.70)
+HELD = square_padded_box([SUBJECT])
+
+
+def moved(box, dx):
+    return (box[0] + dx, box[1], box[2] + dx, box[3])
+
+
+def test_share_inside():
+    assert share_inside(SUBJECT, HELD) == pytest.approx(1.0)
+    # 0.6 + 0.26 reaches 0.04 past the held box's right edge at 0.82: a fifth of the width.
+    assert share_inside(moved(SUBJECT, 0.26), HELD) == pytest.approx(0.8)
+    assert share_inside(moved(SUBJECT, 0.70), HELD) == 0.0
+
+
+@pytest.mark.parametrize("found, verdict, note", [
+    (12, "ACCEPT", None),
+    (11, "WARN", "the face was missed in 1 of 12 sample frames; treat as indicative"),
+    (10, "WARN", "the face was missed in 2 of 12 sample frames; treat as indicative"),
+    (9, "REJECT", "the face was found in only 9 of 12 sample frames; keep your whole face in view"),
+    (3, "REJECT", "the face was found in only 3 of 12 sample frames; keep your whole face in view")])
+def test_faces_found_in_the_samples(found, verdict, note):
+    faces = [[SUBJECT]] * found + [[]] * (12 - found)
+    got, gate_notes, summary = session.face_verdict(faces, HELD)
+    assert got == verdict
+    assert gate_notes == ([] if note is None else [(verdict, note)])
+    assert summary == dict(second_face_samples=0, face_inside_min=pytest.approx(1.0))
+
+
+@pytest.mark.parametrize("ratio, counted", [(0.9, True), (0.55, True), (0.45, False)])
+def test_a_second_face_warns_from_half_the_subjects_width(ratio, counted):
+    width = (SUBJECT[2] - SUBJECT[0]) * ratio
+    other = (0.70, 0.40, 0.70 + width, 0.40 + 2 * width)
+    faces = [[SUBJECT, other]] * 2 + [[SUBJECT]] * 10
+    verdict, gate_notes, summary = session.face_verdict(faces, HELD)
+    assert summary["second_face_samples"] == (2 if counted else 0)
+    assert verdict == ("WARN" if counted else "ACCEPT")
+    if counted:
+        assert gate_notes == [("WARN", "a second face was in view in 2 of 12 sample frames; "
+                                       "only one person should face the camera")]
+
+
+@pytest.mark.parametrize("dx, verdict, note", [
+    (0.22, "ACCEPT", None),  # at the held box's edge, wholly inside
+    (0.26, "WARN", "part of the face left the analysed area in 1 of 12 sample frames; "
+                   "treat as indicative"),
+    (0.36, "REJECT", "the face moved out of the analysed area (at worst 30% of it inside); "
+                     "keep still and centred")])
+def test_a_face_outside_the_held_box(dx, verdict, note):
+    faces = [[SUBJECT]] * 11 + [[moved(SUBJECT, dx)]]
+    got, gate_notes, summary = session.face_verdict(faces, HELD)
+    assert got == verdict
+    assert gate_notes == ([] if note is None else [(verdict, note)])
+    assert summary["face_inside_min"] == pytest.approx(1.0 - max(0.0, 0.6 + dx - 0.82) / 0.2)
+
+
+def test_every_face_check_reports_at_its_own_level():
+    """A missed sample, a second face and a face far outside the box at once."""
+    other = (0.70, 0.40, 0.85, 0.70)
+    faces = [[]] + [[SUBJECT, other]] + [[SUBJECT]] * 9 + [[moved(SUBJECT, 0.36)]]
+    verdict, gate_notes, _ = session.face_verdict(faces, HELD)
+    assert verdict == "REJECT"
+    assert [level for level, _ in gate_notes] == ["WARN", "WARN", "REJECT"]
