@@ -31,6 +31,14 @@ Since 2026-10-15 the app's capture gates include the periodic-motion gate
 (capture/motion.py). It is re-run here like the framing and rate gates, so a run from then
 on refuses what the app refuses, and the motion columns record the gate's measure.
 
+Since 2026-10-21 they also include three face checks (capture/session.py, face_verdict).
+The store records how many of the detection samples found the face, counted at the app's
+sample positions, but not where, so only the first check is re-run here
+(face_found_notes): the face in 9 or fewer of 12 samples refuses, in 10-11 warns. A second
+face and a face leaving the held box need the sample frames, which the store does not
+keep, so a capture the app refuses for either is still scored here; check_face_boxes.py
+measures both on the videos kept in demo_data.
+
 The store is evaluation only and its licence forbids redistribution. Nothing written here
 contains a frame.
 
@@ -55,7 +63,8 @@ if str(_REPO_ROOT) not in sys.path:
 
 from app.live_vitals import config
 from app.live_vitals.capture.motion import motion_verdict
-from app.live_vitals.capture.session import framing_verdict, rate_verdict, worst_verdict
+from app.live_vitals.capture.session import (face_found_notes, framing_verdict, rate_verdict,
+                                             worst_verdict)
 from app.live_vitals.estimators import registry
 from app.live_vitals.scripts.bench_outputs import provenance, subset_suffix, unique
 
@@ -69,6 +78,8 @@ REF_RECORDING_MIN = 0.80   # a recording enters the primary set at this referenc
 SPAN_TOLERANCE = 0.05      # a window whose real span is further off nominal is reported apart
 LOW_DETECTION = config.N_DETECT_FRAMES / 2  # fewer detections than this: reported apart
 NAN = float("nan")
+FACE_CHECKS_RERUN = ("the share of samples with a face only; a second face and a face leaving "
+                     "the held box need the sample frames, which the store does not keep")
 BOOT_MIN_SUBJECTS = 5      # fewer subjects behind an interval's denominator: not estimable
 
 # ------------------------------------------------------------------- reading --
@@ -82,9 +93,10 @@ def read_recording(name, group):
     """Reads one group: frames, the frozen reference, the capture gates and its set.
 
     The capture gates are re-run with the app's current code - framing on the stored box,
-    motion on the stored crops - so the benchmark refuses exactly what the app would refuse
-    today. The rate is the capture clock's: an uncompressed AVI's container stamps only
-    repeat the declared 30 fps.
+    motion on the stored crops, the face check the store allows on its detection count - so
+    the benchmark refuses what the app would refuse today, short of the two face checks the
+    store cannot support (see the module docstring). The rate is the capture clock's: an
+    uncompressed AVI's container stamps only repeat the declared 30 fps.
     """
     attrs = {k: _plain(v) for k, v in group.attrs.items()}
     if attrs.get("role") != "benchmark":
@@ -107,6 +119,9 @@ def read_recording(name, group):
         box, int(attrs["frame_width"]), int(attrs["frame_height"]))
     rate, rate_note = rate_verdict(fps)
     motion, motion_note, motion_summary = motion_verdict(frames, fps)
+    face_notes = face_found_notes(int(attrs["face_detections"]),
+                                  int(attrs["face_detections_attempted"]))
+    face = worst_verdict(*(level for level, _ in face_notes))
 
     ref_frac = float(referenced.mean())
     flags = dict(below_gate=ref_frac < REF_RECORDING_MIN,
@@ -130,11 +145,12 @@ def read_recording(name, group):
         span_s=span_s, off_span=off_span, ref_frac=ref_frac,
         ref_hr_median=float(np.median(ref_hr[referenced])) if referenced.any() else NAN,
         framing=framing, frac_side_lost=float(report["frac_side_lost"]),
-        rate=rate, motion=motion,
+        rate=rate, motion=motion, face=face,
         motion_px=motion_summary["amp_median"] if motion_summary else NAN,
         motion_periodic=motion_summary["clear_frac"] if motion_summary else NAN,
-        capture=worst_verdict(framing, rate, motion),
-        capture_notes=[n for n in (*framing_notes, rate_note, motion_note) if n],
+        capture=worst_verdict(framing, rate, motion, face),
+        capture_notes=[n for n in (*framing_notes, rate_note, motion_note,
+                                   *(note for _, note in face_notes)) if n],
         primary=not any(flags.values()), mismatch=mismatch, **flags)
 
 
@@ -223,7 +239,7 @@ def evaluate(store_path, estimators, limit):
                     box_side_lost_stored=float(a["box_side_lost"]),
                     framing_verdict=rec["framing"], rate_verdict=rec["rate"],
                     motion_verdict=rec["motion"], motion_px=rec["motion_px"],
-                    motion_periodic=rec["motion_periodic"],
+                    motion_periodic=rec["motion_periodic"], face_verdict=rec["face"],
                     capture_verdict=rec["capture"], capture_notes="; ".join(rec["capture_notes"]),
                     status=status, value=value, reported=reported, refused=int(not reported),
                     confidence=float(forced.confidence) if gated else NAN,
@@ -485,6 +501,9 @@ def build_summary(estimator, recordings, windows, args):
                       motion_reject_px=config.MOTION_REJECT_PX,
                       motion_periodic_px=config.MOTION_PERIODIC_PX,
                       motion_periodic_share=config.MOTION_PERIODIC_SHARE,
+                      face_samples_warn=config.FACE_SAMPLES_WARN,
+                      face_samples_reject=config.FACE_SAMPLES_REJECT,
+                      face_checks_rerun=FACE_CHECKS_RERUN,
                       fps_range=[min(fps_values), max(fps_values)] if fps_values else [],
                       bootstrap=dict(unit="subject", resamples=args.boot, seed=args.seed,
                                      min_subjects=BOOT_MIN_SUBJECTS)),
@@ -494,7 +513,7 @@ def build_summary(estimator, recordings, windows, args):
                   capture_rejected={gate: dict(
                       all=sum(r[f"{gate}_verdict"] == "REJECT" for r in recordings),
                       primary=sum(r[f"{gate}_verdict"] == "REJECT" for r in primary))
-                      for gate in ("framing", "rate", "motion")},
+                      for gate in ("framing", "rate", "motion", "face")},
                   store_mismatches={r["recording"]: r["store_mismatch"]
                                     for r in recordings if r["store_mismatch"]}),
         primary_by_activity=per_activity(primary, boot),
@@ -531,6 +550,7 @@ def print_summary(s):
     refused = s["sets"]["capture_rejected"]
     print("capture gates refuse (all / primary): " + ", ".join(
         f"{gate} {n['all']}/{n['primary']}" for gate, n in refused.items()))
+    print(f"  face: {s['settings']['face_checks_rerun']}")
     print(f"\n{'act':3} {'light':7} {'motion':8} {'rec':>3} {'rep':>3} {'refused%':>8} "
           f"{'95% CI   subj':>15} {'discard%':>8} {'CW k/n':>9} {'CW%':>5} {'95% CI   subj':>15} "
           f"{'MAE':>6} {'bias':>6} {'cover%':>6}")

@@ -218,6 +218,8 @@ def test_faces_found_in_the_samples(found, verdict, note):
     assert got == verdict
     assert gate_notes == ([] if note is None else [(verdict, note)])
     assert summary == dict(second_face_samples=0, face_inside_min=pytest.approx(1.0))
+    # The same check from the counts alone, as a benchmark store re-runs it.
+    assert session.face_found_notes(found, 12) == gate_notes
 
 
 @pytest.mark.parametrize("ratio, counted", [(0.9, True), (0.55, True), (0.45, False)])

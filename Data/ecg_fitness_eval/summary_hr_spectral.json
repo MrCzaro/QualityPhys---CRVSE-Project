@@ -17,6 +17,9 @@
     "motion_reject_px": 1.7,
     "motion_periodic_px": 0.9,
     "motion_periodic_share": 0.5,
+    "face_samples_warn": 1.0,
+    "face_samples_reject": 0.8,
+    "face_checks_rerun": "the share of samples with a face only; a second face and a face leaving the held box need the sample frames, which the store does not keep",
     "fps_range": [
       28.158211898761913,
       30.015850504713438
@@ -51,6 +54,10 @@
       "motion": {
         "all": 59,
         "primary": 40
+      },
+      "face": {
+        "all": 25,
+        "primary": 15
       }
     },
     "store_mismatches": {}
@@ -92,10 +99,10 @@
       "lighting": "ambient",
       "motion_class": "moderate",
       "n_recordings": 11,
-      "n_reported": 2,
-      "refusal": 0.8181818181818182,
+      "n_reported": 1,
+      "refusal": 0.9090909090909091,
       "refusal_ci": [
-        0.5714285714285714,
+        0.7139285714285715,
         1.0
       ],
       "refusal_ci_subjects": 11,
@@ -107,28 +114,28 @@
         0.7238095238095238
       ],
       "window_discard_ci_subjects": 11,
-      "n_scored": 32,
-      "n_confident_wrong": 32,
+      "n_scored": 19,
+      "n_confident_wrong": 19,
       "confident_wrong": 1.0,
       "confident_wrong_ci": [
         NaN,
         NaN
       ],
-      "confident_wrong_ci_subjects": 2,
-      "mae": 45.81264110538288,
-      "bias": -45.81264110538288,
-      "coverage": 0.13852813852813853,
+      "confident_wrong_ci_subjects": 1,
+      "mae": 45.53046170963845,
+      "bias": -45.53046170963845,
+      "coverage": 0.08225108225108226,
       "n_kept_unreferenced": 0
     },
     "03": {
       "lighting": "halogen",
       "motion_class": "low",
       "n_recordings": 17,
-      "n_reported": 4,
-      "refusal": 0.7647058823529411,
+      "n_reported": 3,
+      "refusal": 0.8235294117647058,
       "refusal_ci": [
-        0.5294117647058824,
-        0.9411764705882353
+        0.6470588235294118,
+        1.0
       ],
       "refusal_ci_subjects": 17,
       "n_windows": 357,
@@ -139,27 +146,27 @@
         0.8796218487394954
       ],
       "window_discard_ci_subjects": 17,
-      "n_scored": 24,
-      "n_confident_wrong": 11,
-      "confident_wrong": 0.4583333333333333,
+      "n_scored": 18,
+      "n_confident_wrong": 6,
+      "confident_wrong": 0.3333333333333333,
       "confident_wrong_ci": [
         NaN,
         NaN
       ],
-      "confident_wrong_ci_subjects": 4,
-      "mae": 21.482945351621733,
-      "bias": -20.04346420026072,
-      "coverage": 0.06722689075630252,
+      "confident_wrong_ci_subjects": 3,
+      "mae": 18.071292858197197,
+      "bias": -16.15198465638251,
+      "coverage": 0.05042016806722689,
       "n_kept_unreferenced": 2
     },
     "04": {
       "lighting": "halogen",
       "motion_class": "moderate",
       "n_recordings": 8,
-      "n_reported": 1,
-      "refusal": 0.875,
+      "n_reported": 0,
+      "refusal": 1.0,
       "refusal_ci": [
-        0.6,
+        1.0,
         1.0
       ],
       "refusal_ci_subjects": 8,
@@ -171,17 +178,17 @@
         0.8928571428571429
       ],
       "window_discard_ci_subjects": 8,
-      "n_scored": 7,
-      "n_confident_wrong": 1,
-      "confident_wrong": 0.14285714285714285,
+      "n_scored": 0,
+      "n_confident_wrong": 0,
+      "confident_wrong": NaN,
       "confident_wrong_ci": [
         NaN,
         NaN
       ],
-      "confident_wrong_ci_subjects": 1,
-      "mae": 9.367935983865895,
-      "bias": -9.058501649383281,
-      "coverage": 0.041666666666666664,
+      "confident_wrong_ci_subjects": 0,
+      "mae": NaN,
+      "bias": NaN,
+      "coverage": 0.0,
       "n_kept_unreferenced": 0
     },
     "05": {
@@ -251,30 +258,30 @@
   },
   "hypotheses": {
     "H1": {
-      "difference": -0.23970944309927367,
+      "difference": -0.1816770186335404,
       "ci": [
         NaN,
         NaN
       ],
       "ci_subjects": [
         1,
-        13
+        10
       ],
-      "share_of_confident_wrong": 0.03125,
-      "share_of_scored_windows": 0.056,
+      "share_of_confident_wrong": 0.044444444444444446,
+      "share_of_scored_windows": 0.0707070707070707,
       "reading": "not estimable"
     },
     "H2": {
       "refusal": {
-        "01/03": 0.6666666666666666,
-        "02/04": 0.8421052631578947,
+        "01/03": 0.696969696969697,
+        "02/04": 0.9473684210526315,
         "05/06": 0.9642857142857143
       },
       "moderate_minus_low": {
-        "difference": 0.17543859649122806,
+        "difference": 0.2503987240829345,
         "ci": [
-          -0.1284007352941176,
-          0.4223640024191494
+          0.04035901292335109,
+          0.42426470588235277
         ],
         "ci_subjects": [
           13,
@@ -282,10 +289,10 @@
         ]
       },
       "high_minus_moderate": {
-        "difference": 0.12218045112781961,
+        "difference": 0.016917293233082775,
         "ci": [
-          0.0,
-          0.30000000000000004
+          -0.10792483660130714,
+          0.1578947368421053
         ],
         "ci_subjects": [
           16,
@@ -297,10 +304,10 @@
     "H3": {
       "03_vs_01": {
         "refusal": {
-          "difference": 0.20220588235294112,
+          "difference": 0.26102941176470584,
           "ci": [
-            -0.1450980392156862,
-            0.5490196078431373
+            -0.047794117647058876,
+            0.5738970588235274
           ],
           "ci_subjects": [
             17,
@@ -309,13 +316,13 @@
           "reading": "not contradicted"
         },
         "confident_wrong": {
-          "difference": 0.13106060606060604,
+          "difference": 0.006060606060606044,
           "ci": [
             NaN,
             NaN
           ],
           "ci_subjects": [
-            4,
+            3,
             7
           ],
           "reading": "not estimable"
@@ -327,10 +334,10 @@
       },
       "04_vs_02": {
         "refusal": {
-          "difference": 0.05681818181818177,
+          "difference": 0.09090909090909094,
           "ci": [
-            -0.2750694444444445,
-            0.3571428571428571
+            0.0,
+            0.2860714285714266
           ],
           "ci_subjects": [
             8,
@@ -339,14 +346,14 @@
           "reading": "not contradicted"
         },
         "confident_wrong": {
-          "difference": -0.8571428571428572,
+          "difference": NaN,
           "ci": [
             NaN,
             NaN
           ],
           "ci_subjects": [
-            1,
-            2
+            0,
+            1
           ],
           "reading": "not estimable"
         },
@@ -360,12 +367,12 @@
   "supplementary_not_preregistered": {
     "confident_wrong_by_recording_status": {
       "flagged (degraded/unstable)": {
-        "n_scored": 82,
-        "n_confident_wrong": 30
+        "n_scored": 69,
+        "n_confident_wrong": 24
       },
       "ok": {
-        "n_scored": 43,
-        "n_confident_wrong": 34
+        "n_scored": 30,
+        "n_confident_wrong": 21
       }
     },
     "recordings_reported_off_by_more_than_10_bpm": {
@@ -375,17 +382,17 @@
         "n_ok_status_off_by_more_than_10": 0
       },
       "02": {
-        "n_reported": 2,
-        "n_off_by_more_than_10": 2,
-        "n_ok_status_off_by_more_than_10": 2
+        "n_reported": 1,
+        "n_off_by_more_than_10": 1,
+        "n_ok_status_off_by_more_than_10": 1
       },
       "03": {
-        "n_reported": 4,
-        "n_off_by_more_than_10": 2,
+        "n_reported": 3,
+        "n_off_by_more_than_10": 1,
         "n_ok_status_off_by_more_than_10": 0
       },
       "04": {
-        "n_reported": 1,
+        "n_reported": 0,
         "n_off_by_more_than_10": 0,
         "n_ok_status_off_by_more_than_10": 0
       },
@@ -606,12 +613,12 @@
         "face_detections": 9,
         "frac_side_lost": 0.0,
         "box_side_lost_stored": 0.0,
-        "capture_verdict": "ACCEPT",
-        "status": "ok",
-        "value": 67.37284022495388,
+        "capture_verdict": "REJECT",
+        "status": "capture_rejected",
+        "value": NaN,
         "forced_status": "ok",
         "forced_value": 67.37284022495388,
-        "error_vs_reference": -47.59254521205784
+        "error_vs_reference": NaN
       },
       {
         "recording": "14_04",
@@ -800,16 +807,15 @@
       "cuda"
     ],
     "git": {
-      "commit": "2f69aff04c77e6840c434f532f2674058bf4027d",
+      "commit": "40f62a5571ce782e928dae893303b9e30571fb65",
       "dirty": true,
       "changed": [
-        "Data/face_gate/summary_face_boxes.json",
-        "app/live_vitals/preprocess/face_box.py",
-        "app/live_vitals/scripts/check_face_boxes.py",
+        "app/live_vitals/capture/session.py",
+        "app/live_vitals/scripts/check_ecg_fitness.py",
         "app/live_vitals/tests/test_gates.py"
       ]
     },
     "weights": null,
-    "written_utc": "2026-10-22T02:46:11+00:00"
+    "written_utc": "2026-10-22T03:44:43+00:00"
   }
 }

@@ -159,6 +159,23 @@ def second_faces(faces):
                          >= config.SECOND_FACE_MIN_WIDTH * (subject[2] - subject[0]))
     return count
 
+def face_found_notes(found, n):
+    """The first of face_verdict's checks, which needs only counts: the share of the n
+    samples that found the face. Returns its (level, note) pairs; none when the share
+    calls for no note.
+
+    It stands alone because a benchmark store records how many samples found the face
+    but not their boxes, so this is the one face check such a store can re-run.
+    """
+    share = found / max(n, 1)
+    if share < config.FACE_SAMPLES_REJECT:
+        return [("REJECT", f"the face was found in only {found} of {n} sample frames; "
+                           f"keep your whole face in view")]
+    if share < config.FACE_SAMPLES_WARN:
+        return [("WARN", f"the face was missed in {n - found} of {n} sample frames; "
+                         f"treat as indicative")]
+    return []
+
 
 def face_verdict(faces, box):
     """Judges the face over a capture's sample frames; returns (verdict, gate_notes, summary).
@@ -166,9 +183,10 @@ def face_verdict(faces, box):
     faces holds every face found in each sample, largest first, and box is the box held
     for the capture (stable_box). Three checks, each at its own level, so gate_notes pairs
     every note with its level:
-      found    the share of samples that found the face: below FACE_SAMPLES_WARN warns,
-               below FACE_SAMPLES_REJECT refuses. A sample without it caught the face
-               turned away, covered or out of view, and the box rests on fewer samples.
+      found    the share of samples that found the face (face_found_notes): below
+               FACE_SAMPLES_WARN warns, below FACE_SAMPLES_REJECT refuses. A sample without
+               it caught the face turned away, covered or out of view, and the box rests on
+               fewer samples.
       second   a second face at least SECOND_FACE_MIN_WIDTH of the subject's width warns.
                The box follows the larger face, but another person in view can move into
                the crop or change its light.
@@ -179,14 +197,7 @@ def face_verdict(faces, box):
     """
     n = len(faces)
     subjects = [boxes[0] for boxes in faces if boxes]
-    gate_notes = []
-    share_found = len(subjects) / max(n, 1)
-    if share_found < config.FACE_SAMPLES_REJECT:
-        gate_notes.append(("REJECT", f"the face was found in only {len(subjects)} of {n} "
-                                     f"sample frames; keep your whole face in view"))
-    elif share_found < config.FACE_SAMPLES_WARN:
-        gate_notes.append(("WARN", f"the face was missed in {n - len(subjects)} of {n} "
-                                   f"sample frames; treat as indicative"))
+    gate_notes = face_found_notes(len(subjects), n)
     second = second_faces(faces)
     if second:
         gate_notes.append(("WARN", f"a second face was in view in {second} of {n} sample "
@@ -207,7 +218,7 @@ def face_verdict(faces, box):
 def detection_positions(n_frames):
     """Returns the indices of the detection samples, spread evenly over n_frames."""
     return sorted(set(np.linspace(0, max(n_frames - 1, 0),
-                                  config.N_DETECT_FRAMES).astype(int)))
+                                  config.N_DETECT_FRAMES).astype(int))) 
 
 
 @contextmanager
