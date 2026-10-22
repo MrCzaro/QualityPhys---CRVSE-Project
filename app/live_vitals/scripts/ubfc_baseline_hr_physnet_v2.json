@@ -153,7 +153,7 @@
     },
     "face_model_sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
     "weights_sha256": "f30fae250fb948e2aaece9aae5ec2d77fcc438d7ef1abbe54ae878a7eecee6b8",
-    "capture_code_sha256": "b9790bb09726fbd1d40fefa89eda22d0ea18826074741e64c1a3d41b3e86efc4",
+    "capture_code_sha256": "061c32d6eb07f1e3f56ac449c36e60e05409058a6910a7977fd5db2ce146de22",
     "versions": {
       "python": "3.14.7",
       "numpy": "2.5.0",
@@ -171,27 +171,15 @@
       "--update-baseline"
     ],
     "git": {
-      "commit": "3e287dc02f6aed5b856aaf07537d99de634db915",
-      "dirty": true,
-      "changed": [
-        "app/live_vitals/capture/session.py",
-        "app/live_vitals/config.py",
-        "app/live_vitals/preprocess/face_box.py",
-        "app/live_vitals/scripts/check_face_boxes.py",
-        "app/live_vitals/scripts/ubfc_baseline_hr_spectral.json",
-        "app/live_vitals/tests/conftest.py",
-        "app/live_vitals/tests/synth.py",
-        "app/live_vitals/tests/test_capture.py",
-        "app/live_vitals/tests/test_gates.py",
-        "app/live_vitals/tests/test_web.py",
-        "app/live_vitals/web/app.py"
-      ]
+      "commit": "2d158a1e0dbd889184dbc4cdfaf6ab4c678544b9",
+      "dirty": false,
+      "changed": []
     },
     "weights": {
       "file": "phase_3_physnet_v2_baseline_best.zip",
       "sha256": "f30fae250fb948e2aaece9aae5ec2d77fcc438d7ef1abbe54ae878a7eecee6b8",
       "bytes": 3106459
     },
-    "written_utc": "2026-10-21T12:45:39+00:00"
+    "written_utc": "2026-10-22T03:53:01+00:00"
   }
 }
