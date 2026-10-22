@@ -15,7 +15,9 @@ This script measured them before their thresholds were set (2026-10-21); run aga
 shows what they decide on the same videos. Detection is the app's own: the same sample
 positions, landmarker (two faces, the larger the subject), box rule and verdict. A
 one-face landmarker, as the app used before, runs beside it to show whether it would
-have taken the other face.
+have taken the other face. Each video's framing verdict (how the held box fits the
+frame) is recorded too, with the box itself, so a change to the framing rule can be
+judged on these videos without detecting again.
 
 Frames are fetched by seeking, not by the app's front-to-back pass: the files here are
 indexed (AVI, MP4, MOV), and a sample a frame or two off changes no box. A file whose
@@ -53,7 +55,8 @@ if str(_REPO_ROOT) not in sys.path:
 
 from app.live_vitals import config  # noqa: E402
 from app.live_vitals.capture.session import (  # noqa: E402
-    detection_positions, face_verdict, opened, read_through, second_faces, stable_box)
+    detection_positions, face_verdict, framing_verdict, opened, read_through, second_faces,
+    stable_box)
 from app.live_vitals.preprocess.face_box import (  # noqa: E402
     box_area, face_boxes, landmark_box, make_landmarker, share_inside, square_padded_box)
 from app.live_vitals.scripts.bench_outputs import (  # noqa: E402
@@ -131,8 +134,11 @@ def measure(path, landmarker, one_face):
                    if boxes and one is not None and iou(one, boxes[0]) < 0.5))
     if box is None:
         return dict(row, verdict="", reasons="no face in any sample", inside_min=NAN,
-                    outside_samples=0, shift_max=NAN, shift_median=NAN, width_ratio=NAN)
+                    outside_samples=0, shift_max=NAN, shift_median=NAN, width_ratio=NAN,
+                    framing="", frac_side_lost=NAN, box_x0=NAN, box_y0=NAN, box_x1=NAN,
+                    box_y1=NAN)
     verdict, gate_notes, _ = face_verdict(faces, box)
+    framing, report, _ = framing_verdict(box, width, height)
     subjects = [boxes[0] for boxes in faces if boxes]
     inside = [share_inside(face, box) for face in subjects]
     # Distances in pixels, in units of the subject's median face width: the relative
@@ -146,7 +152,10 @@ def measure(path, landmarker, one_face):
                 outside_samples=int(sum(s < 1.0 - config.FACE_OUTSIDE_WARN for s in inside)),
                 shift_max=round(float(shifts.max()), 4),
                 shift_median=round(float(np.median(shifts)), 4),
-                width_ratio=round(float(widths.max() / widths.min()), 4))
+                width_ratio=round(float(widths.max() / widths.min()), 4),
+                framing=framing, frac_side_lost=round(report["frac_side_lost"], 4),
+                **{f"box_{name}": round(float(value), 4)
+                   for name, value in zip(("x0", "y0", "x1", "y1"), box)})
 
 
 def detail(path, landmarker):
@@ -228,6 +237,8 @@ def summarise(rows):
             one_face_took_other_face=sum(r["one_face_other_samples"] > 0 for r in ok),
             with_face_partly_outside=sum(r["outside_samples"] > 0 for r in ok),
             verdicts={v: sum(r["verdict"] == v for r in ok) for v in ("ACCEPT", "WARN", "REJECT")},
+            framing={v: sum(r["framing"] == v for r in ok) for v in ("ACCEPT", "WARN", "REJECT")},
+            clamped=sum(r["frac_side_lost"] > config.MAX_BOX_SIDE_LOST for r in ok),
             inside_min=quantiles([r["inside_min"] for r in ok], (0.0, 0.05, 0.5)),
             shift_max=quantiles([r["shift_max"] for r in ok], (0.5, 0.95, 1.0)),
             width_ratio=quantiles([r["width_ratio"] for r in ok], (0.5, 0.95, 1.0)))
@@ -236,14 +247,14 @@ def summarise(rows):
 
 def print_summary(summary):
     print(f"\n{'group':26} {'videos':>6} {'all':>4} {'fewest':>6} {'2nd':>4} {'near':>4} "
-          f"{'1-face':>6} {'out':>4} {'warn':>4} {'refuse':>6} | {'inside min':>10} "
+          f"{'1-face':>6} {'out':>4} {'warn':>4} {'refuse':>6} {'clamp':>5} | {'inside min':>10} "
           f"{'shift p95':>9} {'shift max':>9} {'width max':>9}")
     for group, s in summary.items():
         fewest = min((int(k) for k in s["faces_by_count"]), default=0)
         print(f"{group[:26]:26} {s['n_videos']:6d} {s['all_read_samples_found']:4d} {fewest:6d} "
               f"{s['with_second_face']:4d} {s['with_near_second_face']:4d} "
               f"{s['one_face_took_other_face']:6d} {s['with_face_partly_outside']:4d} "
-              f"{s['verdicts']['WARN']:4d} {s['verdicts']['REJECT']:6d} | "
+              f"{s['verdicts']['WARN']:4d} {s['verdicts']['REJECT']:6d} {s['clamped']:5d} | "
               f"{s['inside_min'].get('p00', NAN):10.3f} "
               f"{s['shift_max'].get('p95', NAN):9.3f} "
               f"{s['shift_max'].get('p100', NAN):9.3f} "
@@ -256,10 +267,12 @@ def print_summary(summary):
           "\nwidth); 1-face: videos where a one-face detector took the other face; out:"
           f"\nvideos with a sample whose face is more than {config.FACE_OUTSIDE_WARN:.0%} outside"
           " the held box;"
-          "\nwarn / refuse: the face checks' verdict; inside min: the lowest share of a face"
-          "\ninside the held box, over all videos; shift: a face's distance from its median"
-          "\nposition, in face widths; width max: the largest ratio of a video's widest to"
-          "\nnarrowest face.")
+          "\nwarn / refuse: the face checks' verdict; clamp: videos whose held box has more"
+          f"\nthan {config.MAX_BOX_SIDE_LOST:.0%} of its width or height outside the frame, which"
+          " the framing gate refuses;"
+          "\ninside min: the lowest share of a face inside the held box, over all videos;"
+          "\nshift: a face's distance from its median position, in face widths; width max: the"
+          "\nlargest ratio of a video's widest to narrowest face.")
 
 
 def main():

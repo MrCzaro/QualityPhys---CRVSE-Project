@@ -34,6 +34,12 @@
         "WARN": 0,
         "REJECT": 3
       },
+      "framing": {
+        "ACCEPT": 8,
+        "WARN": 0,
+        "REJECT": 0
+      },
+      "clamped": 0,
       "inside_min": {
         "p00": 0.0381,
         "p05": 0.3676,
@@ -68,6 +74,12 @@
         "WARN": 1,
         "REJECT": 0
       },
+      "framing": {
+        "ACCEPT": 2,
+        "WARN": 3,
+        "REJECT": 1
+      },
+      "clamped": 1,
       "inside_min": {
         "p00": 1.0,
         "p05": 1.0,
@@ -102,6 +114,12 @@
         "WARN": 1,
         "REJECT": 0
       },
+      "framing": {
+        "ACCEPT": 12,
+        "WARN": 0,
+        "REJECT": 0
+      },
+      "clamped": 0,
       "inside_min": {
         "p00": 1.0,
         "p05": 1.0,
@@ -135,6 +153,12 @@
         "WARN": 4,
         "REJECT": 0
       },
+      "framing": {
+        "ACCEPT": 0,
+        "WARN": 22,
+        "REJECT": 4
+      },
+      "clamped": 4,
       "inside_min": {
         "p00": 0.6586,
         "p05": 0.7256,
@@ -168,6 +192,12 @@
         "WARN": 0,
         "REJECT": 0
       },
+      "framing": {
+        "ACCEPT": 8,
+        "WARN": 0,
+        "REJECT": 0
+      },
+      "clamped": 0,
       "inside_min": {
         "p00": 1.0,
         "p05": 1.0,
@@ -202,6 +232,12 @@
         "WARN": 1,
         "REJECT": 0
       },
+      "framing": {
+        "ACCEPT": 0,
+        "WARN": 11,
+        "REJECT": 13
+      },
+      "clamped": 13,
       "inside_min": {
         "p00": 1.0,
         "p05": 1.0,
@@ -224,25 +260,15 @@
       "check_face_boxes.py"
     ],
     "git": {
-      "commit": "3e287dc02f6aed5b856aaf07537d99de634db915",
+      "commit": "2f69aff04c77e6840c434f532f2674058bf4027d",
       "dirty": true,
       "changed": [
-        "app/live_vitals/capture/session.py",
-        "app/live_vitals/config.py",
         "app/live_vitals/preprocess/face_box.py",
         "app/live_vitals/scripts/check_face_boxes.py",
-        "app/live_vitals/scripts/ubfc_baseline_hr_physnet_v2.json",
-        "app/live_vitals/scripts/ubfc_baseline_hr_physnet_v3.json",
-        "app/live_vitals/scripts/ubfc_baseline_hr_spectral.json",
-        "app/live_vitals/tests/conftest.py",
-        "app/live_vitals/tests/synth.py",
-        "app/live_vitals/tests/test_capture.py",
-        "app/live_vitals/tests/test_gates.py",
-        "app/live_vitals/tests/test_web.py",
-        "app/live_vitals/web/app.py"
+        "app/live_vitals/tests/test_gates.py"
       ]
     },
     "weights": null,
-    "written_utc": "2026-10-21T12:46:43+00:00"
+    "written_utc": "2026-10-22T02:32:02+00:00"
   }
 }

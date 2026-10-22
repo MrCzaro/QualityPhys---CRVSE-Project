@@ -67,6 +67,12 @@ def box_clamp_report(box, width, height):
 
     A clamped box yields a crop whose aspect differs from the training stretch,
     which puts the model input off-distribution.
+
+    `frac_side_lost` is the share of the box's side that falls outside the frame, on
+    the worse axis - the definition every Phase-3 store records as box_side_lost. Each
+    axis is measured against its own side: the box is square in relative coordinates
+    but not in pixels, so overflow at the top measured against the width would read
+    3/4 of its size on a 4:3 frame, and 9/16 on a 16:9 one.
     """
     px = np.array([box[0] * width, box[1] * height, box[2] * width, box[3] * height])
     over = np.array([max(0.0, -px[0]), max(0.0, -px[1]),
@@ -76,6 +82,8 @@ def box_clamp_report(box, width, height):
     kept_h = min(px[3], height) - max(px[1], 0.0)
     expected_aspect = float(full_w / max(full_h, 1e-9))
     kept_aspect = float(kept_w / max(kept_h, 1e-9))
+    lost_w = (over[0] + over[2]) / max(full_w, 1e-9)
+    lost_h = (over[1] + over[3]) / max(full_h, 1e-9)
     return dict(clamped=bool(over.any()),
                 overflow_px=over,
                 expected_aspect=expected_aspect,
@@ -83,4 +91,4 @@ def box_clamp_report(box, width, height):
                 distortion=float(kept_aspect / max(expected_aspect, 1e-9)),
                 aspect_in_training_range=bool(
                     TRAIN_ASPECT_RANGE[0] <= expected_aspect <= TRAIN_ASPECT_RANGE[1]),
-                frac_side_lost=float(over.sum() / max(full_w, 1e-9)))
+                frac_side_lost=float(max(lost_w, lost_h)))

@@ -514,7 +514,7 @@
         "ref_frac": 0.667,
         "ref_hr_median": 134.1070327758789,
         "face_detections": 11,
-        "frac_side_lost": 0.0523,
+        "frac_side_lost": 0.093,
         "box_side_lost_stored": 0.093,
         "capture_verdict": "REJECT",
         "status": "capture_rejected",
@@ -529,7 +529,7 @@
         "ref_frac": 0.714,
         "ref_hr_median": 139.1076202392578,
         "face_detections": 10,
-        "frac_side_lost": 0.038,
+        "frac_side_lost": 0.0675,
         "box_side_lost_stored": 0.0675,
         "capture_verdict": "REJECT",
         "status": "capture_rejected",
@@ -666,7 +666,7 @@
         "ref_frac": 0.952,
         "ref_hr_median": 115.2558708190918,
         "face_detections": 12,
-        "frac_side_lost": 0.0497,
+        "frac_side_lost": 0.0883,
         "box_side_lost_stored": 0.0883,
         "capture_verdict": "REJECT",
         "status": "capture_rejected",
@@ -681,7 +681,7 @@
         "ref_frac": 0.667,
         "ref_hr_median": 134.1070327758789,
         "face_detections": 11,
-        "frac_side_lost": 0.0523,
+        "frac_side_lost": 0.093,
         "box_side_lost_stored": 0.093,
         "capture_verdict": "REJECT",
         "status": "capture_rejected",
@@ -696,7 +696,7 @@
         "ref_frac": 0.714,
         "ref_hr_median": 139.1076202392578,
         "face_detections": 10,
-        "frac_side_lost": 0.038,
+        "frac_side_lost": 0.0675,
         "box_side_lost_stored": 0.0675,
         "capture_verdict": "REJECT",
         "status": "capture_rejected",
@@ -711,7 +711,7 @@
         "ref_frac": 0.81,
         "ref_hr_median": 138.70567321777344,
         "face_detections": 12,
-        "frac_side_lost": 0.0363,
+        "frac_side_lost": 0.0645,
         "box_side_lost_stored": 0.0645,
         "capture_verdict": "REJECT",
         "status": "capture_rejected",
@@ -800,15 +800,20 @@
       "cuda"
     ],
     "git": {
-      "commit": "6ab72373ede98281ad10e4970f9bc37deecfe9b0",
-      "dirty": false,
-      "changed": []
+      "commit": "2f69aff04c77e6840c434f532f2674058bf4027d",
+      "dirty": true,
+      "changed": [
+        "Data/face_gate/summary_face_boxes.json",
+        "app/live_vitals/preprocess/face_box.py",
+        "app/live_vitals/scripts/check_face_boxes.py",
+        "app/live_vitals/tests/test_gates.py"
+      ]
     },
     "weights": {
       "file": "phase_3_physnet_v2_baseline_best.zip",
       "sha256": "f30fae250fb948e2aaece9aae5ec2d77fcc438d7ef1abbe54ae878a7eecee6b8",
       "bytes": 3106459
     },
-    "written_utc": "2026-10-15T15:14:39+00:00"
+    "written_utc": "2026-10-22T02:46:11+00:00"
   }
 }

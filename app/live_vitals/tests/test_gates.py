@@ -6,7 +6,8 @@ import pytest
 from app.live_vitals import config
 from app.live_vitals.capture import session
 from app.live_vitals.capture.motion import motion_verdict
-from app.live_vitals.preprocess.face_box import share_inside, square_padded_box
+from app.live_vitals.preprocess.face_box import (
+    box_clamp_report, share_inside, square_padded_box)
 from app.live_vitals.tests import synth
 
 NAN = float("nan")
@@ -58,7 +59,46 @@ def test_a_box_past_the_frame_is_refused():
     assert report["frac_side_lost"] > config.MAX_BOX_SIDE_LOST
     assert notes == ["face box extends past the frame; sit further back"]
 
+def stores_side_lost(box):
+    """box_side_lost as NB_P3_27 and NB_P3_29 record it in every Phase-3 store."""
+    lost_x = max(0.0, -box[0]) + max(0.0, box[2] - 1.0)
+    lost_y = max(0.0, -box[1]) + max(0.0, box[3] - 1.0)
+    return max(lost_x / (box[2] - box[0]), lost_y / (box[3] - box[1]))
 
+
+@pytest.mark.parametrize("width, height", [(640, 480), (1280, 720), (480, 640)])
+def test_overflow_is_measured_against_its_own_side(width, height):
+    # 0.03 of a 0.4-tall box lies above the frame: 7.5% of its height, whatever the frame.
+    report = box_clamp_report((0.3, -0.03, 0.7, 0.37), width, height)
+    assert report["frac_side_lost"] == pytest.approx(0.075)
+
+
+def test_a_face_cut_off_at_the_top_of_a_wide_frame_is_refused():
+    # 3% of the box's height lies above a 16:9 frame. Measured against the box's width
+    # it would read 1.7%, inside the limit.
+    verdict, report, notes = session.framing_verdict((0.3, -0.012, 0.7, 0.388), 1280, 720)
+    assert report["frac_side_lost"] == pytest.approx(0.03)
+    assert verdict == "REJECT"
+    assert notes == ["face box extends past the frame; sit further back"]
+
+
+def test_the_worse_axis_decides_not_the_sum():
+    # 1.5% of the box lost on each axis: neither is past the limit.
+    verdict, report, _ = session.framing_verdict((-0.006, -0.006, 0.394, 0.394), 640, 480)
+    assert report["frac_side_lost"] == pytest.approx(0.015)
+    assert verdict == "ACCEPT"
+
+
+def test_the_app_measures_clamping_as_the_stores_do():
+    rng = np.random.default_rng(0)
+    for _ in range(200):
+        cx, cy, half = rng.uniform(-0.1, 1.1), rng.uniform(-0.1, 1.1), rng.uniform(0.05, 0.4)
+        box = (cx - half, cy - half, cx + half, cy + half)
+        for width, height in ((640, 480), (1920, 1080), (960, 1056)):
+            assert (box_clamp_report(box, width, height)["frac_side_lost"]
+                    == pytest.approx(stores_side_lost(box)))
+
+            
 def test_a_portrait_frame_is_flagged():
     verdict, report, notes = session.framing_verdict((0.4, 0.4, 0.6, 0.6), 480, 640)
     assert verdict == "WARN" and "record in landscape" in notes[0]
