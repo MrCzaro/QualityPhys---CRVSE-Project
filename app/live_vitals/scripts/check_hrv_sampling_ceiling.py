@@ -33,7 +33,7 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-from scipy.signal import butter, filtfilt, find_peaks
+from scipy.signal import butter, filtfilt, find_peaks, welch
 
 DEFAULT_DATA_DIR = Path(r"D:\QualityPhys\demo_data\mcd_rppg_subset")
 SUBJECTS = ["4087", "4874", "5130", "6137", "8584", "9092"]
@@ -41,6 +41,7 @@ STATES = ["before", "after"]
 DEFAULT_RATES = [100.0, 60.0, 30.0, 29.9, 25.0, 20.0, 15.0]
 REFERENCE_HZ = 100.0
 STAMP = "%Y-%m-%d %H:%M:%S.%f"
+BEAT_SPACING = 0.55   # the least a beat may follow the last, as a share of the dominant period
 
 
 def load_ppg(path):
@@ -89,10 +90,32 @@ def refine(y, index):
     return float(index) + (offset if abs(offset) <= 0.5 else 0.0)
 
 
-def beat_times(y, fs, sub_sample, low_hz=0.7, high_hz=3.5):
-    """Returns beat times in seconds from a pulse waveform."""
+def dominant_period(y, fs, low_hz=0.7, high_hz=3.5):
+    """Returns the dominant beat period in seconds, from a Welch spectrum of the band.
+
+    Taken over the whole waveform, which is what makes it a property of the recording
+    rather than of a moment: a heart rate that drifts across a capture still has one
+    dominant period, and that is all the peak spacing needs.
+    """
+    nperseg = int(min(len(y), max(8 * fs, 256)))
+    freqs, power = welch(y - np.mean(y), fs=fs, nperseg=nperseg)
+    band = (freqs >= low_hz) & (freqs <= high_hz)
+    if not band.any() or not np.any(power[band] > 0):
+        return 1.0 / low_hz
+    return float(1.0 / freqs[band][np.argmax(power[band])])
+
+
+def beat_times(y, fs, sub_sample, low_hz=0.7, high_hz=3.5, spacing=BEAT_SPACING):
+    """Returns beat times in seconds from a pulse waveform.
+
+    The minimum spacing between beats is a share of the recording's own dominant period,
+    not a fixed interval. A fixed 0.3 s is 200 bpm: at a resting 50 bpm it leaves the
+    dicrotic notch, which follows the systolic peak by about a third of a beat, free to
+    register as a beat of its own and halve every interval it touches.
+    """
     filtered = bandpass(y, fs, low_hz, high_hz)
-    peaks, _ = find_peaks(filtered, distance=max(1, int(0.3 * fs)),
+    period = dominant_period(filtered, fs, low_hz, high_hz)
+    peaks, _ = find_peaks(filtered, distance=max(1, int(spacing * period * fs)),
                           height=0.2 * np.std(filtered))
     if sub_sample:
         peaks = np.array([refine(filtered, int(p)) for p in peaks], dtype=float)

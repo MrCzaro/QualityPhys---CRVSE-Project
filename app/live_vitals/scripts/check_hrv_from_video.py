@@ -50,7 +50,15 @@ from app.live_vitals.scripts.check_hrv_sampling_ceiling import (
 
 DEFAULT_CACHE = Path(r"D:\QualityPhys\demo_data\mcd_rppg_subset\.crop_cache")
 MATCH_TOLERANCE_S = 0.15
-MAX_LAG_S = 0.4   # below half a beat interval; see align_offset
+# Still below half a beat interval, and for the same reason: a wider window lets the alignment
+# slip by a whole beat. The median distance between paired beats discriminates better than
+# counting matches, but it does not make a wide search safe - searched over +/-1 s these
+# recordings produce subject anchors of up to 972 ms, which MCD's frame-aligned PPG (documented
+# within about twenty frames) cannot have. Widen this only for a dataset whose own offset is
+# known to be larger, and then only with several recordings of differing heart rate pooled.
+MAX_LAG_S = 0.4
+MIN_SLIP_MARGIN_S = 0.25    # how far a rival alignment must sit before it counts as a rival
+ANCHOR_HALF_WIDTH_S = 0.25  # each recording is aligned this far either side of its subject's
 
 
 def continuous_bvp(model, clip, device="cpu"):
@@ -75,41 +83,81 @@ def continuous_bvp(model, clip, device="cpu"):
     return np.concatenate(pieces), starts[0] + margin
 
 
-def align_offset(predicted, reference, limit_s=MAX_LAG_S, step_s=0.005):
-    """Returns the constant time offset that best pairs predicted beats to reference.
+def nearest_gaps(predicted, reference):
+    """Distance from each reference beat to the nearest predicted beat, in seconds."""
+    index = np.clip(np.searchsorted(predicted, reference), 1, len(predicted) - 1)
+    left = np.abs(predicted[index - 1] - reference)
+    right = np.abs(predicted[index] - reference)
+    return np.minimum(left, right)
 
-    The offset is searched on the beat times themselves rather than by
-    cross-correlating the waveforms. A pulse is quasi-periodic, so waveform
-    correlation peaks again at every multiple of the beat interval and the search
-    settles on an arbitrary one; counting matched beats has a single maximum.
 
-    The search is capped below half a beat interval for the same reason. A larger
-    window would let the alignment slip by a whole beat, which scores just as well
-    and is silently wrong. MCD-rPPG documents its own PPG-to-video offset as within
-    about twenty frames, comfortably inside this.
+def offset_scores(pairs, limit_s=MAX_LAG_S, step_s=0.0025, centre_s=0.0):
+    """Returns (offsets, median distance at each) over one or more (predicted, reference) pairs.
 
-    A constant offset is not itself an error for HRV: interval variability is
-    unaffected by when the recording is considered to start. Only jitter matters,
-    which is what the timing spread reports.
+    Pooling pairs that share an offset - the recordings of one subject, whose camera and
+    sensor sat at the same remove from each other - is what makes a whole-beat slip
+    impossible to mistake for the truth: the recordings' heart rates differ, so a slip
+    fits each of them at a different shift and only the true offset fits them together.
     """
-    if not len(predicted) or not len(reference):
-        return 0.0, 0
-    # Every offset inside the match tolerance pairs the same beats, so counting
-    # matches alone leaves a plateau the width of that tolerance and the search
-    # settles at its edge. Ties are broken on total timing error, which has one
-    # minimum, so the reported jitter is the signal's and not the search's.
-    best = (0.0, -1, np.inf)
-    for offset in np.arange(-limit_s, limit_s + step_s, step_s):
-        shifted = predicted + offset
-        matched, error = 0, 0.0
-        for t in reference:
-            gap = float(np.min(np.abs(shifted - t)))
-            if gap <= MATCH_TOLERANCE_S:
-                matched += 1
-                error += gap
-        if matched > best[1] or (matched == best[1] and error < best[2]):
-            best = (float(offset), matched, error)
-    return best[0], best[1]
+    offsets = np.arange(centre_s - limit_s, centre_s + limit_s + step_s / 2, step_s)
+    usable = [(np.asarray(p), np.asarray(r)) for p, r in pairs
+              if len(p) >= 3 and len(r) >= 3]
+    if not usable:
+        return offsets, np.full(offsets.size, np.nan)
+    medians = []
+    for offset in offsets:
+        gaps = np.concatenate([nearest_gaps(p + offset, r) for p, r in usable])
+        medians.append(float(np.median(gaps)))
+    return offsets, np.array(medians)
+
+
+def align_offset(predicted, reference, limit_s=ANCHOR_HALF_WIDTH_S, step_s=0.0025,
+                 centre_s=0.0):
+    """Returns (offset, median distance, matched share, margin) for one recording.
+
+    The offset is the one whose reference beats sit closest to a predicted beat, measured
+    by the **median distance** between paired beats rather than by how many pairs fall
+    within a tolerance. Counting matches cannot see a whole-beat slip: most beat-to-beat
+    changes are far below the tolerance, so a shift of one beat keeps nearly every pair
+    inside it - 88% against 100% on one Rice recording - while the median distance
+    separates the two several-fold (55 against 13 ms there).
+
+    `margin` is how much worse, in milliseconds, the best alignment more than
+    MIN_SLIP_MARGIN_S away fits. A few milliseconds means a second alignment fits about as
+    well and the offset should not be trusted; the reference, which aligns with itself
+    exactly, shows a margin the size of its own timing spread.
+
+    The search is narrow by default, and is meant to be centred on an offset found for
+    several recordings at once. Neither criterion is safe over a wide window on one short
+    span: measured on 30 s spans of the Rice recordings, counting matches and the median
+    distance choose alignments a whole beat apart in 3 of 15, and on one of those the
+    median distance prefers the slipped one, because 30 s of a talking recording genuinely
+    fits a shifted alignment better. What rules a slip out is that the recordings of one
+    subject share an offset while their heart rates differ, which is what `pooled_offset`
+    uses.
+
+    A constant offset is not itself an error for HRV: interval variability is unaffected
+    by when the recording is considered to start. Only jitter matters, which is what the
+    timing spread reports.
+    """
+    offsets, medians = offset_scores([(predicted, reference)], limit_s, step_s, centre_s)
+    if np.all(np.isnan(medians)):
+        return 0.0, float("nan"), 0.0, float("nan")
+    best = int(np.nanargmin(medians))
+    away = np.abs(offsets - offsets[best]) > MIN_SLIP_MARGIN_S
+    alternative = np.nanmin(medians[away]) if away.any() else np.nan
+    shifted = np.asarray(predicted) + offsets[best]
+    matched = float(np.mean(nearest_gaps(shifted, np.asarray(reference)) <= MATCH_TOLERANCE_S))
+    return (float(offsets[best]), float(medians[best]), matched,
+            float((alternative - medians[best]) * 1000.0))
+
+
+def pooled_offset(pairs, limit_s=MAX_LAG_S, step_s=0.0025):  # the wide search lives here
+    """The offset that fits every pair at once, for recordings that share one."""
+    offsets, medians = offset_scores(pairs, limit_s, step_s)
+    if np.all(np.isnan(medians)):
+        return 0.0
+    return float(offsets[int(np.nanargmin(medians))])
 
 
 def match_beats(predicted, reference, tolerance=MATCH_TOLERANCE_S):
@@ -132,6 +180,20 @@ def match_beats(predicted, reference, tolerance=MATCH_TOLERANCE_S):
     return len(errors), len(reference) - len(errors), int((~used).sum()), np.array(errors)
 
 
+def is_recording_cache(path):
+    """True for a crop cache, which is the only kind this script reads.
+
+    The folder also holds this script's own reconstructions and the window caches another
+    script writes, and more kinds may appear. Asking what a file contains, rather than
+    excluding the suffixes known today, keeps the selection correct as that grows.
+    """
+    try:
+        with np.load(path) as archive:
+            return {"clip", "ppg", "fps"} <= set(archive.files)
+    except (OSError, ValueError):
+        return False
+
+    
 def reconstructions(path, cache=True):
     """Returns (traces, reference, fps) for one cached recording."""
     store = path.with_name(path.stem + "_bvp.npz")
@@ -169,8 +231,8 @@ def main():
                         help="recompute reconstructions instead of reusing them")
     args = parser.parse_args()
 
-    paths = sorted(p for p in args.cache_dir.glob("*.npz")
-                   if not p.stem.endswith("_bvp"))
+    paths = sorted(p for p in args.cache_dir.glob("*.npz") if is_recording_cache(p))
+
     if args.recordings:
         wanted = set(args.recordings)
         paths = [p for p in paths if p.stem in wanted]
@@ -180,42 +242,74 @@ def main():
 
     print("Heart rate needs one frequency to be right. Beat timing needs every")
     print("peak in the right place. This measures the second thing.\n")
-    print(f"{'recording':>14} {'method':>8} {'lag s':>7} {'matched':>8} "
-          f"{'missed':>7} {'extra':>6} {'|dt| ms':>8} "
+
+    # Every recording is read once, and its beats found once, before any alignment: the
+    # offset of a recording is searched around one found for its subject's recordings
+    # together, which is what a whole-beat slip cannot survive.
+    loaded = {}
+    for path in paths:
+        traces, reference, fps = reconstructions(path, cache=not args.no_cache)
+        beats = {name: beat_times(trace, fps, sub_sample=True)
+                 for name, trace in list(traces.items()) + [("reference", reference)]}
+        loaded[path.stem] = {"fps": fps, "beats": beats,
+                             "reference": beats["reference"]}
+
+    methods = [name for name in loaded[paths[0].stem]["beats"]]
+    subjects = {}
+    for stem in loaded:
+        subjects.setdefault(stem.split("_")[0], []).append(stem)
+    anchors = {(subject, method):
+               pooled_offset([(loaded[s]["beats"][method], loaded[s]["reference"])
+                              for s in stems])
+               for subject, stems in subjects.items() for method in methods}
+    print("anchor offsets, each subject's recordings searched together "
+          f"(+/-{MAX_LAG_S:g} s), then each recording within +/-{ANCHOR_HALF_WIDTH_S:g} s of it:")
+    for (subject, method), anchor in sorted(anchors.items()):
+        print(f"  {subject:>6} {method:>9} {anchor * 1000:+8.0f} ms")
+    print()
+    print(f"{'recording':>14} {'method':>9} {'lag s':>7} {'matched':>8} "
+          f"{'missed':>7} {'extra':>6} {'|dt| ms':>8} {'gap ms':>7} {'margin':>7} "
           f"{'RMSSD pred':>11} {'ref':>7} {'err':>7}")
 
     summary = {}
     for path in paths:
-        traces, reference, fps = reconstructions(path, cache=not args.no_cache)
-        ref_beats = beat_times(reference, fps, sub_sample=True)
+        entry = loaded[path.stem]
+        fps, ref_beats = entry["fps"], entry["reference"]
         ref_rmssd, ref_sdnn, _, _ = hrv(ref_beats)
 
         # The reference is scored against itself as a control. Anything other than
         # a perfect row there means the harness is broken, not the model.
-        for name, trace in list(traces.items()) + [("reference", reference)]:
-            pred_beats = beat_times(trace, fps, sub_sample=True)
-            offset, _ = align_offset(pred_beats, ref_beats)
-            pred_beats = pred_beats + offset
-            lag = offset * fps
+        for name in methods:
+            anchor = anchors[(path.stem.split("_")[0], name)]
+            offset, gap, _, margin = align_offset(entry["beats"][name], ref_beats,
+                                                  limit_s=ANCHOR_HALF_WIDTH_S,
+                                                  centre_s=anchor)
+            pred_beats = entry["beats"][name] + offset
             matched, missed, extra, errors = match_beats(pred_beats, ref_beats)
             rmssd, sdnn, _, _ = hrv(pred_beats)
             rate = matched / max(len(ref_beats), 1)
             timing = np.median(np.abs(errors)) * 1000.0 if len(errors) else float("nan")
             summary.setdefault(name, []).append(
-                (rate, timing, rmssd - ref_rmssd, sdnn - ref_sdnn))
-            print(f"{path.stem:>14} {name:>8} {lag / fps:7.2f} "
-                  f"{rate:7.0%} {missed:7d} {extra:6d} {timing:8.1f} "
-                  f"{rmssd:11.1f} {ref_rmssd:7.1f} {rmssd - ref_rmssd:+7.1f}")
+                (rate, timing, rmssd - ref_rmssd, sdnn - ref_sdnn, gap * 1000.0, margin))
+            print(f"{path.stem:>14} {name:>9} {offset:7.2f} "
+                  f"{rate:7.0%} {missed:7d} {extra:6d} {timing:8.1f} {gap * 1000:7.1f} "
+                  f"{margin:7.0f} {rmssd:11.1f} {ref_rmssd:7.1f} {rmssd - ref_rmssd:+7.1f}")
         print()
 
-    print(f"{'method':>8} {'match rate':>11} {'|dt| ms':>9} "
-          f"{'RMSSD err':>10} {'SDNN err':>9}")
+    print(f"{'method':>9} {'match rate':>11} {'|dt| ms':>9} "
+          f"{'RMSSD err':>10} {'SDNN err':>9} {'gap ms':>8} {'margin':>7}")
     for name, rows in summary.items():
         rate = np.nanmedian([r[0] for r in rows])
         timing = np.nanmedian([r[1] for r in rows])
         rmssd = np.nanmedian(np.abs([r[2] for r in rows]))
         sdnn = np.nanmedian(np.abs([r[3] for r in rows]))
-        print(f"{name:>8} {rate:10.0%} {timing:9.1f} {rmssd:10.1f} {sdnn:9.1f}")
+        gap = np.nanmedian([r[4] for r in rows])
+        margin = np.nanmin([r[5] for r in rows])
+        print(f"{name:>9} {rate:10.0%} {timing:9.1f} {rmssd:10.1f} {sdnn:9.1f} "
+              f"{gap:8.1f} {margin:7.0f}")
+    print("\n`gap` is the median distance between paired beats at the chosen offset, and")
+    print("`margin` how much worse, in ms, the best alignment 0.25 s away fits. A few ms means")
+    print("a second alignment fits as well, and that offset is not to be trusted.")
 
     print("\nA high match rate with small |dt| means the waveform carries real beat")
     print("timing and HRV is worth pursuing. A high match rate with large RMSSD")
