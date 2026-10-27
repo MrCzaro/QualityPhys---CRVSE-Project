@@ -1,0 +1,711 @@
+{
+  "estimator": "hr_physnet_v2",
+  "dataset": "Rice-iPPG",
+  "crop": "frames_clamped",
+  "store": "D:\\QualityPhys\\phase 3 benchmarks\\rice_ippg_phase3_rc_none.h5",
+  "device": "cuda",
+  "activities": [
+    "stationary",
+    "reading",
+    "watching",
+    "talking",
+    "deep"
+  ],
+  "limit": null,
+  "settings": {
+    "clip_len": 160,
+    "window_stride": 80,
+    "min_confidence": 0.65,
+    "fps": [
+      30.017,
+      30.018
+    ],
+    "window_seconds": 5.33,
+    "training_window_seconds": 5.33
+  },
+  "confounds": [
+    "the app's framing gate refuses all 70 recordings: a face filling 60-95% of the frame's height cannot fit a box padded by 0.6, so these readings are forced",
+    "the reference is a 60 Hz 7-bit finger pulse oximeter, aligned per recording by the store's offset, which mixes both devices' latencies with the pulse's travel",
+    "talking is reported on its own and never pooled: the weakest correlations, the widest beat distances and the only recording POS cannot read",
+    "windows whose frames the reference does not cover are excluded and counted"
+  ],
+  "analysis_sets": {
+    "primary": "windows kept by the reference's own gating, in recordings whose reference yields a reading",
+    "sensitivity": "every window with a finite reference reading"
+  },
+  "n_recordings": 70,
+  "activity_counts": {
+    "stationary": 14,
+    "reading": 14,
+    "watching": 14,
+    "talking": 14,
+    "deep": 14
+  },
+  "windows_uncovered": 77,
+  "reference_accepted": {
+    "accepted": 70,
+    "total": 70
+  },
+  "reference_hr": {
+    "n": 70,
+    "min": 50.42951479898278,
+    "median": 77.90199935504228,
+    "max": 111.10332020937709,
+    "above_100": 6
+  },
+  "reported_hr": {
+    "n": 66,
+    "min": 52.21136514746193,
+    "median": 77.77586342122629,
+    "max": 110.84648918624788,
+    "above_100": 5
+  },
+  "sets": {
+    "primary": {
+      "n_recordings": 70,
+      "n_windows_eligible": 2828,
+      "n_windows_model_no_peak": 0,
+      "window": {
+        "n": 2828,
+        "mae": 3.7829441460741755,
+        "rmse": 10.820318405231431,
+        "mape": 5.385954417054224,
+        "bias": 1.9713508086751135,
+        "loa_low": -18.885214139797274,
+        "loa_high": 22.827915757147498,
+        "r": 0.7783169876256182
+      },
+      "coverage": 0.9428571428571428,
+      "recording": {
+        "n": 66,
+        "mae": 0.8955275435897686,
+        "rmse": 1.6060585103493756,
+        "mape": 1.2303273161106818,
+        "bias": 0.08778540071107914,
+        "loa_low": -3.0794694107927274,
+        "loa_high": 3.255040212214886,
+        "r": 0.995964437093991
+      },
+      "status_counts": {
+        "ok": 56,
+        "degraded_capture": 10,
+        "insufficient_quality": 4
+      },
+      "mean_usable_fraction": 0.7777222155690018
+    },
+    "sensitivity": {
+      "n_recordings": 70,
+      "n_windows_eligible": 2998,
+      "n_windows_model_no_peak": 0,
+      "window": {
+        "n": 2998,
+        "mae": 4.035552561694097,
+        "rmse": 11.172069320035344,
+        "mape": 5.740631357415037,
+        "bias": 2.115740881387738,
+        "loa_low": -19.388855929802524,
+        "loa_high": 23.620337692577998,
+        "r": 0.7652564733033819
+      },
+      "coverage": 0.9428571428571428,
+      "recording": {
+        "n": 66,
+        "mae": 0.8233628140987664,
+        "rmse": 1.4640857903364506,
+        "mape": 1.1324444552652313,
+        "bias": 0.08242542536803148,
+        "loa_low": -2.8045862982639362,
+        "loa_high": 2.9694371489999996,
+        "r": 0.9966089912232673
+      },
+      "status_counts": {
+        "ok": 56,
+        "degraded_capture": 10,
+        "insufficient_quality": 4
+      },
+      "mean_usable_fraction": 0.7777222155690018
+    }
+  },
+  "by_activity": {
+    "stationary": {
+      "primary": {
+        "n_recordings": 14,
+        "n_windows_eligible": 579,
+        "n_windows_model_no_peak": 0,
+        "window": {
+          "n": 579,
+          "mae": 0.7691516102434969,
+          "rmse": 3.7188377951029925,
+          "mape": 1.1823013125781716,
+          "bias": 0.373279724283222,
+          "loa_low": -6.88510140970152,
+          "loa_high": 7.631660858267964,
+          "r": 0.9739339467847168
+        },
+        "coverage": 1.0,
+        "recording": {
+          "n": 14,
+          "mae": 0.5086702224059145,
+          "rmse": 1.0212702212699067,
+          "mape": 0.8631999511184967,
+          "bias": 0.44699212068582383,
+          "loa_low": -1.4207261651602119,
+          "loa_high": 2.3147104065318596,
+          "r": 0.9988836046765852
+        },
+        "status_counts": {
+          "ok": 13,
+          "degraded_capture": 1
+        },
+        "mean_usable_fraction": 0.9330262760495318
+      },
+      "sensitivity": {
+        "n_recordings": 14,
+        "n_windows_eligible": 595,
+        "n_windows_model_no_peak": 0,
+        "window": {
+          "n": 595,
+          "mae": 0.7673307768359005,
+          "rmse": 3.672986037656118,
+          "mape": 1.173632930310084,
+          "bias": 0.36020166788802466,
+          "loa_low": -6.810177691678971,
+          "loa_high": 7.530581027455021,
+          "r": 0.9753027483019168
+        },
+        "coverage": 1.0,
+        "recording": {
+          "n": 14,
+          "mae": 0.5096904254319173,
+          "rmse": 0.9935769313415181,
+          "mape": 0.8586091454411116,
+          "bias": 0.3770328878666765,
+          "loa_low": -1.4927336604297305,
+          "loa_high": 2.2467994361630836,
+          "r": 0.9988780527118579
+        },
+        "status_counts": {
+          "ok": 13,
+          "degraded_capture": 1
+        },
+        "mean_usable_fraction": 0.9330262760495318
+      }
+    },
+    "reading": {
+      "primary": {
+        "n_recordings": 14,
+        "n_windows_eligible": 574,
+        "n_windows_model_no_peak": 0,
+        "window": {
+          "n": 574,
+          "mae": 1.4558953155416825,
+          "rmse": 5.011001117704665,
+          "mape": 2.02066836343568,
+          "bias": 0.3463831479147453,
+          "loa_low": -9.46023231329075,
+          "loa_high": 10.152998609120239,
+          "r": 0.9492397290845349
+        },
+        "coverage": 1.0,
+        "recording": {
+          "n": 14,
+          "mae": 0.47908058858774083,
+          "rmse": 0.6279884540420109,
+          "mape": 0.7332634145915619,
+          "bias": 0.39469481059105,
+          "loa_low": -0.5988110663948574,
+          "loa_high": 1.3882006875769572,
+          "r": 0.9997401768499871
+        },
+        "status_counts": {
+          "ok": 12,
+          "degraded_capture": 2
+        },
+        "mean_usable_fraction": 0.8482454896788072
+      },
+      "sensitivity": {
+        "n_recordings": 14,
+        "n_windows_eligible": 600,
+        "n_windows_model_no_peak": 0,
+        "window": {
+          "n": 600,
+          "mae": 1.7394910482463366,
+          "rmse": 5.921177862165315,
+          "mape": 2.411529649703389,
+          "bias": 0.634551827814992,
+          "loa_low": -10.91374929470391,
+          "loa_high": 12.182852950333894,
+          "r": 0.9292904129334758
+        },
+        "coverage": 1.0,
+        "recording": {
+          "n": 14,
+          "mae": 0.4594261701615022,
+          "rmse": 0.616220191919949,
+          "mape": 0.6975616915926022,
+          "bias": 0.34949385041955644,
+          "loa_low": -0.6828054673609472,
+          "loa_high": 1.38179316820006,
+          "r": 0.9996247592152794
+        },
+        "status_counts": {
+          "ok": 12,
+          "degraded_capture": 2
+        },
+        "mean_usable_fraction": 0.8482454896788072
+      }
+    },
+    "watching": {
+      "primary": {
+        "n_recordings": 14,
+        "n_windows_eligible": 565,
+        "n_windows_model_no_peak": 0,
+        "window": {
+          "n": 565,
+          "mae": 2.5279042879206273,
+          "rmse": 8.2608653781542,
+          "mape": 3.900425886524478,
+          "bias": 1.536147481695485,
+          "loa_low": -14.386842339559877,
+          "loa_high": 17.459137302950847,
+          "r": 0.844666242117697
+        },
+        "coverage": 1.0,
+        "recording": {
+          "n": 14,
+          "mae": 0.4808736208957442,
+          "rmse": 0.7160240123458376,
+          "mape": 0.7561804130224851,
+          "bias": 0.1716963116191188,
+          "loa_low": -1.242197235971737,
+          "loa_high": 1.5855898592099746,
+          "r": 0.9990073043670152
+        },
+        "status_counts": {
+          "ok": 13,
+          "degraded_capture": 1
+        },
+        "mean_usable_fraction": 0.8223062363617178
+      },
+      "sensitivity": {
+        "n_recordings": 14,
+        "n_windows_eligible": 596,
+        "n_windows_model_no_peak": 0,
+        "window": {
+          "n": 596,
+          "mae": 2.747795432362389,
+          "rmse": 8.599771528819048,
+          "mape": 4.206100567641731,
+          "bias": 1.5422152455078475,
+          "loa_low": -15.054013552372254,
+          "loa_high": 18.13844404338795,
+          "r": 0.8340822650022115
+        },
+        "coverage": 1.0,
+        "recording": {
+          "n": 14,
+          "mae": 0.5110029112501826,
+          "rmse": 0.7833728877008161,
+          "mape": 0.788335059284582,
+          "bias": 0.07816247557380913,
+          "loa_low": -1.5072574979357904,
+          "loa_high": 1.6635824490834086,
+          "r": 0.9986207801446579
+        },
+        "status_counts": {
+          "ok": 13,
+          "degraded_capture": 1
+        },
+        "mean_usable_fraction": 0.8223062363617178
+      }
+    },
+    "talking": {
+      "primary": {
+        "n_recordings": 14,
+        "n_windows_eligible": 552,
+        "n_windows_model_no_peak": 0,
+        "window": {
+          "n": 552,
+          "mae": 12.057555104693972,
+          "rmse": 20.67797191279327,
+          "mape": 16.785721846763504,
+          "bias": 7.403169642238535,
+          "loa_low": -30.473450686701522,
+          "loa_high": 45.279789971178594,
+          "r": 0.2925688879517888
+        },
+        "coverage": 0.7142857142857143,
+        "recording": {
+          "n": 10,
+          "mae": 2.3954312893191494,
+          "rmse": 3.2850492500179,
+          "mape": 2.7648094215724583,
+          "bias": -1.180946655632652,
+          "loa_low": -7.514208337388088,
+          "loa_high": 5.152315026122785,
+          "r": 0.9847726920533603
+        },
+        "status_counts": {
+          "degraded_capture": 5,
+          "ok": 5,
+          "insufficient_quality": 4
+        },
+        "mean_usable_fraction": 0.4319908814589665
+      },
+      "sensitivity": {
+        "n_recordings": 14,
+        "n_windows_eligible": 603,
+        "n_windows_model_no_peak": 0,
+        "window": {
+          "n": 603,
+          "mae": 12.407368272204577,
+          "rmse": 20.975658427366735,
+          "mape": 17.344440563839882,
+          "bias": 7.6185548842030215,
+          "loa_low": -30.71787836201372,
+          "loa_high": 45.954988130419764,
+          "r": 0.27833139791149447
+        },
+        "coverage": 0.7142857142857143,
+        "recording": {
+          "n": 10,
+          "mae": 2.1034525423952664,
+          "rmse": 2.8918736723078466,
+          "mape": 2.4411050016871862,
+          "bias": -0.9138204788606565,
+          "loa_low": -6.582354287500013,
+          "loa_high": 4.7547133297787,
+          "r": 0.9912231356913176
+        },
+        "status_counts": {
+          "degraded_capture": 5,
+          "ok": 5,
+          "insufficient_quality": 4
+        },
+        "mean_usable_fraction": 0.4319908814589665
+      }
+    },
+    "deep": {
+      "primary": {
+        "n_recordings": 14,
+        "n_windows_eligible": 558,
+        "n_windows_model_no_peak": 0,
+        "window": {
+          "n": 558,
+          "mae": 2.3890806651964707,
+          "rmse": 7.817310699735238,
+          "mape": 3.4365661389511017,
+          "bias": 0.36837675626622185,
+          "loa_low": -14.950263383414429,
+          "loa_high": 15.687016895946874,
+          "r": 0.8495702158537588
+        },
+        "coverage": 1.0,
+        "recording": {
+          "n": 14,
+          "mae": 1.0421259240915457,
+          "rmse": 1.5817204852456732,
+          "mape": 1.4726068389517715,
+          "bias": 0.24399554305098903,
+          "loa_low": -2.9346963884196335,
+          "loa_high": 3.4226874745216116,
+          "r": 0.9972658189491694
+        },
+        "status_counts": {
+          "ok": 13,
+          "degraded_capture": 1
+        },
+        "mean_usable_fraction": 0.853042194295986
+      },
+      "sensitivity": {
+        "n_recordings": 14,
+        "n_windows_eligible": 604,
+        "n_windows_model_no_peak": 0,
+        "window": {
+          "n": 604,
+          "mae": 2.448677140672842,
+          "rmse": 7.693187165469215,
+          "mape": 3.4762414368606396,
+          "bias": 0.38872713877644177,
+          "loa_low": -14.683140224380972,
+          "loa_high": 15.460594501933857,
+          "r": 0.8534945636939082
+        },
+        "coverage": 1.0,
+        "recording": {
+          "n": 14,
+          "mae": 0.8989819436253919,
+          "rmse": 1.466688314982918,
+          "mape": 1.2505143915840904,
+          "bias": 0.23661670491828954,
+          "loa_low": -2.7075325555464334,
+          "loa_high": 3.1807659653830127,
+          "r": 0.9971065871439151
+        },
+        "status_counts": {
+          "ok": 13,
+          "degraded_capture": 1
+        },
+        "mean_usable_fraction": 0.853042194295986
+      }
+    }
+  },
+  "strata": {
+    "activity": {
+      "deep": {
+        "n": 558,
+        "mae": 2.3890806651964707,
+        "rmse": 7.817310699735238,
+        "mape": 3.4365661389511017,
+        "bias": 0.36837675626622185,
+        "loa_low": -14.950263383414429,
+        "loa_high": 15.687016895946874,
+        "r": 0.8495702158537588,
+        "n_recordings": 14
+      },
+      "reading": {
+        "n": 574,
+        "mae": 1.4558953155416825,
+        "rmse": 5.011001117704665,
+        "mape": 2.02066836343568,
+        "bias": 0.3463831479147453,
+        "loa_low": -9.46023231329075,
+        "loa_high": 10.152998609120239,
+        "r": 0.9492397290845349,
+        "n_recordings": 14
+      },
+      "stationary": {
+        "n": 579,
+        "mae": 0.7691516102434969,
+        "rmse": 3.7188377951029925,
+        "mape": 1.1823013125781716,
+        "bias": 0.373279724283222,
+        "loa_low": -6.88510140970152,
+        "loa_high": 7.631660858267964,
+        "r": 0.9739339467847168,
+        "n_recordings": 14
+      },
+      "talking": {
+        "n": 552,
+        "mae": 12.057555104693972,
+        "rmse": 20.67797191279327,
+        "mape": 16.785721846763504,
+        "bias": 7.403169642238535,
+        "loa_low": -30.473450686701522,
+        "loa_high": 45.279789971178594,
+        "r": 0.2925688879517888,
+        "n_recordings": 14
+      },
+      "watching": {
+        "n": 565,
+        "mae": 2.5279042879206273,
+        "rmse": 8.2608653781542,
+        "mape": 3.900425886524478,
+        "bias": 1.536147481695485,
+        "loa_low": -14.386842339559877,
+        "loa_high": 17.459137302950847,
+        "r": 0.844666242117697,
+        "n_recordings": 14
+      }
+    },
+    "has_hrv": {
+      "hr only": {
+        "n": 473,
+        "mae": 2.123348880229921,
+        "rmse": 6.349506886409612,
+        "mape": 2.4145587493744416,
+        "bias": -0.5237509818218371,
+        "loa_low": -12.939505104165622,
+        "loa_high": 11.892003140521947,
+        "r": 0.9152517307657682,
+        "n_recordings": 12
+      },
+      "hrv": {
+        "n": 2355,
+        "mae": 4.116272621974105,
+        "rmse": 11.510738137963777,
+        "mape": 5.982757028864218,
+        "bias": 2.472490149186815,
+        "loa_low": -19.566624715636248,
+        "loa_high": 24.511605014009877,
+        "r": 0.7409826939723013,
+        "n_recordings": 58
+      }
+    },
+    "trace": {
+      "POS r <= -0.6": {
+        "n": 2794,
+        "mae": 3.560840530658348,
+        "rmse": 10.353392634769387,
+        "mape": 5.085341715088858,
+        "bias": 1.7309675592981624,
+        "loa_low": -18.2796434567381,
+        "loa_high": 21.741578575334422,
+        "r": 0.7941877026805474,
+        "n_recordings": 69
+      },
+      "POS r > -0.6": {
+        "n": 34,
+        "mae": 22.03463536583366,
+        "rmse": 30.488049886382864,
+        "mape": 30.089245278561012,
+        "bias": 21.725197831004586,
+        "loa_low": -20.829905901479187,
+        "loa_high": 64.28030156348836,
+        "r": 0.3719307542783046,
+        "n_recordings": 1
+      }
+    }
+  },
+  "beat_reference_check": {
+    "n_recordings": 66,
+    "agreement": {
+      "n": 66,
+      "mae": 0.9676493053159555,
+      "rmse": 1.4844931227916993,
+      "mape": 1.2941761352761634,
+      "bias": -0.21514575066736602,
+      "loa_low": -3.1160936747443597,
+      "loa_high": 2.6858021734096273,
+      "r": 0.9957178970808555
+    }
+  },
+  "common_windows": {
+    "hr_physnet_v3": {
+      "primary": {
+        "n_windows_eligible": 2828,
+        "n_both": 2828,
+        "n_this_only": 0,
+        "n_other_only": 0,
+        "n_recordings": 70,
+        "this": {
+          "n": 2828,
+          "mae": 3.7829441460741755,
+          "rmse": 10.820318405231431,
+          "mape": 5.385954417054224,
+          "bias": 1.9713508086751135,
+          "loa_low": -18.885214139797274,
+          "loa_high": 22.827915757147498,
+          "r": 0.7783169876256182
+        },
+        "other": {
+          "n": 2828,
+          "mae": 3.404508057290515,
+          "rmse": 10.009217994002512,
+          "mape": 4.715943979937092,
+          "bias": 1.6994335687625919,
+          "loa_low": -17.637214336179138,
+          "loa_high": 21.036081473704325,
+          "r": 0.8130883412161076
+        }
+      },
+      "sensitivity": {
+        "n_windows_eligible": 2998,
+        "n_both": 2998,
+        "n_this_only": 0,
+        "n_other_only": 0,
+        "n_recordings": 70,
+        "this": {
+          "n": 2998,
+          "mae": 4.035552561694097,
+          "rmse": 11.172069320035344,
+          "mape": 5.740631357415037,
+          "bias": 2.115740881387738,
+          "loa_low": -19.388855929802524,
+          "loa_high": 23.620337692577998,
+          "r": 0.7652564733033819
+        },
+        "other": {
+          "n": 2998,
+          "mae": 3.686624019139165,
+          "rmse": 10.535242050276135,
+          "mape": 5.086957838192011,
+          "bias": 1.787128213517147,
+          "loa_low": -18.566079003984463,
+          "loa_high": 22.140335431018755,
+          "r": 0.7952454729739639
+        }
+      }
+    },
+    "hr_spectral": {
+      "primary": {
+        "n_windows_eligible": 2828,
+        "n_both": 2828,
+        "n_this_only": 0,
+        "n_other_only": 0,
+        "n_recordings": 70,
+        "this": {
+          "n": 2828,
+          "mae": 3.7829441460741755,
+          "rmse": 10.820318405231431,
+          "mape": 5.385954417054224,
+          "bias": 1.9713508086751135,
+          "loa_low": -18.885214139797274,
+          "loa_high": 22.827915757147498,
+          "r": 0.7783169876256182
+        },
+        "other": {
+          "n": 2828,
+          "mae": 1.4149820675219937,
+          "rmse": 5.186897762407418,
+          "mape": 1.7989336578639052,
+          "bias": -0.2979447619641531,
+          "loa_low": -10.449273271445543,
+          "loa_high": 9.853383747517237,
+          "r": 0.9459312433725849
+        }
+      },
+      "sensitivity": {
+        "n_windows_eligible": 2998,
+        "n_both": 2998,
+        "n_this_only": 0,
+        "n_other_only": 0,
+        "n_recordings": 70,
+        "this": {
+          "n": 2998,
+          "mae": 4.035552561694097,
+          "rmse": 11.172069320035344,
+          "mape": 5.740631357415037,
+          "bias": 2.115740881387738,
+          "loa_low": -19.388855929802524,
+          "loa_high": 23.620337692577998,
+          "r": 0.7652564733033819
+        },
+        "other": {
+          "n": 2998,
+          "mae": 1.5711442421905861,
+          "rmse": 5.620622482848657,
+          "mape": 1.9940827766188436,
+          "bias": -0.3644989672403519,
+          "loa_low": -11.35956340838495,
+          "loa_high": 10.630565473904248,
+          "r": 0.9367190037985367
+        }
+      }
+    }
+  },
+  "provenance": {
+    "command": [
+      "check_rice_ippg.py",
+      "--crop",
+      "frames_clamped",
+      "--crop",
+      "frames",
+      "--device",
+      "cuda"
+    ],
+    "git": {
+      "commit": "f9be3e426b5a1ec4abe36958cc8a46c2f398d456",
+      "dirty": true,
+      "changed": [
+        ".gitignore"
+      ]
+    },
+    "weights": {
+      "file": "phase_3_physnet_v2_baseline_best.zip",
+      "sha256": "f30fae250fb948e2aaece9aae5ec2d77fcc438d7ef1abbe54ae878a7eecee6b8",
+      "bytes": 3106459
+    },
+    "written_utc": "2026-10-27T03:40:30+00:00"
+  }
+}

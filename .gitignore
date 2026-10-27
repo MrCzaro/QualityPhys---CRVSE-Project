@@ -49,6 +49,8 @@ Data/ubfc_phys_eval/*
 !Data/ubfc_phys_eval/summary_*.json
 Data/vitalvideos_eval/*
 !Data/vitalvideos_eval/summary_*.json
+Data/rice_ippg_eval/*
+!Data/rice_ippg_eval/summary_*.json
 Data/ecg_fitness_eval/*
 !Data/ecg_fitness_eval/summary_*.json
 Data/motion_gate/*
