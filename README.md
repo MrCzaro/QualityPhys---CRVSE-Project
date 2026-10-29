@@ -279,6 +279,8 @@ cross-check added on evidence gathered while validating it.
 | UBFC-Phys | held-out evaluation: rest, speech and arithmetic tasks | per request / registration |
 | ECG-Fitness | refusal benchmark only, never trained on: exercise, high heart rate | signed request, no redistribution |
 | VitalVideos-WW | training + held-out evaluation, frozen 240/60 split | per request, academic and commercial separate |
+| Rice iPPG (HRVCam) | evaluation only, forced readings: heart rate, and pulse-rate variability (exploratory) | download; citation required, no redistribution |
+| MR-NIRP Indoor | evaluation only, forced readings: a second session, mostly on the Rice camera | request form; citation required, no redistribution |
 
 Raw datasets are external materials and the repository licence grants no rights to
 redistribute them. See `docs/data_sources.md` for the boundary, per-dataset terms, and

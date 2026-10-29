@@ -6,10 +6,9 @@ citation requirements, access rules, or redistribution limits.
 
 ## Summary
 
-The project uses seven rPPG datasets. Four entered in Phase 2 (UBFC-rPPG, UBFC-Phys,
-MCD-rPPG, ECG-Fitness) and three in Phase 3 (DLCN, PhysDrive, VitalVideos-Worldwide).
-The roles below are the Phase-3 ones; each section under Dataset Roles also records
-how the dataset was used before.
+The project uses nine rPPG datasets. Four entered in Phase 2 (UBFC-rPPG, UBFC-Phys,
+MCD-rPPG, ECG-Fitness) and five in Phase 3 (DLCN, PhysDrive, VitalVideos-Worldwide, and
+two Rice University sets used for evaluation only, Rice iPPG and MR-NIRP Indoor). The roles below are the Phase-3 ones; each section under Dataset Roles also records how the dataset was used before.
 
 | Dataset | Project role | Current app interpretation |
 | --- | --- | --- |
@@ -19,7 +18,8 @@ how the dataset was used before.
 | VitalVideos-Worldwide | Training corpus with a frozen 240/60 subject split; so far evaluated zero-shot only | Still/seated evidence across Fitzpatrick skin types, confounded with recording site. |
 | UBFC-Phys | Held-out cross-dataset evaluation; never trained on | Still/seated evidence at rest and under speech and arithmetic stress tasks. |
 | PhysDrive | Zero-shot in-vehicle benchmark | Outside the app's scope; documents a failure mode. |
-| ECG-Fitness | Refusal benchmark only; never trained on | Tests whether the app declines or flags exercise captures. Not part of the still/seated support claim. |
+| ECG-Fitness | Refusal benchmark only; never trained on | Tests whether the app declines or flags exercise captures. Not part of the still/seated support claim. | Rice iPPG (HRVCam) | Evaluation only; never trained on. Held-out heart rate, and the discovery set for pulse-rate variability | One fixed laboratory camera. The app's framing gate refuses all 70 recordings, so every figure is a forced reading of the method, not something the app reports. |
+| MR-NIRP Indoor | Evaluation only; never trained on. A second recording session, mostly on the Rice camera | Still and mildly moving heads on the same laboratory rig. The framing gate refuses 13 of 15 recordings. |
 
 ## Required Citations
 
@@ -123,6 +123,35 @@ earlier release, VitalVideos-Europe (arXiv:2306.11891), is a distinct dataset.
 Distribution: https://vitalvideos.org/
 
 ## Dataset Roles
+
+### Rice iPPG (HRVCam)
+
+> A. Pai, A. Veeraraghavan, A. Sabharwal. "HRVCam: robust camera-based measurement
+> of heart rate variability." *Journal of Biomedical Optics*, 26(2):022707, 2021.
+> doi:10.1117/1.JBO.26.2.022707
+
+This is the citation the dataset's README requires for any use. The same README asks
+that participant 12's images never be used for illustration, in papers or
+presentations; this project shows no frame of any participant.
+
+Distributed by Rice University as the "Imaging Photoplethysmography Dataset": 14
+subjects, five two-minute activities each, with a CMS 50D+ finger pulse oximeter as the
+reference.
+
+### MR-NIRP Indoor
+
+> E. M. Nowara, T. K. Marks, H. Mansour, A. Veeraraghavan. "SparsePPG: Towards
+> Driver Monitoring Using Camera-Based Vital Signs Estimation in Near-Infrared."
+> *Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition
+> Workshops (CVPRW)*, 2018, pp. 1272-1281.
+
+The MERL-Rice Near-Infrared Pulse (MR-NIRP) Indoor dataset's README asks for this
+citation. It also asks that any comparison with SparsePPG use the table of results in
+the README, which covers the eight released subjects, rather than the paper's figures,
+which used an earlier twelve-subject version. This project makes no such comparison.
+
+Paper: https://openaccess.thecvf.com/content_cvpr_2018_workshops/w27/html/Nowara_SparsePPG_Towards_Driver_CVPR_2018_paper.html
+
 
 ### UBFC-rPPG
 
@@ -259,6 +288,64 @@ Project artifacts include:
 - `Data/vitalvideos_eval/summary_*.json`; the per-recording evaluation tables carry
   participant age, sex and skin type and are not committed
 
+### Rice iPPG (HRVCam)
+
+Rice iPPG entered in Phase 3 as an evaluation-only set (NB_P3_33 exploration, NB_P3_34
+store), acquired for the project's heart-rate variability work. Its 70 recordings are 14
+subjects in five two-minute activities: stationary with normal breathing, reading a web
+page, watching a video, talking, and deep breathing paced at about 5.5 breaths per
+minute. One camera recorded all of them, a Blackfly BFLY-U3-23S6C under white LED flood
+lights. The reference is a finger pulse oximeter sampled at 60 Hz, so what can be
+measured against it is pulse-rate variability, not ECG-based heart-rate variability. It
+carries heart rate in all 70 recordings and variability in 58.
+
+It is evaluated for heart rate (`check_rice_ippg`) and pulse-rate variability
+(`check_rice_hrv`). The faces fill 60-95% of the frame height, so the app's framing gate
+refuses all 70 recordings: every figure is a forced reading of the method, not something
+the app reports. Its variability results are the project's discovery set and stay
+exploratory until an independent set confirms them. The store carries no training
+label, so no training loader can pick it up.
+
+Access route: downloaded from the Rice research group's distribution link. No licence
+text accompanies it beyond the citation and the participant-12 request, so it is treated
+as not redistributable.
+
+Citation required: Pai et al., *Journal of Biomedical Optics*, 2021 (see Required
+Citations).
+
+Project artifacts include:
+
+- `Data/processing_log_rice_ippg_phase3.csv`
+- `Data/rice_ippg_eval/summary_*.json` and `Data/rice_hrv_eval/summary_*.json`; the
+  per-recording tables are not committed
+
+### MR-NIRP Indoor
+
+MR-NIRP Indoor entered in Phase 3 as an evaluation-only set (NB_P3_35 exploration,
+NB_P3_36 store). It holds 15 recordings of 8 subjects with a finger pulse oximeter of
+the same model as Rice's: for each subject a still recording of three to four minutes
+and one of about a minute with head motion, except one subject with no motion
+recording. Its near-infrared frames were not kept. Seven of the subjects were recorded
+on the same Blackfly camera unit as Rice iPPG, through the same recorder, so for them it
+is a second recording session rather than a second camera; subject 6 was recorded on a
+Point Grey Flea3.
+
+Its role is a descriptive replication of the Rice results: seven still recordings are
+long enough to carry variability. The faces fill 57-79% of the frame height, so the
+framing gate refuses 13 of the 15 recordings and warns on the other two, and every
+figure is a forced reading. Heart rate read by POS lies within 1.7 bpm of the reference
+in all 15 recordings. The store keeps the app's 8-bit crop and, beside it, the
+full-depth colour trace of the same region, and it carries no training label.
+
+Access route: downloaded from the Rice research group's distribution link. No licence
+text accompanies it beyond the citation, so it is treated
+as not redistributable.
+
+Citation required: Nowara et al., *CVPR Workshops*, 2018 (see Required Citations).
+
+Project artifact: `Data/processing_log_mrnirp_indoor_phase3.csv`.
+
+
 ## Derived Artifacts
 
 The `Data/` directory contains derived logs and audit CSV files, including:
@@ -299,6 +386,8 @@ It does not automatically license:
 - raw DLCN data
 - raw PhysDrive data
 - raw VitalVideos data
+- raw Rice iPPG data
+- raw MR-NIRP data Indoor 
 - HDF5 corpora derived from restricted datasets
 - pretrained checkpoints from third parties
 - MediaPipe model assets
@@ -318,6 +407,10 @@ the most restricted: it is licensed per request, separately for academic and
 commercial use, and its academic terms must stay walled off from any commercial
 version of this project. The same caution applies to PhysDrive. Confirm current
 terms with each provider before any release.
+
+Rice iPPG and MR-NIRP Indoor came from Rice University. Neither states a licence beyond
+its request for citation, and Rice iPPG adds that participant 12's images must not be
+used for illustration. 
 
 DLCN was obtained from its open-access Kaggle release rather than by the email
 request its repository describes for raw data, so no separate release agreement was
@@ -372,3 +465,7 @@ validated clinical measurement system
 The ECG-Fitness benchmark does not change this. It measures whether the app refuses
 or flags exercise captures; a good result there supports the refusal behavior, not
 an exercise claim.
+
+Nor do the Rice iPPG and MR-NIRP Indoor evaluations. The app's framing gate refuses
+nearly all of their recordings, so their figures describe the method under forced
+readings, not what the app reports.
