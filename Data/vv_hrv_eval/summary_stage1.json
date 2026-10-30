@@ -1,0 +1,177 @@
+{
+  "dataset": "VitalVideos-WW",
+  "stage": 1,
+  "store": "D:\\QualityPhys\\phase 3 datasets\\vitalvideos_phase3_rc_none.h5",
+  "limit": null,
+  "status_estimator": "hr_physnet_v2",
+  "settings": {
+    "qrs_band_hz": [
+      5.0,
+      20.0
+    ],
+    "energy_window_s": 0.15,
+    "r_spacing": 0.55,
+    "r_energy_share": 0.3,
+    "r_search_s": 0.08,
+    "ptt_window_s": [
+      0.08,
+      0.45
+    ],
+    "ref_min_kept_share": 0.9,
+    "min_span_intervals": 30,
+    "tolerance": 0.1,
+    "tolerance_reported": 0.2,
+    "bar_lower_bound": 0.5
+  },
+  "not_rerun": [
+    "second face",
+    "face outside the held box"
+  ],
+  "n_recordings": 300,
+  "funnel": {
+    "capture_not_rejected": 266,
+    "reported_by_v2": 276,
+    "accepted": 243,
+    "accepted_unflagged": 238,
+    "primary": 236
+  },
+  "capture_rejected": {
+    "framing": 33,
+    "rate": 0,
+    "motion": 0,
+    "face": 1
+  },
+  "statuses": {
+    "degraded_capture": 24,
+    "insufficient_quality": 24,
+    "ok": 252
+  },
+  "reference": {
+    "ecg_usable": 295,
+    "ecg_usable_among_accepted_unflagged": 236,
+    "negative_leads": 4,
+    "hr_against_audit": {
+      "n": 300,
+      "median_abs_bpm": 0.0627774088759594,
+      "within_1_bpm": 0.9766666666666667,
+      "over_2_bpm": 5
+    },
+    "paired_share": {
+      "q10": 0.9850520126639529,
+      "median": 1.0
+    },
+    "recordings_paired_95": 297,
+    "ptt_median_ms": {
+      "q25": 235.271183195636,
+      "median": 248.3315735377327,
+      "q75": 263.9215086371862
+    },
+    "ptt_iqr_ms_median": 4.029891672572061
+  },
+  "floor": {
+    "sdnn": {
+      "n": 236,
+      "median": 0.014044570453304428,
+      "median_abs": 0.020365370083351486,
+      "within_10": 0.9364406779661016,
+      "within_10_low": 0.8977933083827405,
+      "within_10_high": 0.9611074044500433,
+      "within_10_outcome": "confirmed",
+      "within_20": 0.9703389830508474
+    },
+    "rmssd": {
+      "n": 236,
+      "median": 0.010982396456699961,
+      "median_abs": 0.03849924215844841,
+      "within_10": 0.7966101694915254,
+      "within_10_low": 0.7406967168616877,
+      "within_10_high": 0.8430222141897189,
+      "within_10_outcome": "confirmed",
+      "within_20": 0.9067796610169492
+    },
+    "reference_sdnn_ms": {
+      "q25": 14.242634091941543,
+      "median": 23.771968607792857,
+      "q75": 32.82569286457613
+    }
+  },
+  "self_test": {
+    "sdnn": {
+      "n": 236,
+      "median": 0.0,
+      "median_abs": 0.0,
+      "within_10": 1.0,
+      "within_10_low": 0.9839833409152282,
+      "within_10_high": 1.0,
+      "within_10_outcome": "confirmed",
+      "within_20": 1.0
+    },
+    "rmssd": {
+      "n": 236,
+      "median": 0.0,
+      "median_abs": 0.0,
+      "within_10": 1.0,
+      "within_10_low": 0.9839833409152282,
+      "within_10_high": 1.0,
+      "within_10_outcome": "confirmed",
+      "within_20": 1.0
+    }
+  },
+  "strata": {
+    "fitzpatrick_group": {
+      "1-2": 78,
+      "3-4": 79,
+      "5-6": 79
+    },
+    "site_group": {
+      "CH*": 70,
+      "CRC/SCH/BET": 83,
+      "MOL/RING": 83
+    },
+    "age_band": {
+      "41-60": 110,
+      "<=40": 79,
+      ">60": 47
+    },
+    "ecg_sdnn_terciles": {
+      "cuts": [
+        17.828441526103333,
+        29.73209391696718
+      ],
+      "counts": [
+        79,
+        78,
+        79
+      ]
+    },
+    "qc_pos_bvp_r_terciles": {
+      "cuts": [
+        -0.8475013083159053,
+        -0.7588309270069545
+      ],
+      "counts": [
+        79,
+        78,
+        79
+      ]
+    }
+  },
+  "provenance": {
+    "command": [
+      "check_vv_hrv.py",
+      "--device",
+      "cuda"
+    ],
+    "git": {
+      "commit": "f07611ec40f66d9ea3e95f9e841f0602d809c6c4",
+      "dirty": false,
+      "changed": []
+    },
+    "weights": {
+      "file": "phase_3_physnet_v2_baseline_best.zip",
+      "sha256": "f30fae250fb948e2aaece9aae5ec2d77fcc438d7ef1abbe54ae878a7eecee6b8",
+      "bytes": 3106459
+    },
+    "written_utc": "2026-10-30T08:15:11+00:00"
+  }
+}
