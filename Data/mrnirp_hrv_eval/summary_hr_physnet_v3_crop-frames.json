@@ -1,0 +1,566 @@
+{
+  "estimator": "hr_physnet_v3",
+  "dataset": "MR-NIRP-Indoor",
+  "crop": "frames",
+  "store": "D:\\QualityPhys\\phase 3 benchmarks\\mrnirp_indoor_phase3_rc_none.h5",
+  "device": "cuda",
+  "activities": [
+    "still",
+    "motion"
+  ],
+  "limit": null,
+  "confounds": [
+    "the app's framing gate refuses 13 of the 15 recordings and warns on the other two: these are forced readings",
+    "seven subjects were recorded on the camera unit that recorded Rice iPPG, subject 6 on a Flea3: a second recording session, not a second camera",
+    "only the 7 still recordings carry a variability reference; the motion recordings last about a minute and enter only the all-recordings figures",
+    "06/still's reference stops 14.3 s before its last frame, and it carries no variability reference",
+    "the camera-to-finger offset mixes both devices' latencies with the pulse's travel; a constant offset cannot change an interval, so it does not affect variability",
+    "the reference is a 60 Hz finger waveform from the same oximeter model as Rice's"
+  ],
+  "settings": {
+    "clip_len": 160,
+    "beat_band_hz": [
+      0.7,
+      3.5
+    ],
+    "beat_spacing": 0.55,
+    "ibi_local_tol": 0.25,
+    "span_s": 60.0,
+    "min_span_intervals": 30,
+    "match_tolerance_s": 0.15,
+    "inverted": false
+  },
+  "hrv_recordings": 7,
+  "set_aside": [
+    "01_motion",
+    "02_motion",
+    "03_motion",
+    "04_motion",
+    "06_motion",
+    "06_still",
+    "07_motion",
+    "08_motion"
+  ],
+  "all_recordings": {
+    "n_recordings": 15,
+    "beats": {
+      "matched": {
+        "n": 15,
+        "median": 0.6541666666666667,
+        "q1": 0.5690020549704597,
+        "q3": 0.8407497303128371
+      },
+      "timing_ms": {
+        "n": 15,
+        "median": 29.517242497939744,
+        "q1": 12.544243079801731,
+        "q3": 58.571560501507136
+      },
+      "beats_per_reference": {
+        "n": 15,
+        "median": 0.982532751091703,
+        "q1": 0.9670307443365695,
+        "q3": 0.995850622406639
+      },
+      "offset_ms": {
+        "n": 15,
+        "median": -27.49999999999947,
+        "q1": -39.99999999999948,
+        "q3": -3.7499999999994476
+      },
+      "offset_gap_ms": {
+        "n": 15,
+        "median": 57.60006110890892,
+        "q1": 18.899062916241327,
+        "q3": 94.9378069384803
+      }
+    },
+    "whole": {
+      "n_spans": 15,
+      "sdnn": {
+        "n": 15,
+        "median": 0.02318498615765674,
+        "median_abs": 0.18256245491849277,
+        "within_10": 0.4666666666666667,
+        "within_20": 0.5333333333333333
+      },
+      "rmssd": {
+        "n": 15,
+        "median": 0.1196685363621588,
+        "median_abs": 0.1688243472188924,
+        "within_10": 0.3333333333333333,
+        "within_20": 0.6
+      },
+      "jitter_sdnn_ms": {
+        "n": 11,
+        "median": 34.80764099454298,
+        "q1": 10.97905185873514,
+        "q3": 48.5158009508517
+      },
+      "jitter_rmssd_ms": {
+        "n": 14,
+        "median": 15.435864135376907,
+        "q1": 7.083225124222718,
+        "q3": 29.78276615084264
+      },
+      "reference_rmssd_ms": {
+        "n": 15,
+        "median": 43.303615373754965,
+        "q1": 38.77375865872251,
+        "q3": 74.00098195575886
+      }
+    },
+    "first 60 s": {
+      "n_spans": 15,
+      "sdnn": {
+        "n": 15,
+        "median": 0.036540407984451795,
+        "median_abs": 0.03727662332352555,
+        "within_10": 0.5333333333333333,
+        "within_20": 0.6
+      },
+      "rmssd": {
+        "n": 15,
+        "median": 0.21613818441199517,
+        "median_abs": 0.21613818441199517,
+        "within_10": 0.26666666666666666,
+        "within_20": 0.4666666666666667
+      },
+      "jitter_sdnn_ms": {
+        "n": 13,
+        "median": 32.74572426098129,
+        "q1": 10.129442111088713,
+        "q3": 39.56165235290202
+      },
+      "jitter_rmssd_ms": {
+        "n": 15,
+        "median": 13.322130032672886,
+        "q1": 10.125477503377244,
+        "q3": 28.88853227327168
+      },
+      "reference_rmssd_ms": {
+        "n": 15,
+        "median": 49.07631318419857,
+        "q1": 40.680704837867864,
+        "q3": 72.23741649400637
+      }
+    },
+    "last 60 s": {
+      "n_spans": 15,
+      "sdnn": {
+        "n": 15,
+        "median": 0.05608840145557492,
+        "median_abs": 0.18165283685001898,
+        "within_10": 0.4666666666666667,
+        "within_20": 0.5333333333333333
+      },
+      "rmssd": {
+        "n": 15,
+        "median": 0.13678505717617084,
+        "median_abs": 0.13678505717617084,
+        "within_10": 0.4666666666666667,
+        "within_20": 0.6
+      },
+      "jitter_sdnn_ms": {
+        "n": 10,
+        "median": 34.82031773423949,
+        "q1": 14.095132558699456,
+        "q3": 52.89135439337707
+      },
+      "jitter_rmssd_ms": {
+        "n": 11,
+        "median": 22.435071319277203,
+        "q1": 8.493862983950521,
+        "q3": 31.247953027421516
+      },
+      "reference_rmssd_ms": {
+        "n": 15,
+        "median": 42.85894986906963,
+        "q1": 37.612896824958426,
+        "q3": 66.8640767050104
+      }
+    }
+  },
+  "hrv_set": {
+    "n_recordings": 7,
+    "beats": {
+      "matched": {
+        "n": 7,
+        "median": 0.6666666666666666,
+        "q1": 0.6525866890380313,
+        "q3": 0.7483684486162028
+      },
+      "timing_ms": {
+        "n": 7,
+        "median": 10.755879495775389,
+        "q1": 8.73883221866123,
+        "q3": 29.847054809178708
+      },
+      "beats_per_reference": {
+        "n": 7,
+        "median": 0.9865771812080537,
+        "q1": 0.9810099652894413,
+        "q3": 0.989600622406639
+      },
+      "offset_ms": {
+        "n": 7,
+        "median": -22.499999999999464,
+        "q1": -43.74999999999949,
+        "q3": -21.249999999999464
+      },
+      "offset_gap_ms": {
+        "n": 7,
+        "median": 23.360447364879633,
+        "q1": 13.693430999561329,
+        "q3": 58.654357609715824
+      }
+    },
+    "whole": {
+      "n_spans": 7,
+      "sdnn": {
+        "n": 7,
+        "median": 0.008698638682237414,
+        "median_abs": 0.014139035166604641,
+        "within_10": 0.8571428571428571,
+        "within_20": 0.8571428571428571
+      },
+      "rmssd": {
+        "n": 7,
+        "median": 0.08980575323763973,
+        "median_abs": 0.08980575323763973,
+        "within_10": 0.5714285714285714,
+        "within_20": 0.8571428571428571
+      },
+      "jitter_sdnn_ms": {
+        "n": 4,
+        "median": 7.877087579799827,
+        "q1": 6.184944360694798,
+        "q3": 12.96372511954103
+      },
+      "jitter_rmssd_ms": {
+        "n": 7,
+        "median": 7.315589240256406,
+        "q1": 5.990159089692745,
+        "q3": 10.564672615541625
+      },
+      "reference_rmssd_ms": {
+        "n": 7,
+        "median": 41.36374932576311,
+        "q1": 36.56222531683276,
+        "q3": 56.08200857716352
+      }
+    },
+    "first 60 s": {
+      "n_spans": 7,
+      "sdnn": {
+        "n": 7,
+        "median": 0.01934059293984758,
+        "median_abs": 0.01981831473506168,
+        "within_10": 0.8571428571428571,
+        "within_20": 0.8571428571428571
+      },
+      "rmssd": {
+        "n": 7,
+        "median": 0.15019559263492543,
+        "median_abs": 0.15019559263492543,
+        "within_10": 0.2857142857142857,
+        "within_20": 0.5714285714285714
+      },
+      "jitter_sdnn_ms": {
+        "n": 5,
+        "median": 10.129442111088713,
+        "q1": 7.872879109090398,
+        "q3": 10.85720294923148
+      },
+      "jitter_rmssd_ms": {
+        "n": 7,
+        "median": 11.254419847755909,
+        "q1": 10.125477503377244,
+        "q3": 13.310919603588914
+      },
+      "reference_rmssd_ms": {
+        "n": 7,
+        "median": 47.15037222998377,
+        "q1": 40.14924203862819,
+        "q3": 58.7142034242396
+      }
+    },
+    "last 60 s": {
+      "n_spans": 7,
+      "sdnn": {
+        "n": 7,
+        "median": -0.006132880220408254,
+        "median_abs": 0.043698372319532774,
+        "within_10": 0.8571428571428571,
+        "within_20": 0.8571428571428571
+      },
+      "rmssd": {
+        "n": 7,
+        "median": 0.04485528835980923,
+        "median_abs": 0.0766200941923032,
+        "within_10": 0.7142857142857143,
+        "within_20": 0.8571428571428571
+      },
+      "jitter_sdnn_ms": {
+        "n": 3,
+        "median": 6.674364338111328,
+        "q1": 6.15139331733249,
+        "q3": 12.68219269259092
+      },
+      "jitter_rmssd_ms": {
+        "n": 4,
+        "median": 8.493862983950521,
+        "q1": 4.831359236914661,
+        "q3": 13.783370123916882
+      },
+      "reference_rmssd_ms": {
+        "n": 7,
+        "median": 38.785148610903505,
+        "q1": 33.76648491261831,
+        "q3": 49.981195562115374
+      }
+    }
+  },
+  "by_activity": {
+    "still": {
+      "n_recordings": 7,
+      "beats": {
+        "matched": {
+          "n": 7,
+          "median": 0.6666666666666666,
+          "q1": 0.6525866890380313,
+          "q3": 0.7483684486162028
+        },
+        "timing_ms": {
+          "n": 7,
+          "median": 10.755879495775389,
+          "q1": 8.73883221866123,
+          "q3": 29.847054809178708
+        },
+        "beats_per_reference": {
+          "n": 7,
+          "median": 0.9865771812080537,
+          "q1": 0.9810099652894413,
+          "q3": 0.989600622406639
+        },
+        "offset_ms": {
+          "n": 7,
+          "median": -22.499999999999464,
+          "q1": -43.74999999999949,
+          "q3": -21.249999999999464
+        },
+        "offset_gap_ms": {
+          "n": 7,
+          "median": 23.360447364879633,
+          "q1": 13.693430999561329,
+          "q3": 58.654357609715824
+        }
+      },
+      "whole": {
+        "n_spans": 7,
+        "sdnn": {
+          "n": 7,
+          "median": 0.008698638682237414,
+          "median_abs": 0.014139035166604641,
+          "within_10": 0.8571428571428571,
+          "within_20": 0.8571428571428571
+        },
+        "rmssd": {
+          "n": 7,
+          "median": 0.08980575323763973,
+          "median_abs": 0.08980575323763973,
+          "within_10": 0.5714285714285714,
+          "within_20": 0.8571428571428571
+        },
+        "jitter_sdnn_ms": {
+          "n": 4,
+          "median": 7.877087579799827,
+          "q1": 6.184944360694798,
+          "q3": 12.96372511954103
+        },
+        "jitter_rmssd_ms": {
+          "n": 7,
+          "median": 7.315589240256406,
+          "q1": 5.990159089692745,
+          "q3": 10.564672615541625
+        },
+        "reference_rmssd_ms": {
+          "n": 7,
+          "median": 41.36374932576311,
+          "q1": 36.56222531683276,
+          "q3": 56.08200857716352
+        }
+      },
+      "first 60 s": {
+        "n_spans": 7,
+        "sdnn": {
+          "n": 7,
+          "median": 0.01934059293984758,
+          "median_abs": 0.01981831473506168,
+          "within_10": 0.8571428571428571,
+          "within_20": 0.8571428571428571
+        },
+        "rmssd": {
+          "n": 7,
+          "median": 0.15019559263492543,
+          "median_abs": 0.15019559263492543,
+          "within_10": 0.2857142857142857,
+          "within_20": 0.5714285714285714
+        },
+        "jitter_sdnn_ms": {
+          "n": 5,
+          "median": 10.129442111088713,
+          "q1": 7.872879109090398,
+          "q3": 10.85720294923148
+        },
+        "jitter_rmssd_ms": {
+          "n": 7,
+          "median": 11.254419847755909,
+          "q1": 10.125477503377244,
+          "q3": 13.310919603588914
+        },
+        "reference_rmssd_ms": {
+          "n": 7,
+          "median": 47.15037222998377,
+          "q1": 40.14924203862819,
+          "q3": 58.7142034242396
+        }
+      },
+      "last 60 s": {
+        "n_spans": 7,
+        "sdnn": {
+          "n": 7,
+          "median": -0.006132880220408254,
+          "median_abs": 0.043698372319532774,
+          "within_10": 0.8571428571428571,
+          "within_20": 0.8571428571428571
+        },
+        "rmssd": {
+          "n": 7,
+          "median": 0.04485528835980923,
+          "median_abs": 0.0766200941923032,
+          "within_10": 0.7142857142857143,
+          "within_20": 0.8571428571428571
+        },
+        "jitter_sdnn_ms": {
+          "n": 3,
+          "median": 6.674364338111328,
+          "q1": 6.15139331733249,
+          "q3": 12.68219269259092
+        },
+        "jitter_rmssd_ms": {
+          "n": 4,
+          "median": 8.493862983950521,
+          "q1": 4.831359236914661,
+          "q3": 13.783370123916882
+        },
+        "reference_rmssd_ms": {
+          "n": 7,
+          "median": 38.785148610903505,
+          "q1": 33.76648491261831,
+          "q3": 49.981195562115374
+        }
+      }
+    },
+    "motion": {
+      "n_recordings": 0,
+      "beats": {
+        "matched": {
+          "n": 0
+        },
+        "timing_ms": {
+          "n": 0
+        },
+        "beats_per_reference": {
+          "n": 0
+        },
+        "offset_ms": {
+          "n": 0
+        },
+        "offset_gap_ms": {
+          "n": 0
+        }
+      },
+      "whole": {
+        "n_spans": 0,
+        "sdnn": {
+          "n": 0
+        },
+        "rmssd": {
+          "n": 0
+        },
+        "jitter_sdnn_ms": {
+          "n": 0
+        },
+        "jitter_rmssd_ms": {
+          "n": 0
+        },
+        "reference_rmssd_ms": {
+          "n": 0
+        }
+      },
+      "first 60 s": {
+        "n_spans": 0,
+        "sdnn": {
+          "n": 0
+        },
+        "rmssd": {
+          "n": 0
+        },
+        "jitter_sdnn_ms": {
+          "n": 0
+        },
+        "jitter_rmssd_ms": {
+          "n": 0
+        },
+        "reference_rmssd_ms": {
+          "n": 0
+        }
+      },
+      "last 60 s": {
+        "n_spans": 0,
+        "sdnn": {
+          "n": 0
+        },
+        "rmssd": {
+          "n": 0
+        },
+        "jitter_sdnn_ms": {
+          "n": 0
+        },
+        "jitter_rmssd_ms": {
+          "n": 0
+        },
+        "reference_rmssd_ms": {
+          "n": 0
+        }
+      }
+    }
+  },
+  "provenance": {
+    "command": [
+      "check_rice_hrv.py",
+      "--dataset",
+      "mrnirp",
+      "--device",
+      "cuda"
+    ],
+    "git": {
+      "commit": "a4660aa2e9e8c24411c463d94777ece3c844ba7e",
+      "dirty": true,
+      "changed": [
+        ".gitignore",
+        "Data/rice_hrv_eval/summary_hr_physnet_v2_crop-frames_clamped.json",
+        "Data/rice_hrv_eval/summary_hr_physnet_v3_crop-frames_clamped.json",
+        "Data/rice_hrv_eval/summary_hr_spectral_crop-frames_clamped.json",
+        "app/live_vitals/scripts/check_rice_hrv.py"
+      ]
+    },
+    "weights": {
+      "file": "phase_3_physnet_v3_A_seed42_last_bn.zip",
+      "sha256": "3fab82a89f4863a70c18ddb3d8f8f7cbc0d923adf65f85b2d0aeaa56895e0600",
+      "bytes": 3105630
+    },
+    "written_utc": "2026-10-30T05:21:47+00:00"
+  }
+}

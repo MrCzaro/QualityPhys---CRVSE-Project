@@ -1,4 +1,4 @@
-"""Beat timing and heart-rate variability from video, on the Rice iPPG (HRVCam) store.
+"""Beat timing and pulse-rate variability from video, on the Rice iPPG or MR-NIRP Indoor store.
 
 The earlier HRV measurement ran on MCD-rPPG, whose reference was never recorded for HRV: a
 100 Hz contact PPG with a resting RMSSD of 20-27 ms, where 46 ms of camera jitter leaves
@@ -6,6 +6,12 @@ nothing to measure. Rice was acquired for this question. Its reference is a fing
 oximeter worn throughout, its beats are timed to well under a millisecond after sub-sample
 refinement, resting RMSSD is 40 ms in the median subject, and the protocol includes paced
 deep breathing, which drives a large slow swing that any beat-timing method should recover.
+
+`--dataset mrnirp` scores MR-NIRP Indoor the same way: 15 recordings of 8 subjects, one still
+and one with head motion each (one subject has no motion recording), recorded mostly on the
+camera unit that recorded Rice, with a finger oximeter of the same model. Its store carries
+every field read here under the same names, and its one crop, `frames`, is the app's clamped
+crop. Seven still recordings carry a variability reference. Rice is the default.
 
 What this scores, per estimator, against the store's own reference beats:
 
@@ -25,32 +31,36 @@ reference are compared on the same terms NB_P3_33 settled:
   from the steepest point of the upstroke refined between samples - not the systolic peak,
   which moves between the systolic and diastolic waves in seven recordings;
 - each recording's camera-to-finger offset (`offset_ms`);
-- which references carry HRV at all (`has_hrv`): 58 of 70, the rest set aside for a doubted
-  clock or too few intervals, and reported separately here.
+- which references carry HRV at all (`has_hrv`): 58 of 70 on Rice and 7 of 15 on MR-NIRP,
+  the rest set aside for a doubted clock or too few intervals, and reported separately here.
 
 The camera's beats use the same fiducial as the reference. POS is inverted first, because it
-correlates negatively with the stored label in all 70 recordings; PhysNet is not, because it
-was trained to match that label. A reconstruction is built by taking the central stride of
-each window, never by overlap-adding: separate windows carry no shared phase, and the
-estimator's own `waveform` concatenates overlapping windows, so its time axis runs long.
+correlates negatively with the stored label in every recording of both stores; PhysNet is not,
+because it was trained to match that label. A reconstruction is built by taking the central
+stride of each window, never by overlap-adding: separate windows carry no shared phase, and
+the estimator's own `waveform` concatenates overlapping windows, so its time axis runs long.
 
-Three caveats hold for every figure, and are written into every summary:
+Each dataset's caveats are written into every summary (`DATASETS` below). For Rice:
 
 - **the app's framing gate refuses all 70 recordings**, so these are forced readings;
 - talking is reported on its own, never pooled;
 - the camera-to-finger offset mixes both devices' latencies with the pulse's travel, which
   does not matter for variability: a constant offset cannot change an interval.
 
+MR-NIRP Indoor's framing gate refuses 13 of its 15 recordings, so its figures are forced
+readings too.
+
 Region fusion - timing three skin patches separately and fusing them, which NB_P3_33 part 3
 found halves the jitter - is not here yet. The store carries `region_rgb` for it.
 
 Usage:
-    python -m app.live_vitals.scripts.check_rice_hrv [--estimator NAME ...] [--crop NAME]
-        [--activities stationary talking ...] [--store PATH] [--device cpu|cuda]
-        [--limit N] [--out-dir DIR]
+    python -m app.live_vitals.scripts.check_rice_hrv [--dataset rice|mrnirp]
+        [--estimator NAME ...] [--crop NAME] [--activities stationary talking ...]
+        [--store PATH] [--device cpu|cuda] [--limit N] [--out-dir DIR]
 
 No frames are rendered or written. The store is read-only.
 """
+
 import argparse
 import json
 import sys
@@ -74,13 +84,11 @@ from app.live_vitals.scripts.check_hrv_from_video import (ANCHOR_HALF_WIDTH_S, M
                                                           nearest_gaps, pooled_offset)
 from app.live_vitals.scripts.check_hrv_sampling_ceiling import (bandpass, dominant_period,
                                                                 refine)
-from app.live_vitals.scripts.check_rice_ippg import (ACTIVITIES, CROPS, DATASET, DEFAULT_CROP,
-                                                     DEFAULT_STORE)
+from app.live_vitals.scripts import check_rice_ippg as rice
 from app.live_vitals.scripts.check_ubfc_phys import _plain, _write_csv
 from app.live_vitals.signal.spectral import pos, rgb_trace
 from scipy.signal import find_peaks
 
-DEFAULT_OUT_DIR = _REPO_ROOT / "Data" / "rice_hrv_eval"
 BEAT_BAND_HZ = (0.7, 3.5)
 BEAT_SPACING = 0.55        # the least a beat may follow the last, as a share of the period
 HR_MIN_BPM, HR_MAX_BPM = 35.0, 180.0
@@ -88,14 +96,42 @@ IBI_LOCAL_TOL = 0.25       # an interval this far from the median around it is a
 SPAN_S = 60.0              # the app's capture, scored at the start and the end of a recording
 MIN_SPAN_INTERVALS = 30    # a span is scored only where both sides keep this many intervals
 INVERTED = ("hr_spectral",)   # estimators whose trace runs opposite to the stored label
-CONFOUNDS = [
-    "the app's framing gate refuses all 70 recordings: these are forced readings",
-    "talking is reported on its own and never pooled",
-    "the camera-to-finger offset mixes both devices' latencies with the pulse's travel; a "
-    "constant offset cannot change an interval, so it does not affect variability",
-    "the reference is a 60 Hz 7-bit finger waveform; after sub-sample refinement its own "
-    "timing adds under 0.05 ms to an 18 ms RMSSD",
-]
+# What differs between the stores read here. Both carry the same fields under the same names
+# (`ref_beat_ms`, `ref_beat_kept`, `offset_ms`, `has_hrv`, `qc_pos_bvp_r`), but a crop name does
+# not mean the same thing in both: Rice's `frames` is padded to the training geometry and its
+# `frames_clamped` is the app's crop, while MR-NIRP's one crop, `frames`, is the app's.
+DATASETS = {
+    "rice": dict(
+        name=rice.DATASET, store=rice.DEFAULT_STORE, crops=rice.CROPS,
+        default_crop=rice.DEFAULT_CROP, activities=rice.ACTIVITIES,
+        out_dir=_REPO_ROOT / "Data" / "rice_hrv_eval",
+        confounds=[
+            "the app's framing gate refuses all 70 recordings: these are forced readings",
+            "talking is reported on its own and never pooled",
+            "the camera-to-finger offset mixes both devices' latencies with the pulse's travel; a "
+            "constant offset cannot change an interval, so it does not affect variability",
+            "the reference is a 60 Hz 7-bit finger waveform; after sub-sample refinement its own "
+            "timing adds under 0.05 ms to an 18 ms RMSSD",
+        ]),
+    "mrnirp": dict(
+        name="MR-NIRP-Indoor",
+        store=Path(r"D:\QualityPhys\phase 3 benchmarks\mrnirp_indoor_phase3_rc_none.h5"),
+        crops=("frames",), default_crop="frames", activities=("still", "motion"),
+        out_dir=_REPO_ROOT / "Data" / "mrnirp_hrv_eval",
+        confounds=[
+            "the app's framing gate refuses 13 of the 15 recordings and warns on the other two: "
+            "these are forced readings",
+            "seven subjects were recorded on the camera unit that recorded Rice iPPG, subject 6 on "
+            "a Flea3: a second recording session, not a second camera",
+            "only the 7 still recordings carry a variability reference; the motion recordings "
+            "last about a minute and enter only the all-recordings figures",
+            "06/still's reference stops 14.3 s before its last frame, and it carries no "
+            "variability reference",
+            "the camera-to-finger offset mixes both devices' latencies with the pulse's travel; a "
+            "constant offset cannot change an interval, so it does not affect variability",
+            "the reference is a 60 Hz finger waveform from the same oximeter model as Rice's",
+        ]),
+}
 
 
 # ------------------------------------------------------------------- the beats --
@@ -337,10 +373,11 @@ def summarise(recordings, spans, hrv_only=True):
 
 def build_summary(estimator, recordings, spans, args, crop):
     """The JSON summary for one estimator on one crop."""
+    spec = DATASETS[args.dataset]
     return dict(
-        estimator=estimator.name, dataset=DATASET, crop=crop, store=str(args.store),
+        estimator=estimator.name, dataset=spec["name"], crop=crop, store=str(args.store),
         device=args.device, activities=list(args.activities), limit=args.limit,
-        confounds=CONFOUNDS,
+        confounds=spec["confounds"],
         settings=dict(clip_len=CLIP_LEN, beat_band_hz=list(BEAT_BAND_HZ),
                       beat_spacing=BEAT_SPACING, ibi_local_tol=IBI_LOCAL_TOL,
                       span_s=SPAN_S, min_span_intervals=MIN_SPAN_INTERVALS,
@@ -395,22 +432,39 @@ def _span_line(label, m):
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--dataset", choices=sorted(DATASETS), default="rice",
+                        help="which store's layout and caveats to use (default: rice)")
     parser.add_argument("--estimator", action="append", choices=registry.available(),
                         help="registered estimator name; repeat for several (default: all)")
-    parser.add_argument("--store", type=Path, default=DEFAULT_STORE)
-    parser.add_argument("--crop", choices=CROPS, default=DEFAULT_CROP)
-    parser.add_argument("--activities", nargs="+", choices=ACTIVITIES, default=list(ACTIVITIES))
+    parser.add_argument("--store", type=Path, default=None,
+                        help="default: the dataset's store")
+    parser.add_argument("--crop", default=None, help="default: the dataset's app crop")
+    parser.add_argument("--activities", nargs="+", default=None,
+                        help="default: all of the dataset's activities")
     parser.add_argument("--device", default="cpu", help="torch device for learned estimators")
     parser.add_argument("--limit", type=int, default=None,
                         help="evaluate only the first N recordings (smoke test)")
-    parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
+    parser.add_argument("--out-dir", type=Path, default=None,
+                        help="default: the dataset's folder under Data/")
     args = parser.parse_args()
 
+    spec = DATASETS[args.dataset]
+    args.store = args.store or spec["store"]
+    args.crop = args.crop or spec["default_crop"]
+    if args.crop not in spec["crops"]:
+        parser.error(f"--crop must be one of {', '.join(spec['crops'])} for {args.dataset}")
+    requested = args.activities or list(spec["activities"])
+    unknown = [a for a in requested if a not in spec["activities"]]
+    if unknown:
+        parser.error(f"not activities of {args.dataset}: {' '.join(unknown)}")
+    args.activities = [a for a in spec["activities"] if a in requested]
+    args.out_dir = args.out_dir or spec["out_dir"]
+
     names = unique(args.estimator or registry.available())
-    args.activities = [a for a in ACTIVITIES if a in args.activities]
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"store: {args.store}\nestimators: {', '.join(names)} | crop: {args.crop} | "
+    print(f"dataset: {spec['name']} | store: {args.store}\nestimators: {', '.join(names)} | "
+          f"crop: {args.crop} | "
           f"activities: {' '.join(args.activities)} | device: {args.device}"
           + (f" | limit {args.limit}" if args.limit else ""))
     estimators = []
@@ -421,15 +475,15 @@ def main():
             raise SystemExit(f"ERROR: checkpoint missing for {name}")
         estimators.append(estimator)
     trained = [e.name for e in estimators
-               if any(dataset == DATASET for dataset, _ in e.trained_on)]
+               if any(dataset == spec["name"] for dataset, _ in e.trained_on)]
     if trained:
-        raise SystemExit(f"ERROR: {', '.join(trained)} trained on {DATASET}; this store is an "
-                         f"evaluation set only")
+        raise SystemExit(f"ERROR: {', '.join(trained)} trained on {spec['name']}; this store is "
+                         f"an evaluation set only")
 
     rows, _ = evaluate(args.store, estimators, args.crop, args.activities, args.limit,
                        args.device)
     suffix = f"_crop-{args.crop}" + subset_suffix(
-        ("activities-", "-".join(args.activities), "-".join(ACTIVITIES)),
+        ("activities-", "-".join(args.activities), "-".join(spec["activities"])),
         ("limit", args.limit or None, None))
     for estimator in estimators:
         name = estimator.name
