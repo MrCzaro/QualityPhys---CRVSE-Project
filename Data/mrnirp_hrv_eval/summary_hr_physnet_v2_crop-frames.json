@@ -546,21 +546,15 @@
       "cuda"
     ],
     "git": {
-      "commit": "a4660aa2e9e8c24411c463d94777ece3c844ba7e",
-      "dirty": true,
-      "changed": [
-        ".gitignore",
-        "Data/rice_hrv_eval/summary_hr_physnet_v2_crop-frames_clamped.json",
-        "Data/rice_hrv_eval/summary_hr_physnet_v3_crop-frames_clamped.json",
-        "Data/rice_hrv_eval/summary_hr_spectral_crop-frames_clamped.json",
-        "app/live_vitals/scripts/check_rice_hrv.py"
-      ]
+      "commit": "a72454af484066cfe539c99777bf92978d9ecd3f",
+      "dirty": false,
+      "changed": []
     },
     "weights": {
       "file": "phase_3_physnet_v2_baseline_best.zip",
       "sha256": "f30fae250fb948e2aaece9aae5ec2d77fcc438d7ef1abbe54ae878a7eecee6b8",
       "bytes": 3106459
     },
-    "written_utc": "2026-10-30T05:21:47+00:00"
+    "written_utc": "2026-10-30T05:30:20+00:00"
   }
 }
