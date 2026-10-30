@@ -24,12 +24,13 @@ rather than held-out accuracy (see the model card).
 | MCD-rPPG subset, 6 subjects / 12 recordings (3 in training) | 5.29 bpm window RMSE, 12/12 reporting |
 | Cross-subject validation during training | **5.22 bpm** shared MAE (DLCN 3.08, MCD 6.84, UBFC 3.13) |
 | Pulse oximeter, one resting capture | oximeter 60 → model 61.2, classical 60.6–61.2 |
-| Beat timing and pulse-rate variability, Rice iPPG: 12 still subjects, one lab camera, the app's gates bypassed (exploratory) | beats timed to **8 ms**; SDNN within 10% of a finger oximeter in **8 of 12**, RMSSD in 5 of 12 |
+| Beat timing and pulse-rate variability, Rice iPPG: 12 still subjects, one lab camera, the app's gates bypassed (exploratory; Rice's rig only) | beats timed to **8 ms**; SDNN within 10% of a finger oximeter in **8 of 12**, RMSSD in 5 of 12 |
+| Pulse-rate variability, VitalVideos-WW: 236 recordings the app's gates accept, a rule fixed before the run (NB_P3_37) | beats timed to **15 ms**; 60 s SDNN within 10% of a contact PPG in **9%** (95% 6–14%) - **not confirmed**; RMSSD 3% |
 
-The last row is the honest boundary. Heart rate works. On one laboratory camera, beat
-timing follows the slow variation SDNN measures in most still recordings but not the
-beat-to-beat variation RMSSD measures; it is an exploratory finding, and the app reports
-neither - see *What It Cannot Do*.
+The last two rows are the honest boundary. Heart rate works. Beat timing good enough for
+variability does not carry over: on one laboratory camera SDNN held in most still
+recordings, but a test fixed in advance on an independent set did not confirm it, and the
+app reports no variability - see *What It Cannot Do*.
 
 ## What the App Does
 
@@ -146,19 +147,26 @@ ceiling for every architecture screened.
 Each of these was measured, not assumed.
 
 **Heart rate variability.** Here a camera's beats can only be checked against another
-pulse sensor, so what is measured is pulse-rate variability, and only a narrow part of it
-is within reach. On the Rice iPPG set (14 subjects, one fixed laboratory camera) PhysNet v2
-times beats to a median 8 ms while the subject sits still: SDNN lands within 10% of a
-finger oximeter's in 8 of 12 stationary two-minute recordings (7 and 9 of 12 over the first
-and last 60 s), but RMSSD, which differencing makes sensitive to the remaining error, in
-only 5 of 12, and reading or talking spoils both. The app's framing gate refuses all of
-these recordings, so this is a forced reading of the method on one rig, exploratory until
-an independent set confirms it; the app reports no variability. The earlier negative on
-the MCD-rPPG subset (90% of beats found, 46.5 ms of jitter against 20–27 ms of RMSSD) was a
-property of that capture, not of the model, and the frame rate is not the limit either:
-resampling a contact PPG to 30 Hz costs 3% of RMSSD when beat positions are refined
-sub-sample. Averaging overlapping model windows recovers 4%, because their errors
-correlate at r ≈ 0.83. A timing-aware training objective is untried.
+pulse sensor or an ECG, so what a camera measures is pulse-rate variability. A rule fixed
+before any camera beat was computed tested it on an independent set (NB_P3_37):
+
+> Pulse-rate variability (60 s SDNN), stationary adults with normal breathing. On the 236
+> of 300 VitalVideos-WW recordings the app's gates accept with a usable, unflagged ECG
+> (lossless lab video at 30 fps, not a browser capture), PhysNet v2 does not recover 60 s
+> SDNN: within 10% of a contact PPG in 9% of recordings (95% interval 6-14%; within 20%:
+> 18%).
+
+The rest of the statement - against ECG, where the word "HRV" is not earned, POS, v3, the
+strata, RMSSD at 3% - is in the [model card](docs/model_card.md#limitations-1). The beats
+are found but timed loosely, a median 15 ms, while the variability at rest is small (median
+ECG SDNN 24 ms). On the Rice iPPG set (14 subjects, one fixed laboratory camera, the app's
+gates bypassed) PhysNet v2 had timed beats to a median 8 ms and landed SDNN within 10% of a
+finger oximeter's in 8 of 12 stationary recordings; that stands as a finding about Rice's
+rig only. The earlier negative on the MCD-rPPG subset (90% of beats found, 46.5 ms of
+jitter against 20–27 ms of RMSSD) was a property of that capture, not of the model, and the
+frame rate is not the limit either: resampling a contact PPG to 30 Hz costs 3% of RMSSD when
+beat positions are refined sub-sample. Averaging overlapping model windows recovers 4%,
+because their errors correlate at r ≈ 0.83. A timing-aware training objective is untried.
 
 **In-vehicle conditions.** Zero-shot on PhysDrive: 27.79 bpm MAE, +24.82 bias,
 r = 0.11 - not tracking at all. Training on PhysDrive repaired that corpus and destroyed
@@ -287,9 +295,8 @@ cross-check added on evidence gathered while validating it.
 | PhysDrive | zero-shot in-vehicle benchmark | per request |
 | UBFC-Phys | held-out evaluation: rest, speech and arithmetic tasks | per request / registration |
 | ECG-Fitness | refusal benchmark only, never trained on: exercise, high heart rate | signed request, no redistribution |
-| VitalVideos-WW | training + held-out evaluation, frozen 240/60 split | per request, academic and commercial separate |
-| Rice iPPG (HRVCam) | evaluation only, forced readings: heart rate, and pulse-rate variability (exploratory) | download; citation required, no redistribution |
-| MR-NIRP Indoor | evaluation only, forced readings: a second session, mostly on the Rice camera | request form; citation required, no redistribution |
+| VitalVideos-WW | training + held-out evaluation, frozen 240/60 split; the pre-registered pulse-rate variability test | per request, academic and commercial separate |
+| Rice iPPG (HRVCam) | evaluation only, forced readings: heart rate, and pulse-rate variability (exploratory; not confirmed on VitalVideos-WW) | download; citation required, no redistribution |
 
 Raw datasets are external materials and the repository licence grants no rights to
 redistribute them. See `docs/data_sources.md` for the boundary, per-dataset terms, and
@@ -315,6 +322,6 @@ the architectures used are original implementations of published designs.
 
 The evidence supports this as a research and portfolio project, not a validated
 measurement product. The stance throughout has been to state the scope narrowly, gate
-what cannot be measured reliably, and publish the negative results - RMSSD out of reach, the
-rejected ensemble, the rejected calibration, the unexplained MCD gap - alongside the
-numbers that worked.
+what cannot be measured reliably, and publish the negative results - pulse-rate variability
+not confirmed on an independent set, RMSSD out of reach, the rejected ensemble, the rejected
+calibration, the unexplained MCD gap - alongside the numbers that worked.

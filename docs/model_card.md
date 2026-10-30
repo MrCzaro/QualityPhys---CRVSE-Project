@@ -395,7 +395,8 @@ Not intended for:
 - speech or other movement during capture, where accuracy degrades sharply
   (measured on UBFC-Phys, see Evaluation)
 - heart-rate or pulse-rate **variability**: the app reports none, and the one positive
-  finding (SDNN, still subjects, one laboratory camera) is exploratory; see Limitations
+  finding (SDNN, still subjects, one laboratory camera) was not confirmed on an
+  independent set under a rule fixed in advance; see Limitations
 - respiratory rate or blood pressure, which the app shows as unavailable
 
 ### Input Contract
@@ -636,21 +637,33 @@ wrong time base: a 10 fps webcam capture once produced a confident reading about
 
 ### Limitations
 
-- **Variability is an exploratory finding on one rig, not something the app does.** A
-  camera's beats can only be checked against another pulse sensor here, so what is
-  measured is pulse-rate variability, not ECG-based heart-rate variability. On the Rice
-  iPPG set (14 subjects, one fixed laboratory camera; the app's framing gate refuses all
-  70 recordings, so these are forced readings) v2 times beats to a median 8.1 ms while
-  the subject sits still, 11.7 ms over all 58 recordings with a variability reference.
-  SDNN lands within 10% of a finger oximeter's in 8 of 12 stationary two-minute
-  recordings (median +2.6%; 7 and 9 of 12 over the first and last 60 s), and in 10 of 13
-  during paced slow breathing. RMSSD, which differencing makes sensitive to the
-  remaining error, lands within 10% in 5 of 12 and is out of reach; reading and talking
-  spoil both. The earlier negative on the 12 MCD subset recordings (3 of the 6 subjects
-  in v2's training split: 90% of reference beats found, 46.5 ms of jitter against an
-  RMSSD of 20-27 ms) was a property of that capture, not of the model, and 30 fps
-  sampling costs only 3% of RMSSD when beat positions are refined sub-sample. The
-  finding stays exploratory until an independent set confirms it.
+- **Variability was not confirmed beyond one laboratory rig, and the app reports none.**
+  Tested under a rule fixed before any camera beat was computed (NB_P3_37; PhysNet v2
+  weights SHA-256 f30fae25…e6b8; run 2026-10-30):
+
+  > Pulse-rate variability (60 s SDNN), stationary adults with normal breathing. On the 236
+  > of 300 VitalVideos-WW recordings the app's gates accept with a usable, unflagged ECG
+  > (lossless lab video at 30 fps, not a browser capture), PhysNet v2 does not recover 60 s
+  > SDNN: within 10% of a contact PPG in 9% of recordings (95% interval 6-14%; within 20%:
+  > 18%). Against ECG the contact PPG itself lands within 10% in 94% and the camera in 8%,
+  > so the word "HRV" is not earned. POS: 2%; v3 on the 49 of its 60 validation recordings
+  > among them: 10%. Strata not confirmed: all 15 (every Fitzpatrick, site, age, ECG-SDNN
+  > and signal-quality group); 0 inconclusive. RMSSD is a negative on this rig: 3% within
+  > 10%. Exploratory and separate: on Rice (14 subjects, one camera, gates bypassed; 12
+  > stationary recordings), v2's SDNN had a +2.6% median error with 67% within 10% of a
+  > finger oximeter (58-75% on 60 s spans). Research use only; no clinical, health-state or
+  > rhythm interpretation.
+
+  The colon after "SDNN" was added after the run so that the sentence cannot read as if 9%
+  were the failures; no word or number changed. Behind the result: v2 finds 92% of the
+  contact PPG's beats within 150 ms but times them to a median 15 ms, about twice the 8 ms
+  of Rice's still recordings, with heavy tails, while the variability to be measured is
+  small (median ECG SDNN 24 ms); the darkest skin types (Fitzpatrick 5-6) and the outdoor
+  site, which are confounded in this set, reach 0%. The earlier negative on the 12 MCD
+  subset recordings (3 of the 6 subjects in v2's training split: 90% of reference beats
+  found, 46.5 ms of jitter against an RMSSD of 20-27 ms) was a property of that capture,
+  not of the model, and 30 fps sampling costs only 3% of RMSSD when beat positions are
+  refined sub-sample.
 - **MCD-rPPG is the standing accuracy ceiling** — around 10 bpm at training time
   against 2-3 on DLCN and UBFC-rPPG, for every architecture screened. Two candidate
   explanations, source frame rate and crop aspect, were each tested and eliminated.
