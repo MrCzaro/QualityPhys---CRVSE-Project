@@ -18,7 +18,8 @@ two Rice University sets used for evaluation only, Rice iPPG and MR-NIRP Indoor)
 | VitalVideos-Worldwide | Training corpus with a frozen 240/60 subject split; so far evaluated zero-shot only | Still/seated evidence across Fitzpatrick skin types, confounded with recording site. |
 | UBFC-Phys | Held-out cross-dataset evaluation; never trained on | Still/seated evidence at rest and under speech and arithmetic stress tasks. |
 | PhysDrive | Zero-shot in-vehicle benchmark | Outside the app's scope; documents a failure mode. |
-| ECG-Fitness | Refusal benchmark only; never trained on | Tests whether the app declines or flags exercise captures. Not part of the still/seated support claim. | Rice iPPG (HRVCam) | Evaluation only; never trained on. Held-out heart rate, and the discovery set for pulse-rate variability | One fixed laboratory camera. The app's framing gate refuses all 70 recordings, so every figure is a forced reading of the method, not something the app reports. |
+| ECG-Fitness | Refusal benchmark only; never trained on | Tests whether the app declines or flags exercise captures. Not part of the still/seated support claim. |
+| Rice iPPG (HRVCam) | Evaluation only; never trained on. Held-out heart rate, and the discovery set for pulse-rate variability | One fixed laboratory camera. The app's framing gate refuses all 70 recordings, so every figure is a forced reading of the method, not something the app reports. |
 | MR-NIRP Indoor | Evaluation only; never trained on. A second recording session, mostly on the Rice camera | Still and mildly moving heads on the same laboratory rig. The framing gate refuses 13 of 15 recordings. |
 
 ## Required Citations

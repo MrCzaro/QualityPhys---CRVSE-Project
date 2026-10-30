@@ -394,7 +394,8 @@ Not intended for:
   (see Limitations)
 - speech or other movement during capture, where accuracy degrades sharply
   (measured on UBFC-Phys, see Evaluation)
-- heart-rate **variability**, which was measured and found out of reach
+- heart-rate or pulse-rate **variability**: the app reports none, and the one positive
+  finding (SDNN, still subjects, one laboratory camera) is exploratory; see Limitations
 - respiratory rate or blood pressure, which the app shows as unavailable
 
 ### Input Contract
@@ -635,14 +636,21 @@ wrong time base: a 10 fps webcam capture once produced a confident reading about
 
 ### Limitations
 
-- **Heart-rate variability is out of reach with this model.** Measured across the 12
-  MCD subset recordings (3 of the 6 subjects in v2's training split): 93% of reference
-  beats are found, but median beat-timing
-  jitter is 56 ms while the RMSSD being measured is 20-27 ms. The noise is two to
-  three times the signal, and RMSSD is built from successive differences, so it
-  amplifies precisely that error. This is a property of the reconstruction, not of
-  the camera: 30 fps sampling costs only 2% of RMSSD when beat positions are refined
-  sub-sample.
+- **Variability is an exploratory finding on one rig, not something the app does.** A
+  camera's beats can only be checked against another pulse sensor here, so what is
+  measured is pulse-rate variability, not ECG-based heart-rate variability. On the Rice
+  iPPG set (14 subjects, one fixed laboratory camera; the app's framing gate refuses all
+  70 recordings, so these are forced readings) v2 times beats to a median 8.1 ms while
+  the subject sits still, 11.7 ms over all 58 recordings with a variability reference.
+  SDNN lands within 10% of a finger oximeter's in 8 of 12 stationary two-minute
+  recordings (median +2.6%; 7 and 9 of 12 over the first and last 60 s), and in 10 of 13
+  during paced slow breathing. RMSSD, which differencing makes sensitive to the
+  remaining error, lands within 10% in 5 of 12 and is out of reach; reading and talking
+  spoil both. The earlier negative on the 12 MCD subset recordings (3 of the 6 subjects
+  in v2's training split: 90% of reference beats found, 46.5 ms of jitter against an
+  RMSSD of 20-27 ms) was a property of that capture, not of the model, and 30 fps
+  sampling costs only 3% of RMSSD when beat positions are refined sub-sample. The
+  finding stays exploratory until an independent set confirms it.
 - **MCD-rPPG is the standing accuracy ceiling** — around 10 bpm at training time
   against 2-3 on DLCN and UBFC-rPPG, for every architecture screened. Two candidate
   explanations, source frame rate and crop aspect, were each tested and eliminated.

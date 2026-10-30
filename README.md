@@ -24,10 +24,12 @@ rather than held-out accuracy (see the model card).
 | MCD-rPPG subset, 6 subjects / 12 recordings (3 in training) | 5.29 bpm window RMSE, 12/12 reporting |
 | Cross-subject validation during training | **5.22 bpm** shared MAE (DLCN 3.08, MCD 6.84, UBFC 3.13) |
 | Pulse oximeter, one resting capture | oximeter 60 → model 61.2, classical 60.6–61.2 |
-| Beat timing (for HRV) | 93% of beats found, but **56 ms** jitter against 20–27 ms of RMSSD |
+| Beat timing and pulse-rate variability, Rice iPPG: 12 still subjects, one lab camera, the app's gates bypassed (exploratory) | beats timed to **8 ms**; SDNN within 10% of a finger oximeter in **8 of 12**, RMSSD in 5 of 12 |
 
-The last row is the honest boundary. Heart rate works; beat-to-beat timing does not,
-and the reason is measured rather than assumed - see *What It Cannot Do*.
+The last row is the honest boundary. Heart rate works. On one laboratory camera, beat
+timing follows the slow variation SDNN measures in most still recordings but not the
+beat-to-beat variation RMSSD measures; it is an exploratory finding, and the app reports
+neither - see *What It Cannot Do*.
 
 ## What the App Does
 
@@ -143,13 +145,20 @@ ceiling for every architecture screened.
 
 Each of these was measured, not assumed.
 
-**Heart rate variability.** The model finds 93% of reference beats, but median
-beat-timing jitter is 56 ms while resting RMSSD is 20–27 ms. Noise exceeds signal by
-two to three times, and RMSSD is built from successive differences, so it amplifies
-exactly that error. This is not the frame rate: resampling a contact PPG to 30 Hz costs
-only 2% of RMSSD when beat positions are refined sub-sample. Averaging overlapping
-model windows was tried and recovers 4%, because their errors correlate at r ≈ 0.83.
-The remaining lever is a timing-aware training objective.
+**Heart rate variability.** Here a camera's beats can only be checked against another
+pulse sensor, so what is measured is pulse-rate variability, and only a narrow part of it
+is within reach. On the Rice iPPG set (14 subjects, one fixed laboratory camera) PhysNet v2
+times beats to a median 8 ms while the subject sits still: SDNN lands within 10% of a
+finger oximeter's in 8 of 12 stationary two-minute recordings (7 and 9 of 12 over the first
+and last 60 s), but RMSSD, which differencing makes sensitive to the remaining error, in
+only 5 of 12, and reading or talking spoils both. The app's framing gate refuses all of
+these recordings, so this is a forced reading of the method on one rig, exploratory until
+an independent set confirms it; the app reports no variability. The earlier negative on
+the MCD-rPPG subset (90% of beats found, 46.5 ms of jitter against 20–27 ms of RMSSD) was a
+property of that capture, not of the model, and the frame rate is not the limit either:
+resampling a contact PPG to 30 Hz costs 3% of RMSSD when beat positions are refined
+sub-sample. Averaging overlapping model windows recovers 4%, because their errors
+correlate at r ≈ 0.83. A timing-aware training objective is untried.
 
 **In-vehicle conditions.** Zero-shot on PhysDrive: 27.79 bpm MAE, +24.82 bias,
 r = 0.11 - not tracking at all. Training on PhysDrive repaired that corpus and destroyed
@@ -306,6 +315,6 @@ the architectures used are original implementations of published designs.
 
 The evidence supports this as a research and portfolio project, not a validated
 measurement product. The stance throughout has been to state the scope narrowly, gate
-what cannot be measured reliably, and publish the negative results - the HRV ceiling, the
+what cannot be measured reliably, and publish the negative results - RMSSD out of reach, the
 rejected ensemble, the rejected calibration, the unexplained MCD gap - alongside the
 numbers that worked.
