@@ -169,6 +169,18 @@ def quantisation_rmssd_ms(fs):
     return float(np.sqrt(h * h / 2.0) * 1000.0)
 
 
+def quantisation_excess_ms(reference_rmssd_ms, fs):
+    """The RMSSD error that rounding beat times to the nearest sample causes.
+
+    The rounding noise's own RMSSD adds in quadrature, so a true RMSSD R reads
+    sqrt(R^2 + q^2) and the error is that minus R - at a resting RMSSD of 20-30 ms and
+    30 fps, about a third of q, not q itself.
+    """
+    q = quantisation_rmssd_ms(fs)
+    r = np.asarray(reference_rmssd_ms, dtype=float)
+    return np.sqrt(r * r + q * q) - r
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -243,7 +255,8 @@ def main():
             got_s = np.array([g for g, _ in sdnn], dtype=float)
             want_s = np.array([w for _, w in sdnn], dtype=float)
             err_r = np.nanmedian(np.abs(got_r - want_r))
-            predicted = quantisation_rmssd_ms(rate) if not sub_sample else float("nan")
+            predicted = (float(np.nanmedian(quantisation_excess_ms(want_r, rate)))
+                         if not sub_sample else float("nan"))
             print(f"{rate:7.1f}H {np.nanmedian(got_r):8.1f} {err_r:8.1f} "
                   f"{100 * err_r / np.nanmedian(want_r):6.0f}% "
                   f"{np.nanmedian(got_s):8.1f} "
@@ -255,7 +268,8 @@ def main():
     print("Read the 30 Hz row against the ECG RMSSD above. If the error there is a")
     print("large fraction of the real value, frame rate caps video HRV no matter")
     print("how good the reconstruction is, and the 'predicted' column says how much")
-    print("of that is pure rounding of beat times to the nearest frame.")
+    print("of that error pure rounding of beat times to the nearest frame explains: its")
+    print("own RMSSD added in quadrature to the true value, set against the 'err' column.")
     return 0
 
 
