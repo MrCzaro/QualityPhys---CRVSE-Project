@@ -1,0 +1,367 @@
+{
+  "check": "frame-rate",
+  "part0": "NB_P3_38 Part 0, pre-registered 2026-11-01",
+  "settings": {
+    "rates": [
+      30,
+      27,
+      25,
+      24,
+      22,
+      20
+    ],
+    "native_fps": 60,
+    "thinning": "index round(k x 60 / r) while inside the recording; exact fractions, half to even",
+    "window_frames": 160,
+    "frame_rate_gate": "not applied",
+    "hold_bpm": 0.5,
+    "hold_fewer": 3,
+    "fail_fewer": 15,
+    "interval": {
+      "unit": "recording",
+      "draws": 10000,
+      "seed": 42,
+      "percentiles": [
+        2.5,
+        97.5
+      ]
+    },
+    "estimators": [
+      "hr_physnet_v2",
+      "hr_spectral"
+    ],
+    "deciding": "hr_physnet_v2",
+    "reported_statuses": [
+      "ok",
+      "degraded_capture",
+      "unstable"
+    ],
+    "store": "D:\\QualityPhys\\phase 3 datasets\\vitalvideos_phase3_rc_none.h5",
+    "recordings": 300,
+    "limit": null
+  },
+  "readout": {
+    "CLIP_LEN": 160,
+    "WINDOW_STRIDE": 80,
+    "TARGET_FPS": 30.0,
+    "HR_LOW_HZ": 0.66,
+    "HR_HIGH_HZ": 3.0,
+    "CONFIDENCE_FLOOR_HZ": 0.15,
+    "MIN_CONFIDENCE": 0.65,
+    "MAD_OUTLIER_K": 3.0,
+    "MAD_FLOOR_BPM": 1.0,
+    "MIN_USABLE_WINDOWS": 3,
+    "MIN_USABLE_FRACTION": 0.5,
+    "MIN_REPORTABLE_FRACTION": 0.25,
+    "HARMONIC_GUARD_ENABLED": false,
+    "MIN_FPS_ACCEPT": 27.0,
+    "MIN_FPS_WARN": 20.0,
+    "MAX_FPS_ACCEPT": 33.0
+  },
+  "self_test": {
+    "recordings": 300,
+    "frames_equal": 300,
+    "bvp_equal": 300
+  },
+  "estimators": {
+    "hr_physnet_v2": {
+      "rates": [
+        {
+          "rate": 30,
+          "frames_each": [
+            1800
+          ],
+          "windows_each": [
+            21
+          ],
+          "reported": 276,
+          "median_abs_error": 0.27954896252092,
+          "median_abs_error_vs_hr_ecg": 0.3370840245962725,
+          "against_30": null
+        },
+        {
+          "rate": 27,
+          "frames_each": [
+            1620
+          ],
+          "windows_each": [
+            19
+          ],
+          "reported": 284,
+          "median_abs_error": 0.25358375940538735,
+          "median_abs_error_vs_hr_ecg": 0.3407822978760322,
+          "against_30": {
+            "reported_at_30": 276,
+            "reported": 284,
+            "fewer": -8,
+            "pairs": 268,
+            "pairs_without_reference": 5,
+            "point": -0.0159213867859905,
+            "lower": -0.06867232938367519,
+            "upper": 0.038793680856808295,
+            "draws": 10000,
+            "outcome": "holds"
+          }
+        },
+        {
+          "rate": 25,
+          "frames_each": [
+            1500
+          ],
+          "windows_each": [
+            17
+          ],
+          "reported": 280,
+          "median_abs_error": 0.24302196413397326,
+          "median_abs_error_vs_hr_ecg": 0.3061157303508928,
+          "against_30": {
+            "reported_at_30": 276,
+            "reported": 280,
+            "fewer": -4,
+            "pairs": 263,
+            "pairs_without_reference": 5,
+            "point": -0.02696707365279514,
+            "lower": -0.08299076209526003,
+            "upper": 0.03271887461692969,
+            "draws": 10000,
+            "outcome": "holds"
+          }
+        },
+        {
+          "rate": 24,
+          "frames_each": [
+            1440
+          ],
+          "windows_each": [
+            17
+          ],
+          "reported": 276,
+          "median_abs_error": 0.2258970433167633,
+          "median_abs_error_vs_hr_ecg": 0.2909856312825845,
+          "against_30": {
+            "reported_at_30": 276,
+            "reported": 276,
+            "fewer": 0,
+            "pairs": 263,
+            "pairs_without_reference": 4,
+            "point": 0.022250811681112505,
+            "lower": -0.05473839831054209,
+            "upper": 0.10592088980296438,
+            "draws": 10000,
+            "outcome": "holds"
+          }
+        },
+        {
+          "rate": 22,
+          "frames_each": [
+            1320
+          ],
+          "windows_each": [
+            15
+          ],
+          "reported": 278,
+          "median_abs_error": 0.20055490886406346,
+          "median_abs_error_vs_hr_ecg": 0.31495387361179183,
+          "against_30": {
+            "reported_at_30": 276,
+            "reported": 278,
+            "fewer": -2,
+            "pairs": 257,
+            "pairs_without_reference": 5,
+            "point": 0.2803562651911761,
+            "lower": -0.04391008696342287,
+            "upper": 0.7450066352567358,
+            "draws": 10000,
+            "outcome": "inconclusive"
+          }
+        },
+        {
+          "rate": 20,
+          "frames_each": [
+            1200
+          ],
+          "windows_each": [
+            14
+          ],
+          "reported": 276,
+          "median_abs_error": 0.1976981095838326,
+          "median_abs_error_vs_hr_ecg": 0.30289938052708365,
+          "against_30": {
+            "reported_at_30": 276,
+            "reported": 276,
+            "fewer": 0,
+            "pairs": 252,
+            "pairs_without_reference": 5,
+            "point": 0.3280989851074479,
+            "lower": 0.005608267202239967,
+            "upper": 0.738396155358346,
+            "draws": 10000,
+            "outcome": "inconclusive"
+          }
+        }
+      ],
+      "lowest_holding_rate": 24
+    },
+    "hr_spectral": {
+      "rates": [
+        {
+          "rate": 30,
+          "frames_each": [
+            1800
+          ],
+          "windows_each": [
+            21
+          ],
+          "reported": 244,
+          "median_abs_error": 0.27767791942003583,
+          "median_abs_error_vs_hr_ecg": 0.2950520409995079,
+          "against_30": null
+        },
+        {
+          "rate": 27,
+          "frames_each": [
+            1620
+          ],
+          "windows_each": [
+            19
+          ],
+          "reported": 241,
+          "median_abs_error": 0.2476395979147732,
+          "median_abs_error_vs_hr_ecg": 0.27325961446118185,
+          "against_30": {
+            "reported_at_30": 244,
+            "reported": 241,
+            "fewer": 3,
+            "pairs": 231,
+            "pairs_without_reference": 5,
+            "point": -0.030425397581850745,
+            "lower": -0.0809876435629056,
+            "upper": 0.02284292604858789,
+            "draws": 10000,
+            "outcome": "holds"
+          }
+        },
+        {
+          "rate": 25,
+          "frames_each": [
+            1500
+          ],
+          "windows_each": [
+            17
+          ],
+          "reported": 229,
+          "median_abs_error": 0.23626834376948125,
+          "median_abs_error_vs_hr_ecg": 0.3144262534275981,
+          "against_30": {
+            "reported_at_30": 244,
+            "reported": 229,
+            "fewer": 15,
+            "pairs": 224,
+            "pairs_without_reference": 4,
+            "point": 0.03496789848637838,
+            "lower": -0.02443024643289128,
+            "upper": 0.0963078672375615,
+            "draws": 10000,
+            "outcome": "inconclusive"
+          }
+        },
+        {
+          "rate": 24,
+          "frames_each": [
+            1440
+          ],
+          "windows_each": [
+            17
+          ],
+          "reported": 225,
+          "median_abs_error": 0.21132395597206255,
+          "median_abs_error_vs_hr_ecg": 0.2670165912195017,
+          "against_30": {
+            "reported_at_30": 244,
+            "reported": 225,
+            "fewer": 19,
+            "pairs": 221,
+            "pairs_without_reference": 4,
+            "point": -0.017144551768127472,
+            "lower": -0.08551848650798274,
+            "upper": 0.04854241995641639,
+            "draws": 10000,
+            "outcome": "fails"
+          }
+        },
+        {
+          "rate": 22,
+          "frames_each": [
+            1320
+          ],
+          "windows_each": [
+            15
+          ],
+          "reported": 235,
+          "median_abs_error": 0.20903509636239903,
+          "median_abs_error_vs_hr_ecg": 0.2819094619863023,
+          "against_30": {
+            "reported_at_30": 244,
+            "reported": 235,
+            "fewer": 9,
+            "pairs": 229,
+            "pairs_without_reference": 5,
+            "point": -0.020447439057822307,
+            "lower": -0.08166615541377263,
+            "upper": 0.040068726986007594,
+            "draws": 10000,
+            "outcome": "inconclusive"
+          }
+        },
+        {
+          "rate": 20,
+          "frames_each": [
+            1200
+          ],
+          "windows_each": [
+            14
+          ],
+          "reported": 235,
+          "median_abs_error": 0.19631579031975832,
+          "median_abs_error_vs_hr_ecg": 0.261100259683289,
+          "against_30": {
+            "reported_at_30": 244,
+            "reported": 235,
+            "fewer": 9,
+            "pairs": 226,
+            "pairs_without_reference": 6,
+            "point": -0.06968407848988437,
+            "lower": -0.12380593568395004,
+            "upper": -0.016349595729498248,
+            "draws": 10000,
+            "outcome": "inconclusive"
+          }
+        }
+      ],
+      "lowest_holding_rate": 27
+    }
+  },
+  "verdict": {
+    "estimator": "hr_physnet_v2",
+    "lowest_holding_rate": 24
+  },
+  "provenance": {
+    "command": [
+      "check_hr_robustness.py",
+      "frame-rate",
+      "--device",
+      "cuda"
+    ],
+    "git": {
+      "commit": "2465f7964b56204e4d4389df0a4d9ec2458b0eb7",
+      "dirty": false,
+      "changed": []
+    },
+    "weights": {
+      "file": "phase_3_physnet_v2_baseline_best.zip",
+      "sha256": "f30fae250fb948e2aaece9aae5ec2d77fcc438d7ef1abbe54ae878a7eecee6b8",
+      "bytes": 3106459
+    },
+    "written_utc": "2026-11-01T15:49:45+00:00"
+  }
+}
