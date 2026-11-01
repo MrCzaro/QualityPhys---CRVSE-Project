@@ -1,0 +1,708 @@
+{
+  "check": "low-hr",
+  "part0": "NB_P3_38 Part 0, pre-registered 2026-11-01",
+  "settings": {
+    "classes": {
+      "low_below": 60.0,
+      "typical": [
+        65.0,
+        90.0
+      ],
+      "high_from": 90.0
+    },
+    "windows": "primary: kept by the reference's own readout, in recordings whose reference is reported",
+    "tolerance": 0.1,
+    "double_tolerance": 0.1,
+    "bar_points": -10.0,
+    "interval": {
+      "unit": "recording",
+      "draws": 10000,
+      "seed": 42,
+      "percentiles": [
+        2.5,
+        97.5
+      ]
+    },
+    "estimators": [
+      "hr_physnet_v2",
+      "hr_spectral"
+    ],
+    "deciding": "hr_physnet_v2",
+    "sets": [
+      {
+        "name": "VitalVideos-WW",
+        "role": "decisive",
+        "store": "D:\\QualityPhys\\phase 3 datasets\\vitalvideos_phase3_rc_none.h5"
+      },
+      {
+        "name": "UBFC-Phys T1",
+        "role": "descriptive",
+        "store": "D:\\QualityPhys\\phase 3 datasets\\ubfc_phys_phase3_rc_none.h5"
+      },
+      {
+        "name": "Rice iPPG, clamped crop",
+        "role": "descriptive",
+        "store": "D:\\QualityPhys\\phase 3 benchmarks\\rice_ippg_phase3_rc_none.h5"
+      }
+    ],
+    "reported_statuses": [
+      "ok",
+      "degraded_capture",
+      "unstable"
+    ],
+    "limit": null
+  },
+  "readout": {
+    "CLIP_LEN": 160,
+    "WINDOW_STRIDE": 80,
+    "TARGET_FPS": 30.0,
+    "HR_LOW_HZ": 0.66,
+    "HR_HIGH_HZ": 3.0,
+    "CONFIDENCE_FLOOR_HZ": 0.15,
+    "MIN_CONFIDENCE": 0.65,
+    "MAD_OUTLIER_K": 3.0,
+    "MAD_FLOOR_BPM": 1.0,
+    "MIN_USABLE_WINDOWS": 3,
+    "MIN_USABLE_FRACTION": 0.5,
+    "MIN_REPORTABLE_FRACTION": 0.25,
+    "HARMONIC_GUARD_ENABLED": false,
+    "MIN_FPS_ACCEPT": 27.0,
+    "MIN_FPS_WARN": 20.0,
+    "MAX_FPS_ACCEPT": 33.0
+  },
+  "sets": {
+    "VitalVideos-WW": {
+      "role": "decisive",
+      "estimators": {
+        "hr_physnet_v2": {
+          "recordings": 300,
+          "reported": 276,
+          "primary_windows": 6035,
+          "classes": {
+            "low": {
+              "windows": 478,
+              "recordings": 42,
+              "share_kept": 0.6464435146443515,
+              "share_good": 0.6359832635983264,
+              "share_kept_off": 0.010460251046025104,
+              "share_doubled": 0.08577405857740586,
+              "median_confidence": 0.7553081014699857,
+              "median_reference_confidence": 0.7510152492285503
+            },
+            "gap": {
+              "windows": 795,
+              "recordings": 71,
+              "share_kept": 0.7584905660377359,
+              "share_good": 0.7396226415094339,
+              "share_kept_off": 0.018867924528301886,
+              "share_doubled": 0.027672955974842768,
+              "median_confidence": 0.8782050222576258,
+              "median_reference_confidence": 0.7717039944610933
+            },
+            "typical": {
+              "windows": 3687,
+              "recordings": 221,
+              "share_kept": 0.8622186059126661,
+              "share_good": 0.8578790344453485,
+              "share_kept_off": 0.0043395714673176026,
+              "share_doubled": 0.0032546786004882017,
+              "median_confidence": 0.8937213743557858,
+              "median_reference_confidence": 0.7867384552867481
+            },
+            "high": {
+              "windows": 1075,
+              "recordings": 70,
+              "share_kept": 0.8186046511627907,
+              "share_good": 0.812093023255814,
+              "share_kept_off": 0.0065116279069767444,
+              "share_doubled": 0.0,
+              "median_confidence": 0.8934592763866183,
+              "median_reference_confidence": 0.9136589347929959
+            }
+          },
+          "low_minus_typical_points": {
+            "point": -22.189577084702215,
+            "lower": -35.810244356280734,
+            "upper": -9.528261852488367,
+            "recordings": 250,
+            "draws": 10000,
+            "draws_used": 10000
+          },
+          "outcome": "inconclusive",
+          "recording_bands": [
+            {
+              "band": "<=55",
+              "recordings": 6,
+              "reported": 5,
+              "ok": 3,
+              "median_abs_error": 0.6991875564729355
+            },
+            {
+              "band": "55-60",
+              "recordings": 17,
+              "reported": 14,
+              "ok": 14,
+              "median_abs_error": 0.3642265209715063
+            },
+            {
+              "band": "60-65",
+              "recordings": 41,
+              "reported": 33,
+              "ok": 31,
+              "median_abs_error": 0.2587206610243058
+            },
+            {
+              "band": "65-75",
+              "recordings": 77,
+              "reported": 73,
+              "ok": 69,
+              "median_abs_error": 0.24866432340536448
+            },
+            {
+              "band": "75-90",
+              "recordings": 102,
+              "reported": 99,
+              "ok": 88,
+              "median_abs_error": 0.30754170805850833
+            },
+            {
+              "band": ">90",
+              "recordings": 53,
+              "reported": 48,
+              "ok": 44,
+              "median_abs_error": 0.2646214330872354
+            }
+          ]
+        },
+        "hr_spectral": {
+          "recordings": 300,
+          "reported": 244,
+          "primary_windows": 6035,
+          "classes": {
+            "low": {
+              "windows": 478,
+              "recordings": 42,
+              "share_kept": 0.7782426778242678,
+              "share_good": 0.7719665271966527,
+              "share_kept_off": 0.006276150627615063,
+              "share_doubled": 0.014644351464435146,
+              "median_confidence": 0.7923287945929336,
+              "median_reference_confidence": 0.7510152492285503
+            },
+            "gap": {
+              "windows": 795,
+              "recordings": 71,
+              "share_kept": 0.7433962264150943,
+              "share_good": 0.740880503144654,
+              "share_kept_off": 0.0025157232704402514,
+              "share_doubled": 0.02389937106918239,
+              "median_confidence": 0.7966425656066565,
+              "median_reference_confidence": 0.7717039944610933
+            },
+            "typical": {
+              "windows": 3687,
+              "recordings": 221,
+              "share_kept": 0.6937889883374017,
+              "share_good": 0.6932465419039869,
+              "share_kept_off": 0.0005424464334147003,
+              "share_doubled": 0.006509357200976403,
+              "median_confidence": 0.767799783273775,
+              "median_reference_confidence": 0.7867384552867481
+            },
+            "high": {
+              "windows": 1075,
+              "recordings": 70,
+              "share_kept": 0.64,
+              "share_good": 0.6390697674418605,
+              "share_kept_off": 0.0009302325581395349,
+              "share_doubled": 0.0,
+              "median_confidence": 0.7579054476476854,
+              "median_reference_confidence": 0.9136589347929959
+            }
+          },
+          "low_minus_typical_points": {
+            "point": 7.871998529266577,
+            "lower": -5.592903933151654,
+            "upper": 19.71054957284336,
+            "recordings": 250,
+            "draws": 10000,
+            "draws_used": 10000
+          },
+          "outcome": "not confirmed",
+          "recording_bands": [
+            {
+              "band": "<=55",
+              "recordings": 6,
+              "reported": 5,
+              "ok": 5,
+              "median_abs_error": 0.18200546110934113
+            },
+            {
+              "band": "55-60",
+              "recordings": 17,
+              "reported": 14,
+              "ok": 14,
+              "median_abs_error": 0.2249817333751416
+            },
+            {
+              "band": "60-65",
+              "recordings": 41,
+              "reported": 33,
+              "ok": 32,
+              "median_abs_error": 0.27854392369307135
+            },
+            {
+              "band": "65-75",
+              "recordings": 77,
+              "reported": 68,
+              "ok": 63,
+              "median_abs_error": 0.24975930307419247
+            },
+            {
+              "band": "75-90",
+              "recordings": 102,
+              "reported": 79,
+              "ok": 64,
+              "median_abs_error": 0.30302838717392433
+            },
+            {
+              "band": ">90",
+              "recordings": 53,
+              "reported": 41,
+              "ok": 33,
+              "median_abs_error": 0.3098696887822996
+            }
+          ]
+        }
+      }
+    },
+    "UBFC-Phys T1": {
+      "role": "descriptive",
+      "estimators": {
+        "hr_physnet_v2": {
+          "recordings": 56,
+          "reported": 56,
+          "primary_windows": 3475,
+          "classes": {
+            "low": {
+              "windows": 164,
+              "recordings": 15,
+              "share_kept": 0.7073170731707317,
+              "share_good": 0.3597560975609756,
+              "share_kept_off": 0.3475609756097561,
+              "share_doubled": 0.042682926829268296,
+              "median_confidence": 0.7439703572577334,
+              "median_reference_confidence": 0.8053504771218114
+            },
+            "gap": {
+              "windows": 223,
+              "recordings": 21,
+              "share_kept": 0.8699551569506726,
+              "share_good": 0.4977578475336323,
+              "share_kept_off": 0.3721973094170404,
+              "share_doubled": 0.026905829596412557,
+              "median_confidence": 0.8400086903600539,
+              "median_reference_confidence": 0.8187222256734141
+            },
+            "typical": {
+              "windows": 1956,
+              "recordings": 51,
+              "share_kept": 0.9130879345603272,
+              "share_good": 0.7060327198364008,
+              "share_kept_off": 0.20705521472392638,
+              "share_doubled": 0.00408997955010225,
+              "median_confidence": 0.8965549723604516,
+              "median_reference_confidence": 0.7952272436690248
+            },
+            "high": {
+              "windows": 1132,
+              "recordings": 34,
+              "share_kept": 0.9522968197879859,
+              "share_good": 0.8542402826855123,
+              "share_kept_off": 0.0980565371024735,
+              "share_doubled": 0.0,
+              "median_confidence": 0.9184087280507516,
+              "median_reference_confidence": 0.8794423505265965
+            }
+          },
+          "low_minus_typical_points": {
+            "point": -34.62766222754252,
+            "lower": -62.886408191979015,
+            "upper": -12.840933866556636,
+            "recordings": 51,
+            "draws": 10000,
+            "draws_used": 10000
+          },
+          "outcome": "confirmed",
+          "recording_bands": [
+            {
+              "band": "55-60",
+              "recordings": 3,
+              "reported": 3,
+              "ok": 2,
+              "median_abs_error": 3.4141444551983042
+            },
+            {
+              "band": "60-65",
+              "recordings": 2,
+              "reported": 2,
+              "ok": 1,
+              "median_abs_error": 8.036552700735307
+            },
+            {
+              "band": "65-75",
+              "recordings": 10,
+              "reported": 10,
+              "ok": 10,
+              "median_abs_error": 1.1388839164668667
+            },
+            {
+              "band": "75-90",
+              "recordings": 22,
+              "reported": 22,
+              "ok": 22,
+              "median_abs_error": 1.4709539266473328
+            },
+            {
+              "band": ">90",
+              "recordings": 17,
+              "reported": 17,
+              "ok": 17,
+              "median_abs_error": 0.34228624861353296
+            }
+          ]
+        },
+        "hr_spectral": {
+          "recordings": 56,
+          "reported": 56,
+          "primary_windows": 3475,
+          "classes": {
+            "low": {
+              "windows": 164,
+              "recordings": 15,
+              "share_kept": 0.8841463414634146,
+              "share_good": 0.573170731707317,
+              "share_kept_off": 0.31097560975609756,
+              "share_doubled": 0.024390243902439025,
+              "median_confidence": 0.8529366649657222,
+              "median_reference_confidence": 0.8053504771218114
+            },
+            "gap": {
+              "windows": 223,
+              "recordings": 21,
+              "share_kept": 0.9327354260089686,
+              "share_good": 0.5650224215246636,
+              "share_kept_off": 0.36771300448430494,
+              "share_doubled": 0.004484304932735426,
+              "median_confidence": 0.8485847655597102,
+              "median_reference_confidence": 0.8187222256734141
+            },
+            "typical": {
+              "windows": 1956,
+              "recordings": 51,
+              "share_kept": 0.9049079754601227,
+              "share_good": 0.7142126789366053,
+              "share_kept_off": 0.19069529652351738,
+              "share_doubled": 0.0005112474437627812,
+              "median_confidence": 0.8324450385347031,
+              "median_reference_confidence": 0.7952272436690248
+            },
+            "high": {
+              "windows": 1132,
+              "recordings": 34,
+              "share_kept": 0.8789752650176679,
+              "share_good": 0.8047703180212014,
+              "share_kept_off": 0.07420494699646643,
+              "share_doubled": 0.0,
+              "median_confidence": 0.8605332612622196,
+              "median_reference_confidence": 0.8794423505265965
+            }
+          },
+          "low_minus_typical_points": {
+            "point": -14.104194722928831,
+            "lower": -63.27262749281114,
+            "upper": 14.256930723884581,
+            "recordings": 51,
+            "draws": 10000,
+            "draws_used": 10000
+          },
+          "outcome": "inconclusive",
+          "recording_bands": [
+            {
+              "band": "55-60",
+              "recordings": 3,
+              "reported": 3,
+              "ok": 3,
+              "median_abs_error": 0.4389637739533896
+            },
+            {
+              "band": "60-65",
+              "recordings": 2,
+              "reported": 2,
+              "ok": 1,
+              "median_abs_error": 7.529317757451022
+            },
+            {
+              "band": "65-75",
+              "recordings": 10,
+              "reported": 10,
+              "ok": 10,
+              "median_abs_error": 0.5982645599339307
+            },
+            {
+              "band": "75-90",
+              "recordings": 22,
+              "reported": 22,
+              "ok": 22,
+              "median_abs_error": 1.3814793695601608
+            },
+            {
+              "band": ">90",
+              "recordings": 17,
+              "reported": 17,
+              "ok": 17,
+              "median_abs_error": 0.368273191030724
+            }
+          ]
+        }
+      }
+    },
+    "Rice iPPG, clamped crop": {
+      "role": "descriptive",
+      "estimators": {
+        "hr_physnet_v2": {
+          "recordings": 70,
+          "reported": 66,
+          "primary_windows": 2828,
+          "classes": {
+            "low": {
+              "windows": 383,
+              "recordings": 20,
+              "share_kept": 0.5639686684073107,
+              "share_good": 0.5535248041775457,
+              "share_kept_off": 0.010443864229765013,
+              "share_doubled": 0.0835509138381201,
+              "median_confidence": 0.6877097316599323,
+              "median_reference_confidence": 0.7323086945912367
+            },
+            "gap": {
+              "windows": 303,
+              "recordings": 24,
+              "share_kept": 0.8679867986798679,
+              "share_good": 0.8646864686468647,
+              "share_kept_off": 0.0033003300330033004,
+              "share_doubled": 0.019801980198019802,
+              "median_confidence": 0.8663297480440613,
+              "median_reference_confidence": 0.7660173934013105
+            },
+            "typical": {
+              "windows": 1513,
+              "recordings": 56,
+              "share_kept": 0.8261731658955717,
+              "share_good": 0.8182419035029742,
+              "share_kept_off": 0.007931262392597489,
+              "share_doubled": 0.0039656311962987445,
+              "median_confidence": 0.8829454724796555,
+              "median_reference_confidence": 0.7597590670116189
+            },
+            "high": {
+              "windows": 629,
+              "recordings": 28,
+              "share_kept": 0.834658187599364,
+              "share_good": 0.8171701112877583,
+              "share_kept_off": 0.017488076311605722,
+              "share_doubled": 0.0,
+              "median_confidence": 0.8810362493771384,
+              "median_reference_confidence": 0.8865708440900636
+            }
+          },
+          "low_minus_typical_points": {
+            "point": -26.471709932542854,
+            "lower": -43.592076498391286,
+            "upper": -5.570477127251901,
+            "recordings": 63,
+            "draws": 10000,
+            "draws_used": 10000
+          },
+          "outcome": "inconclusive",
+          "recording_bands": [
+            {
+              "band": "<=55",
+              "recordings": 5,
+              "reported": 4,
+              "ok": 0,
+              "median_abs_error": 2.8410796976585146
+            },
+            {
+              "band": "55-60",
+              "recordings": 3,
+              "reported": 3,
+              "ok": 3,
+              "median_abs_error": 0.8103078952253142
+            },
+            {
+              "band": "60-65",
+              "recordings": 9,
+              "reported": 9,
+              "ok": 7,
+              "median_abs_error": 0.39570626056222835
+            },
+            {
+              "band": "65-75",
+              "recordings": 12,
+              "reported": 10,
+              "ok": 10,
+              "median_abs_error": 0.1755796750609946
+            },
+            {
+              "band": "75-90",
+              "recordings": 27,
+              "reported": 26,
+              "ok": 24,
+              "median_abs_error": 0.27838948550130027
+            },
+            {
+              "band": ">90",
+              "recordings": 14,
+              "reported": 14,
+              "ok": 12,
+              "median_abs_error": 0.4238868946461949
+            }
+          ]
+        },
+        "hr_spectral": {
+          "recordings": 70,
+          "reported": 69,
+          "primary_windows": 2828,
+          "classes": {
+            "low": {
+              "windows": 383,
+              "recordings": 20,
+              "share_kept": 0.9373368146214099,
+              "share_good": 0.9373368146214099,
+              "share_kept_off": 0.0,
+              "share_doubled": 0.0026109660574412533,
+              "median_confidence": 0.861301250488978,
+              "median_reference_confidence": 0.7323086945912367
+            },
+            "gap": {
+              "windows": 303,
+              "recordings": 24,
+              "share_kept": 0.9801980198019802,
+              "share_good": 0.9801980198019802,
+              "share_kept_off": 0.0,
+              "share_doubled": 0.0,
+              "median_confidence": 0.8605509007422084,
+              "median_reference_confidence": 0.7660173934013105
+            },
+            "typical": {
+              "windows": 1513,
+              "recordings": 56,
+              "share_kept": 0.9015201586252478,
+              "share_good": 0.9008592200925314,
+              "share_kept_off": 0.0006609385327164573,
+              "share_doubled": 0.0,
+              "median_confidence": 0.8332360382433791,
+              "median_reference_confidence": 0.7597590670116189
+            },
+            "high": {
+              "windows": 629,
+              "recordings": 28,
+              "share_kept": 0.8394276629570747,
+              "share_good": 0.8394276629570747,
+              "share_kept_off": 0.0,
+              "share_doubled": 0.0,
+              "median_confidence": 0.8337366660750021,
+              "median_reference_confidence": 0.8865708440900636
+            }
+          },
+          "low_minus_typical_points": {
+            "point": 3.6477594528878554,
+            "lower": -6.2813104803957325,
+            "upper": 12.414076666669319,
+            "recordings": 63,
+            "draws": 10000,
+            "draws_used": 10000
+          },
+          "outcome": "not confirmed",
+          "recording_bands": [
+            {
+              "band": "<=55",
+              "recordings": 5,
+              "reported": 5,
+              "ok": 5,
+              "median_abs_error": 0.27389444929541895
+            },
+            {
+              "band": "55-60",
+              "recordings": 3,
+              "reported": 3,
+              "ok": 3,
+              "median_abs_error": 0.2197412364375424
+            },
+            {
+              "band": "60-65",
+              "recordings": 9,
+              "reported": 9,
+              "ok": 9,
+              "median_abs_error": 0.05786820282537519
+            },
+            {
+              "band": "65-75",
+              "recordings": 12,
+              "reported": 11,
+              "ok": 11,
+              "median_abs_error": 0.3387240234197577
+            },
+            {
+              "band": "75-90",
+              "recordings": 27,
+              "reported": 27,
+              "ok": 26,
+              "median_abs_error": 0.4387297901079421
+            },
+            {
+              "band": ">90",
+              "recordings": 14,
+              "reported": 14,
+              "ok": 13,
+              "median_abs_error": 0.2759103156660814
+            }
+          ]
+        }
+      }
+    }
+  },
+  "verdict": {
+    "set": "VitalVideos-WW",
+    "estimator": "hr_physnet_v2",
+    "outcome": "inconclusive",
+    "low_minus_typical_points": {
+      "point": -22.189577084702215,
+      "lower": -35.810244356280734,
+      "upper": -9.528261852488367,
+      "recordings": 250,
+      "draws": 10000,
+      "draws_used": 10000
+    }
+  },
+  "provenance": {
+    "command": [
+      "check_hr_robustness.py",
+      "low-hr",
+      "--device",
+      "cuda"
+    ],
+    "git": {
+      "commit": "aa2f51a0a77d06aab657f2959376a6ee1f507ffa",
+      "dirty": false,
+      "changed": []
+    },
+    "weights": {
+      "file": "phase_3_physnet_v2_baseline_best.zip",
+      "sha256": "f30fae250fb948e2aaece9aae5ec2d77fcc438d7ef1abbe54ae878a7eecee6b8",
+      "bytes": 3106459
+    },
+    "written_utc": "2026-11-01T10:57:59+00:00"
+  }
+}
