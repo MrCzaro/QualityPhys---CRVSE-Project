@@ -1,15 +1,25 @@
-"""Check 1 of check_hr_robustness on synthetic rows: classes, flags, interval, outcomes, outputs.
+"""check_hr_robustness on synthetic data only.
 
-No store is read: the benchmark scripts' evaluation functions are replaced by rows built
-here, so these tests say nothing about any dataset.
+Check 1 on rows built here (classes, flags, interval, outcomes, outputs): the benchmark
+scripts' evaluation functions are replaced, so no store is read. Check 2 on a synthetic face
+recorded losslessly at a quarter of the raw recordings' size (the ladder, its self-test, the
+outcome rule, the app's own reading path, the run). None of it says anything about a dataset.
 """
 import argparse
 import json
+from fractions import Fraction
 
+import av
+import cv2
+import numpy as np
 import pytest
 
+from app.live_vitals.estimators import registry
 from app.live_vitals.scripts import check_hr_robustness as robust
+from app.live_vitals.tests import synth
 
+
+# ------------------------------------------------------------------ check 1 --
 
 def window(recording, ref, pred, kept=True, primary=True):
     return dict(recording=recording, ref_hr=ref, ref_confidence=0.7, ref_kept=True,
@@ -152,3 +162,204 @@ def test_the_run_writes_its_summary_and_tables(tmp_path, monkeypatch, limit, sum
     assert "provenance" in summary
     assert len(list((tmp_path / "out").glob("windows_low_hr_*.csv"))) == 6
     assert len(list((tmp_path / "out").glob("recordings_low_hr_*.csv"))) == 6
+
+
+# ------------------------------------------------------------------ check 2 --
+# The recipe at a quarter of the real size: a 480x528 lossless 4:4:4 source at 60 fps,
+# laddered to 240x264 at 30 fps. Only the sizes and the frame count are changed.
+
+def small_recipe(monkeypatch, frames):
+    monkeypatch.setattr(robust, "SOURCE", dict(codec="h264", pix_fmt="yuv444p", height=528,
+                                               width=480, fps=60.0, frames=frames))
+    monkeypatch.setattr(robust, "LADDER_HEIGHT", 264)
+    monkeypatch.setattr(robust, "LADDER_WIDTH", 240)
+
+
+def write_source(path, frames, pix_fmt="yuv444p", bpm=72.0):
+    """A lossless H.264 recording of the synthetic face at 60 fps, laid out like the raw subset."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    scene = synth.Scene(width=480, height=528, fps=60.0, bpm=bpm)
+    with av.open(str(path), "w") as container:
+        stream = container.add_stream("libx264", rate=60, options={"qp": "0", "preset": "veryfast"})
+        stream.width, stream.height, stream.pix_fmt = 480, 528, pix_fmt
+        for i in range(frames):
+            frame = av.VideoFrame.from_ndarray(scene.frame(i), format="rgb24").reformat(format=pix_fmt)
+            frame.pts, frame.time_base = i, Fraction(1, 60)
+            container.mux(stream.encode(frame))
+        container.mux(stream.encode(None))
+    return path
+
+
+def lossy_copy(r0, path):
+    """The frames of an R0 encoded again with loss, as a broken baseline would be."""
+    with av.open(str(path), "w") as container:
+        stream = container.add_stream("libx264", rate=30, options={"qp": "20", "preset": "veryfast"})
+        stream.width, stream.height, stream.pix_fmt = 240, 264, "yuv444p"
+        for i, planes in enumerate(robust.decoded_planes(r0)):
+            frame = av.VideoFrame.from_ndarray(planes, format="yuv444p")
+            frame.pts, frame.time_base = i, Fraction(1, 30)
+            container.mux(stream.encode(frame))
+        container.mux(stream.encode(None))
+
+
+def test_the_encoder_settings_are_part0s():
+    by_rung = {rung["rung"]: robust.encoder_options(rung) for rung in robust.RUNGS}
+    assert by_rung["R0"] == by_rung["R1"] == {"qp": "0", "preset": "veryfast", "g": "60"}
+    assert by_rung["R2"] == {"preset": "veryfast", "tune": "zerolatency", "maxrate": "4950000",
+                             "bufsize": "4950000", "g": "60"}
+    assert by_rung["R3"]["maxrate"] == "2475000" and by_rung["R4"]["maxrate"] == "1237500"
+    assert by_rung["R5"] == {"deadline": "realtime", "cpu-used": "4", "maxrate": "4950000",
+                             "bufsize": "4950000", "g": "60"}
+    assert [rung["pix_fmt"] for rung in robust.RUNGS] == ["yuv444p"] + ["yuv420p"] * 5
+    assert robust.BROWSER_BITS == pytest.approx(0.651, abs=5e-4)
+
+
+def test_source_planes_are_every_second_frame_scaled_by_area(tmp_path, monkeypatch):
+    small_recipe(monkeypatch, frames=8)
+    source = write_source(tmp_path / "raw" / "rec" / "rec_1.mp4", frames=8)
+    with av.open(str(source)) as container:
+        decoded = [frame.to_ndarray(format="yuv444p") for frame in container.decode(video=0)]
+    planes = list(robust.source_planes(source))
+    assert len(planes) == 4 and planes[0].shape == (3, 264, 240)
+    for got, index in zip(planes, (0, 2, 4, 6)):
+        expected = np.stack([cv2.resize(p, (240, 264), interpolation=cv2.INTER_AREA)
+                             for p in decoded[index]])
+        assert np.array_equal(got, expected)
+
+
+def test_a_source_not_as_described_is_refused(tmp_path, monkeypatch):
+    small_recipe(monkeypatch, frames=8)
+    source = write_source(tmp_path / "raw" / "rec" / "rec_1.mp4", frames=8, pix_fmt="yuv420p")
+    with pytest.raises(ValueError, match="Part 0 describes"):
+        list(robust.source_planes(source))
+
+
+def test_the_ladder_and_its_self_test(tmp_path, monkeypatch):
+    small_recipe(monkeypatch, frames=40)
+    source = write_source(tmp_path / "raw" / "rec" / "rec_1.mp4", frames=40)
+    robust.write_ladder(source, tmp_path / "ladder", "rec")
+    for rung in robust.RUNGS:
+        facts = robust.file_facts(robust.rung_file(tmp_path / "ladder", "rec", rung))
+        assert robust.facts_match(facts, rung), (rung["rung"], facts)
+    r0 = robust.rung_file(tmp_path / "ladder", "rec", robust.RUNGS[0])
+    assert robust.r0_self_test(source, r0) == dict(equal=True, frames=20, max_abs_diff=0)
+    lossy_copy(r0, tmp_path / "lossy.mp4")
+    broken = robust.r0_self_test(source, tmp_path / "lossy.mp4")
+    assert not broken["equal"] and broken["max_abs_diff"] > 0
+    # A 4:2:0 baseline cannot hold 4:4:4 planes either.
+    r1 = robust.rung_file(tmp_path / "ladder", "rec", robust.RUNGS[1])
+    assert not robust.r0_self_test(source, r1)["equal"]
+
+
+def reading(value, reported=True):
+    return dict(value=value, reported=reported)
+
+
+@pytest.mark.parametrize("values, expected", [
+    ([72.0, 60.0, 80.0], "no effect"),
+    ([73.0, 59.0, 81.0], "no effect"),       # each exactly 1.0 away
+    ([73.5, 60.0, 80.0], "inconclusive"),    # one moved 1.5
+    ([75.0, 60.0, 80.0], "inconclusive"),    # one moved 3.0: one is not enough
+    ([75.0, 63.0, 80.0], "effect"),          # two moved more than 2.0
+    ([None, 60.0, 80.0], "inconclusive"),    # one lost
+    ([None, None, 80.0], "effect"),          # two lost
+    ([None, 63.0, 80.0], "effect"),          # one lost, one moved more than 2.0
+    ([74.0, 62.0, 80.0], "inconclusive"),    # two moved exactly 2.0: not more than it
+])
+def test_rung_outcomes_follow_part0(values, expected):
+    base = {"a": reading(72.0), "b": reading(60.0), "c": reading(80.0),
+            "d": reading(float("nan"), reported=False)}
+    rung = {name: reading(float("nan"), reported=False) if value is None else reading(value)
+            for name, value in zip("abc", values)}
+    rung["d"] = reading(66.0)  # R0 did not report it: gained, and outside the rule
+    result = robust.rung_outcome(base, rung)
+    assert result["outcome"] == expected
+    assert result["base_reported"] == 3 and result["gained"] == 1
+
+
+def test_nothing_reported_at_r0_is_not_estimable():
+    base = {"a": reading(float("nan"), reported=False)}
+    assert robust.rung_outcome(base, {"a": reading(70.0)})["outcome"] == "not estimable"
+
+
+def test_a_rung_is_read_as_the_web_app_reads_an_upload(tmp_path, monkeypatch, landmarker):
+    small_recipe(monkeypatch, frames=640)  # 320 frames at 30 fps: three analysis windows
+    source = write_source(tmp_path / "raw" / "rec" / "rec_1.mp4", frames=640, bpm=72.0)
+    robust.write_ladder(source, tmp_path / "ladder", "rec")
+    pos = registry.get_estimator("hr_spectral")
+    for rung in (robust.RUNGS[0], robust.RUNGS[2], robust.RUNGS[5]):
+        path = robust.rung_file(tmp_path / "ladder", "rec", rung)
+        result = robust.read_like_the_app(path, landmarker, [pos])["hr_spectral"]
+        assert result["reported"], (rung["rung"], result)
+        assert result["value"] == pytest.approx(72.0, abs=3.0)
+        assert result["capture_verdict"] != "REJECT" and result["frames"] == 320
+
+
+def test_the_reencode_run(tmp_path, monkeypatch):
+    small_recipe(monkeypatch, frames=40)
+    sources = []
+    for name in ("rec_a", "rec_b"):
+        sources.append(write_source(tmp_path / "raw" / name / f"{name}_1.mp4", frames=40))
+        robust.write_ladder(sources[-1], tmp_path / "ladder", name)
+    robust.write_manifest(tmp_path / "ladder", sources)
+
+    def read(path, landmarker, estimators):
+        rung, name = path.stem, path.parent.name
+        moved = 1.5 if (rung == "R4" and name == "rec_a") else 0.0
+        lost = rung == "R5"
+        return {e.name: dict(value=float("nan") if lost else 70.0 + moved,
+                             status="capture_rejected" if lost else "ok", reported=not lost,
+                             capture_verdict="WARN", capture_reasons="", effective_fps=30.0,
+                             frames=20, confidence=0.9, usable_fraction=1.0) for e in estimators}
+
+    class Closable:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(robust, "read_like_the_app", read)
+    monkeypatch.setattr(robust, "make_landmarker", Closable)
+    monkeypatch.setattr(robust, "reference_rates", lambda names: {n: 70.5 for n in names})
+    monkeypatch.setattr(robust, "make_estimators",
+                        lambda names, device: [FakeEstimator(name) for name in names])
+    args = argparse.Namespace(device="cpu", limit=None, source=tmp_path / "raw",
+                              ladder_dir=tmp_path / "ladder", out_dir=tmp_path / "out")
+    robust.run_reencode(args)
+
+    summary = json.loads((tmp_path / "out" / "summary_reencode.json").read_text(encoding="utf-8"))
+    assert summary["self_test"] == dict(recordings=2, equal=2, frames_each=[20], max_abs_diff=0)
+    assert summary["verdict"] == dict(rung="R2", estimator="hr_physnet_v2", outcome="no effect")
+    outcomes = {rung: block["hr_physnet_v2"]["outcome"] for rung, block in summary["rungs"].items()}
+    assert outcomes == {"R1": "no effect", "R2": "no effect", "R3": "no effect",
+                        "R4": "inconclusive", "R5": "effect"}
+    assert summary["settings"]["decisive_rung"] == "R2" and summary["settings"]["recordings"] == 2
+    assert [r["rung"] for r in summary["settings"]["rungs"]] == ["R0", "R1", "R2", "R3", "R4", "R5"]
+    assert summary["files"]["R5"]["codec"] == "vp8" and summary["files"]["R0"]["pix_fmt"] == "yuv444p"
+    rows = (tmp_path / "out" / "recordings_reencode.csv").read_text(encoding="utf-8").splitlines()
+    assert len(rows) == 1 + 2 * 6 * 2
+    assert len(summary["ladder"]["manifest_sha256"]) == 64
+
+    def run_again(out):
+        robust.run_reencode(argparse.Namespace(**{**vars(args), "out_dir": tmp_path / out}))
+
+    # A file changed after the manifest was written is refused.
+    r3_a = robust.rung_file(tmp_path / "ladder", "rec_a", robust.RUNGS[3])
+    kept = r3_a.read_bytes()
+    r3_a.write_bytes(kept + b"\0")
+    with pytest.raises(SystemExit, match="rec_a/R3.mp4 does not match the manifest"):
+        run_again("out2")
+    r3_a.write_bytes(kept)
+    # A baseline that is not lossless stops the run before anything is scored, even when
+    # the manifest records it.
+    r0_b = robust.rung_file(tmp_path / "ladder", "rec_b", robust.RUNGS[0])
+    lossy_copy(r0_b, tmp_path / "lossy.mp4")
+    r0_b.write_bytes((tmp_path / "lossy.mp4").read_bytes())
+    robust.write_manifest(tmp_path / "ladder", sources)
+    with pytest.raises(SystemExit, match="does not decode to the frames it was made from"):
+        run_again("out3")
+    # A ladder without its manifest is refused, and so is a missing rung.
+    (tmp_path / "ladder" / robust.MANIFEST).unlink()
+    with pytest.raises(SystemExit, match="no manifest.json"):
+        run_again("out4")
+    robust.rung_file(tmp_path / "ladder", "rec_a", robust.RUNGS[3]).unlink()
+    with pytest.raises(SystemExit, match="1 rung files missing"):
+        run_again("out5")

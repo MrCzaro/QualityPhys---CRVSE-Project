@@ -17,20 +17,40 @@ reference's. The decisive figure is v2's share of good windows among low windows
 among typical ones, in points, with a 95% interval from recordings resampled whole; a loss
 of 10 points is the bar.
 
+reencode: does compressing a recording the way a browser recorder does move the reading?
+The twelve raw VitalVideos-WW recordings are re-encoded on a ladder of six rungs - R0
+lossless 4:4:4, R1 lossless 4:2:0, R2 H.264 at the app's recorder setting in bits per pixel
+per frame (decisive), R3 and R4 at a half and a quarter of it, R5 VP8 at it - from the same
+frames: every second one, scaled to half size plane by plane in YUV 4:4:4. The recipe is
+here; the files are written by a standalone tool outside the repository, which calls
+write_ladder and write_manifest. This command first holds the files to their manifest and
+checks that every R0 decodes to exactly the planes it was made from, then reads every rung
+as the web app reads an upload and judges each against R0:
+no effect when every recording R0 reports stays reported within 1.0 bpm; an effect when at
+least two lose their reading or move by more than 2.0 bpm; inconclusive between.
+
 Usage:
     python -m app.live_vitals.scripts.check_hr_robustness low-hr [--device cpu|cuda]
         [--limit N] [--vv-store PATH] [--ubfc-phys-store PATH] [--rice-store PATH]
         [--out-dir DIR]
+    python -m app.live_vitals.scripts.check_hr_robustness reencode [--device cpu|cuda]
+        [--limit N] [--source DIR] [--ladder-dir DIR] [--out-dir DIR]
 
-No frame is rendered or written; every store is read-only.
+No frame is rendered; every store and source video is read-only.
 """
 import argparse
 import json
 import math
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from fractions import Fraction
+from itertools import zip_longest
 from pathlib import Path
 
+import av
+import cv2
+import h5py
 import numpy as np
 import pandas as pd
 
@@ -39,8 +59,10 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from app.live_vitals import config
+from app.live_vitals.capture import session
+from app.live_vitals.preprocess.face_box import make_landmarker
 from app.live_vitals.scripts import check_rice_ippg, check_ubfc_phys, check_vitalvideos
-from app.live_vitals.scripts.bench_outputs import provenance, subset_suffix
+from app.live_vitals.scripts.bench_outputs import file_sha256, git_state, provenance, subset_suffix
 from app.live_vitals.scripts.check_ubfc_phys import REPORTED, _write_csv, make_estimators
 
 DEFAULT_OUT_DIR = _REPO_ROOT / "Data" / "hr_robustness"
@@ -64,6 +86,32 @@ READOUT = ("CLIP_LEN", "WINDOW_STRIDE", "TARGET_FPS", "HR_LOW_HZ", "HR_HIGH_HZ",
            "MIN_USABLE_WINDOWS", "MIN_USABLE_FRACTION", "MIN_REPORTABLE_FRACTION",
            "HARMONIC_GUARD_ENABLED", "MIN_FPS_ACCEPT", "MIN_FPS_WARN", "MAX_FPS_ACCEPT")
 
+# Check 2 (reencode), Part 0's numbers.
+RAW_SUBSET = Path(r"D:\QualityPhys\demo_data\vitalvideos_subset")
+DEFAULT_LADDER_DIR = Path(r"D:\QualityPhys\demo_data\vitalvideos_reencoded")
+SOURCE = dict(codec="h264", pix_fmt="yuv444p", height=1056, width=960, fps=60.0, frames=3600)
+FRAME_STEP = 2                          # frames 0, 2, 4 ...: the 30 fps frames the store keeps
+LADDER_HEIGHT, LADDER_WIDTH = 528, 480  # half size, so the face spans a webcam's pixels
+LADDER_FPS = 30
+BROWSER_BITS = 6e6 / (640 * 480 * 30)   # the app's recorder: 640x480 at 6 Mbit/s and 30 fps
+KEYFRAME_INTERVAL = 60
+RUNGS = (  # bits: per pixel per frame; None is lossless
+    dict(rung="R0", codec="libx264", container="mp4", pix_fmt="yuv444p", bits=None),
+    dict(rung="R1", codec="libx264", container="mp4", pix_fmt="yuv420p", bits=None),
+    dict(rung="R2", codec="libx264", container="mp4", pix_fmt="yuv420p", bits=BROWSER_BITS),
+    dict(rung="R3", codec="libx264", container="mp4", pix_fmt="yuv420p", bits=BROWSER_BITS / 2),
+    dict(rung="R4", codec="libx264", container="mp4", pix_fmt="yuv420p", bits=BROWSER_BITS / 4),
+    dict(rung="R5", codec="libvpx", container="webm", pix_fmt="yuv420p", bits=BROWSER_BITS),
+)
+DECODED_AS = {"libx264": "h264", "libvpx": "vp8"}
+MANIFEST = "manifest.json"  # written with the ladder by the tool outside the repository
+DECISIVE_RUNG = "R2"
+NO_EFFECT_BPM = 1.0        # every recording R0 reports stays reported within this: no effect
+EFFECT_BPM = 2.0           # lost, or moved by more than this, ...
+EFFECT_RECORDINGS = 2      # ... in at least this many recordings: an effect
+
+
+# ================================================================== check 1 ==
 
 # --------------------------------------------------------------------- sets --
 
@@ -332,6 +380,387 @@ def run_low_hr(args):
     return summary
 
 
+# ================================================================== check 2 ==
+
+# ------------------------------------------------------------------- ladder --
+
+def rung_file(ladder_dir, recording, rung):
+    """Where one recording's rung lives: <ladder_dir>/<recording>/<rung>.<container>."""
+    return Path(ladder_dir) / recording / f"{rung['rung']}.{rung['container']}"
+
+
+def target_bit_rate(rung):
+    """A lossy rung's target in bits per second, from its bits per pixel per frame."""
+    return None if rung["bits"] is None else rung["bits"] * LADDER_WIDTH * LADDER_HEIGHT * LADDER_FPS
+
+
+def encoder_options(rung):
+    """Part 0's encoder settings for a rung.
+
+    Lossy rungs imitate a real-time encoder: no B-frames and no look-ahead for H.264, the
+    real-time deadline for VP8; the target is both the average and the maximum rate, with a
+    one-second buffer; a key frame every KEYFRAME_INTERVAL frames.
+    """
+    keyframes = {"g": str(KEYFRAME_INTERVAL)}
+    if rung["bits"] is None:
+        return {"qp": "0", "preset": "veryfast", **keyframes}
+    rate = str(int(round(target_bit_rate(rung))))
+    capped = {"maxrate": rate, "bufsize": rate, **keyframes}
+    if rung["codec"] == "libx264":
+        return {"preset": "veryfast", "tune": "zerolatency", **capped}
+    return {"deadline": "realtime", "cpu-used": "4", **capped}
+
+
+def source_planes(path):
+    """Every second frame of a raw recording as half-size YUV 4:4:4 planes, uint8 (3, H, W).
+
+    Each plane is scaled on its own with INTER_AREA, in the recording's own colour space, so
+    that the lossless baseline can hold the scaled frames to the bit. Stops unless the file is
+    the recording Part 0 describes.
+    """
+    with av.open(str(path)) as container:
+        stream = container.streams.video[0]
+        # Frame threads decode these files about ten times faster, to the same frames.
+        stream.thread_type = "AUTO"
+        found = dict(codec=stream.codec_context.name, pix_fmt=stream.codec_context.pix_fmt,
+                     height=stream.codec_context.height, width=stream.codec_context.width,
+                     fps=float(stream.average_rate), frames=stream.frames)
+        if found != SOURCE:
+            raise ValueError(f"{Path(path).name}: {found}, but Part 0 describes {SOURCE}")
+        count = 0
+        for index, frame in enumerate(container.decode(stream)):
+            count += 1
+            if index % FRAME_STEP == 0:
+                yield np.stack([cv2.resize(plane, (LADDER_WIDTH, LADDER_HEIGHT),
+                                           interpolation=cv2.INTER_AREA)
+                                for plane in frame.to_ndarray(format="yuv444p")])
+        if count != SOURCE["frames"]:
+            raise ValueError(f"{Path(path).name}: decoded {count} frames, not {SOURCE['frames']}")
+
+
+def write_ladder(source_path, ladder_dir, recording):
+    """Writes R0-R5 of one raw recording in a single pass over its frames."""
+    (Path(ladder_dir) / recording).mkdir(parents=True, exist_ok=True)
+    opened = []
+    try:
+        for rung in RUNGS:
+            container = av.open(str(rung_file(ladder_dir, recording, rung)), "w")
+            opened.append((container, None))  # listed before its stream, so a failure still closes it
+            stream = container.add_stream(rung["codec"], rate=LADDER_FPS,
+                                          options=encoder_options(rung))
+            stream.width, stream.height, stream.pix_fmt = LADDER_WIDTH, LADDER_HEIGHT, rung["pix_fmt"]
+            if rung["bits"] is not None:
+                stream.bit_rate = int(round(target_bit_rate(rung)))
+            opened[-1] = (container, stream)
+        for index, planes in enumerate(source_planes(source_path)):
+            frame = av.VideoFrame.from_ndarray(planes, format="yuv444p")
+            frame.pts, frame.time_base = index, Fraction(1, LADDER_FPS)
+            for container, stream in opened:
+                container.mux(stream.encode(frame))
+        for container, stream in opened:
+            container.mux(stream.encode(None))
+    finally:
+        for container, _ in opened:
+            container.close()
+
+
+# -------------------------------------------------------------------- files --
+
+def decoded_planes(path):
+    """A video's frames as YUV 4:4:4 planes, uint8 (3, H, W)."""
+    with av.open(str(path)) as container:
+        container.streams.video[0].thread_type = "AUTO"
+        for frame in container.decode(video=0):
+            yield frame.to_ndarray(format="yuv444p")
+
+
+def r0_self_test(source_path, r0_path):
+    """Whether R0 decodes to exactly the scaled planes of the recording it was made from."""
+    frames, worst = 0, 0
+    for expected, decoded in zip_longest(source_planes(source_path), decoded_planes(r0_path)):
+        if expected is None or decoded is None:
+            return dict(equal=False, frames=frames, max_abs_diff=None)
+        worst = max(worst, int(np.abs(expected.astype(np.int16) - decoded.astype(np.int16)).max()))
+        frames += 1
+    return dict(equal=worst == 0, frames=frames, max_abs_diff=worst)
+
+
+def file_facts(path):
+    """What a rung file holds: codec, pixel format, size, frames, rate, bits per pixel per frame.
+
+    Frames are counted, and the rate measured from their timestamps, by decoding: a WebM
+    file states neither.
+    """
+    with av.open(str(path)) as container:
+        stream = container.streams.video[0]
+        stream.thread_type = "AUTO"
+        codec, pix_fmt = stream.codec_context.name, stream.codec_context.pix_fmt
+        width, height = stream.codec_context.width, stream.codec_context.height
+        times = [frame.time for frame in container.decode(stream)]
+    frames = len(times)
+    rate = (frames - 1) / (times[-1] - times[0]) if frames > 1 and times[-1] > times[0] else float("nan")
+    size = Path(path).stat().st_size
+    bits = size * 8 / (width * height * frames) if frames else float("nan")
+    return dict(codec=codec, pix_fmt=pix_fmt, width=width, height=height, frames=frames,
+                fps=rate, bytes=size, bits_per_pixel_frame=bits)
+
+
+def facts_match(facts, rung):
+    """Whether a rung file is what the recipe says it is.
+
+    The rate is allowed 0.1 fps: WebM stamps frames to the millisecond, which moves a rate
+    measured over a short file by a few hundredths.
+    """
+    return (facts["codec"] == DECODED_AS[rung["codec"]] and facts["pix_fmt"] == rung["pix_fmt"]
+            and (facts["width"], facts["height"]) == (LADDER_WIDTH, LADDER_HEIGHT)
+            and facts["frames"] == SOURCE["frames"] // FRAME_STEP
+            and abs(facts["fps"] - LADDER_FPS) < 0.1)
+
+
+# ----------------------------------------------------------------- readings --
+
+def read_like_the_app(path, landmarker, estimators):
+    """A rung file read as the web app reads an upload: one reading per estimator.
+
+    The capture path decides first: a refused capture is `capture_rejected` and too few
+    frames `insufficient_frames`, with no value; otherwise the estimator's own status stands.
+    """
+    clip, fps, quality = session.crops_from_video(path, landmarker)
+    readings = {}
+    for estimator in estimators:
+        result = None
+        if quality.verdict == "REJECT":
+            status = "capture_rejected"
+        elif len(clip) < config.CLIP_LEN:
+            status = "insufficient_frames"
+        else:
+            result = estimator.estimate(clip, fps)
+            status = result.status
+        detail = (result.detail or {}) if result is not None else {}
+        readings[estimator.name] = dict(
+            value=float(result.value) if result is not None else float("nan"),
+            status=status, reported=status in REPORTED,
+            capture_verdict=quality.verdict, capture_reasons="; ".join(quality.reasons),
+            effective_fps=float(quality.effective_fps), frames=int(quality.n_frames),
+            confidence=float(result.confidence) if result is not None else float("nan"),
+            usable_fraction=float(detail.get("usable_fraction", float("nan"))))
+    return readings
+
+
+def rung_outcome(base, rung):
+    """Part 0's outcome of one rung against R0, over the recordings R0 reports.
+
+    `base` and `rung` map each recording to its reading. No effect: every recording R0
+    reports is reported at the rung too, within NO_EFFECT_BPM of its R0 value. An effect: at
+    least EFFECT_RECORDINGS of them lose their reading or move by more than EFFECT_BPM.
+    Anything between is inconclusive.
+    """
+    names = sorted(name for name, reading in base.items() if reading["reported"])
+    lost = [name for name in names if not rung[name]["reported"]]
+    moves = [abs(rung[name]["value"] - base[name]["value"])
+             for name in names if rung[name]["reported"]]
+    hits = len(lost) + sum(move > EFFECT_BPM for move in moves)
+    if not names:
+        verdict = "not estimable"
+    elif not lost and all(move <= NO_EFFECT_BPM for move in moves):
+        verdict = "no effect"
+    elif hits >= EFFECT_RECORDINGS:
+        verdict = "effect"
+    else:
+        verdict = "inconclusive"
+    return dict(base_reported=len(names), lost=len(lost),
+                gained=sum(1 for name, reading in base.items()
+                           if not reading["reported"] and rung[name]["reported"]),
+                moved_over_no_effect=sum(move > NO_EFFECT_BPM for move in moves),
+                moved_over_effect=sum(move > EFFECT_BPM for move in moves),
+                max_move=max(moves) if moves else None,
+                median_move=_median(moves), outcome=verdict)
+
+
+def reference_rates(recordings, store=check_vitalvideos.DEFAULT_STORE):
+    """Each recording's ECG heart rate from the VitalVideos-WW store, for description only."""
+    with h5py.File(store, "r") as handle:
+        return {name: float(handle[name].attrs["hr_ecg"]) if name in handle else float("nan")
+                for name in recordings}
+
+
+# ----------------------------------------------------------------- manifest --
+
+def ladder_settings():
+    """The ladder as this code builds it, for the tool's manifest and the check's summary."""
+    return dict(source=dict(SOURCE), frame_step=FRAME_STEP,
+                ladder=dict(height=LADDER_HEIGHT, width=LADDER_WIDTH, fps=LADDER_FPS,
+                            scaling="INTER_AREA, plane by plane in YUV 4:4:4"),
+                browser_bits_per_pixel_frame=BROWSER_BITS, keyframe_interval=KEYFRAME_INTERVAL,
+                rungs=[dict(rung, target_bit_rate=target_bit_rate(rung),
+                            options=encoder_options(rung)) for rung in RUNGS],
+                pyav=av.__version__)
+
+
+def write_manifest(ladder_dir, sources, minutes=None):
+    """Records the recipe, the repository's state and every rung file written, with its hash."""
+    files = [rung_file(ladder_dir, source.parent.name, rung) for source in sources for rung in RUNGS]
+    manifest = dict(
+        written_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"), minutes=minutes,
+        recipe=ladder_settings(), repository=git_state(),
+        recordings=[source.parent.name for source in sources],
+        files={path.relative_to(ladder_dir).as_posix(): dict(bytes=path.stat().st_size,
+                                                              sha256=file_sha256(path))
+               for path in files})
+    (Path(ladder_dir) / MANIFEST).write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return manifest
+
+
+def manifest_problems(ladder_dir, recordings):
+    """What keeps the ladder on disk from being the one its manifest records under this recipe.
+
+    The encoder's settings cannot be read back from the files, so the manifest written with
+    them has to name this code's recipe, and every file has to be the one it hashed.
+    """
+    path = Path(ladder_dir) / MANIFEST
+    if not path.is_file():
+        return [f"no {MANIFEST} in {ladder_dir}: the ladder was not written by the tool"]
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    problems = []
+    if manifest.get("recipe") != json.loads(json.dumps(ladder_settings())):
+        problems.append("the manifest's recipe is not this code's")
+    for name in recordings:
+        for rung in RUNGS:
+            file = rung_file(ladder_dir, name, rung)
+            entry = manifest.get("files", {}).get(file.relative_to(ladder_dir).as_posix())
+            if entry is None or entry["sha256"] != file_sha256(file):
+                problems.append(f"{file.relative_to(ladder_dir).as_posix()} does not match the manifest")
+    return problems
+
+
+# ------------------------------------------------------------------ summary --
+
+def reencode_settings(args, recordings):
+    """Check 2's rule as this run applies it, for the notebook to hold against Part 0."""
+    return dict(ladder_settings(), decisive_rung=DECISIVE_RUNG, no_effect_bpm=NO_EFFECT_BPM,
+                effect_bpm=EFFECT_BPM, effect_recordings=EFFECT_RECORDINGS,
+                estimators=list(ESTIMATORS), deciding=DECIDING, reported_statuses=list(REPORTED),
+                recordings=len(recordings), raw_subset=str(args.source),
+                ladder_dir=str(args.ladder_dir), limit=args.limit)
+
+
+def print_reencode(summary):
+    """Prints the self-test, the files and each rung's outcome against R0."""
+    test = summary["self_test"]
+    print(f"\nself-test: R0 decodes to its scaled source in {test['equal']} of {test['recordings']} "
+          f"recordings ({test['frames_each']} frames each; largest difference {test['max_abs_diff']})")
+    for rung, files in summary["files"].items():
+        target = files["target_bits_per_pixel_frame"]
+        print(f"  {rung}: {files['codec']} {files['pix_fmt']}, median "
+              f"{files['median_bits_per_pixel_frame']:.3f} bits per pixel per frame "
+              f"(target {'lossless' if target is None else f'{target:.3f}'})")
+    for rung, block in summary["rungs"].items():
+        for name, result in block.items():
+            move = "-" if result["max_move"] is None else f"{result['max_move']:.2f}"
+            print(f"  {rung} | {name:<14}: R0 reports {result['base_reported']}, lost "
+                  f"{result['lost']}, gained {result['gained']}, moved >{NO_EFFECT_BPM:g} bpm "
+                  f"{result['moved_over_no_effect']}, >{EFFECT_BPM:g} bpm "
+                  f"{result['moved_over_effect']}, largest {move} -> {result['outcome']}")
+    verdict = summary["verdict"]
+    print(f"\nVERDICT, check 2 ({verdict['rung']}, {verdict['estimator']}): {verdict['outcome']}")
+
+
+# ---------------------------------------------------------------------- run --
+
+def run_reencode(args):
+    """Check 2: the R0 self-test first, then every rung read like an upload; writes the outputs."""
+    sources = sorted(Path(args.source).glob("*/*_1.mp4"))
+    if args.limit:
+        sources = sources[:args.limit]
+    recordings = [source.parent.name for source in sources]
+    missing = [rung_file(args.ladder_dir, name, rung) for name in recordings for rung in RUNGS
+               if not rung_file(args.ladder_dir, name, rung).is_file()]
+    if not recordings or missing:
+        raise SystemExit(f"ERROR: {len(recordings)} recordings under {args.source}, "
+                         f"{len(missing)} rung files missing under {args.ladder_dir}")
+    problems = manifest_problems(args.ladder_dir, recordings)
+    if problems:
+        raise SystemExit("ERROR: the ladder is not the recorded one:\n  " + "\n  ".join(problems))
+    manifest = json.loads((Path(args.ladder_dir) / MANIFEST).read_text(encoding="utf-8"))
+    estimators = make_estimators(list(ESTIMATORS), args.device)
+    deciding = next(e for e in estimators if e.name == DECIDING)
+    produced_by = provenance(deciding)
+    suffix = subset_suffix(("limit", args.limit or None, None))
+
+    # Self-tests come first: every R0 must hold the scaled source frames to the bit.
+    self_test = {}
+    for source, name in zip(sources, recordings):
+        self_test[name] = r0_self_test(source, rung_file(args.ladder_dir, name, RUNGS[0]))
+        print(f"  self-test {name}: {self_test[name]}", flush=True)
+    if not all(result["equal"] for result in self_test.values()):
+        raise SystemExit("ERROR: an R0 does not decode to the frames it was made from; nothing scored")
+
+    facts = {rung["rung"]: [] for rung in RUNGS}
+    for name in recordings:
+        for rung in RUNGS:
+            found = file_facts(rung_file(args.ladder_dir, name, rung))
+            if not facts_match(found, rung):
+                raise SystemExit(f"ERROR: {name} {rung['rung']} is not the recipe's file: {found}")
+            facts[rung["rung"]].append(found)
+
+    reference = reference_rates(recordings)
+    readings = {e.name: {rung["rung"]: {} for rung in RUNGS} for e in estimators}
+    landmarker = make_landmarker()
+    try:
+        for i, name in enumerate(recordings, 1):
+            for rung in RUNGS:
+                path = rung_file(args.ladder_dir, name, rung)
+                for estimator_name, reading in read_like_the_app(path, landmarker, estimators).items():
+                    readings[estimator_name][rung["rung"]][name] = reading
+            print(f"  {i}/{len(recordings)} recordings read on every rung", flush=True)
+    finally:
+        landmarker.close()
+
+    rows = []
+    for estimator_name, by_rung in readings.items():
+        base = by_rung[RUNGS[0]["rung"]]
+        for rung, by_name in by_rung.items():
+            for name, reading in by_name.items():
+                rows.append(dict(recording=name, rung=rung, estimator=estimator_name, **reading,
+                                 change_vs_r0=(reading["value"] - base[name]["value"]
+                                               if reading["reported"] and base[name]["reported"]
+                                               else float("nan")),
+                                 error_vs_hr_ecg=reading["value"] - reference[name]))
+    summary = dict(
+        check="reencode", part0=PART0, settings=reencode_settings(args, recordings),
+        readout=readout_settings(),
+        ladder=dict(manifest_sha256=file_sha256(Path(args.ladder_dir) / MANIFEST),
+                    written_utc=manifest["written_utc"], repository=manifest["repository"]),
+        self_test=dict(recordings=len(self_test),
+                       equal=sum(result["equal"] for result in self_test.values()),
+                       frames_each=sorted({result["frames"] for result in self_test.values()}),
+                       max_abs_diff=max(result["max_abs_diff"] for result in self_test.values())),
+        files={rung["rung"]: dict(
+            codec=facts[rung["rung"]][0]["codec"], pix_fmt=facts[rung["rung"]][0]["pix_fmt"],
+            target_bits_per_pixel_frame=rung["bits"],
+            median_bits_per_pixel_frame=_median([f["bits_per_pixel_frame"] for f in facts[rung["rung"]]]),
+            bytes=sum(f["bytes"] for f in facts[rung["rung"]])) for rung in RUNGS},
+        rungs={rung["rung"]: {name: rung_outcome(by_rung[RUNGS[0]["rung"]], by_rung[rung["rung"]])
+                              for name, by_rung in readings.items()}
+               for rung in RUNGS[1:]},
+        reference=dict(source="hr_ecg of the VitalVideos-WW store, description only",
+                       median_abs_error={name: {rung["rung"]: _median(
+                           [abs(r["value"] - reference[n]) for n, r in readings[name][rung["rung"]].items()
+                            if r["reported"]]) for rung in RUNGS} for name in readings}))
+    summary["verdict"] = dict(rung=DECISIVE_RUNG, estimator=DECIDING,
+                              outcome=summary["rungs"][DECISIVE_RUNG][DECIDING]["outcome"])
+    summary["provenance"] = produced_by
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+    _write_csv(args.out_dir / f"recordings_reencode{suffix}.csv", rows)
+    (args.out_dir / f"summary_reencode{suffix}.json").write_text(json.dumps(summary, indent=2),
+                                                                 encoding="utf-8")
+    print_reencode(summary)
+    print(f"\noutputs: {args.out_dir}" + (f" (subset run: names end in {suffix})" if suffix else ""))
+    return summary
+
+
+# ===================================================================== main ==
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -344,9 +773,18 @@ def main():
     low.add_argument("--ubfc-phys-store", type=Path, default=check_ubfc_phys.DEFAULT_STORE)
     low.add_argument("--rice-store", type=Path, default=check_rice_ippg.DEFAULT_STORE)
     low.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
+    encode = checks.add_parser("reencode", help="check 2: a browser-grade encode")
+    encode.add_argument("--device", default="cpu", help="torch device for learned estimators")
+    encode.add_argument("--limit", type=int, default=None,
+                        help="the first N recordings only (smoke test)")
+    encode.add_argument("--source", type=Path, default=RAW_SUBSET)
+    encode.add_argument("--ladder-dir", type=Path, default=DEFAULT_LADDER_DIR)
+    encode.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     args = parser.parse_args()
     if args.check == "low-hr":
         run_low_hr(args)
+    elif args.check == "reencode":
+        run_reencode(args)
     return 0
 
 
