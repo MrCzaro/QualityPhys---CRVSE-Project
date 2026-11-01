@@ -1,0 +1,366 @@
+{
+  "check": "reencode",
+  "part0": "NB_P3_38 Part 0, pre-registered 2026-11-01",
+  "settings": {
+    "source": {
+      "codec": "h264",
+      "pix_fmt": "yuv444p",
+      "height": 1056,
+      "width": 960,
+      "fps": 60.0,
+      "frames": 3600
+    },
+    "frame_step": 2,
+    "ladder": {
+      "height": 528,
+      "width": 480,
+      "fps": 30,
+      "scaling": "INTER_AREA, plane by plane in YUV 4:4:4"
+    },
+    "browser_bits_per_pixel_frame": 0.6510416666666666,
+    "keyframe_interval": 60,
+    "rungs": [
+      {
+        "rung": "R0",
+        "codec": "libx264",
+        "container": "mp4",
+        "pix_fmt": "yuv444p",
+        "bits": null,
+        "target_bit_rate": null,
+        "options": {
+          "qp": "0",
+          "preset": "veryfast",
+          "g": "60"
+        }
+      },
+      {
+        "rung": "R1",
+        "codec": "libx264",
+        "container": "mp4",
+        "pix_fmt": "yuv420p",
+        "bits": null,
+        "target_bit_rate": null,
+        "options": {
+          "qp": "0",
+          "preset": "veryfast",
+          "g": "60"
+        }
+      },
+      {
+        "rung": "R2",
+        "codec": "libx264",
+        "container": "mp4",
+        "pix_fmt": "yuv420p",
+        "bits": 0.6510416666666666,
+        "target_bit_rate": 4950000.0,
+        "options": {
+          "preset": "veryfast",
+          "tune": "zerolatency",
+          "maxrate": "4950000",
+          "bufsize": "4950000",
+          "g": "60"
+        }
+      },
+      {
+        "rung": "R3",
+        "codec": "libx264",
+        "container": "mp4",
+        "pix_fmt": "yuv420p",
+        "bits": 0.3255208333333333,
+        "target_bit_rate": 2475000.0,
+        "options": {
+          "preset": "veryfast",
+          "tune": "zerolatency",
+          "maxrate": "2475000",
+          "bufsize": "2475000",
+          "g": "60"
+        }
+      },
+      {
+        "rung": "R4",
+        "codec": "libx264",
+        "container": "mp4",
+        "pix_fmt": "yuv420p",
+        "bits": 0.16276041666666666,
+        "target_bit_rate": 1237500.0,
+        "options": {
+          "preset": "veryfast",
+          "tune": "zerolatency",
+          "maxrate": "1237500",
+          "bufsize": "1237500",
+          "g": "60"
+        }
+      },
+      {
+        "rung": "R5",
+        "codec": "libvpx",
+        "container": "webm",
+        "pix_fmt": "yuv420p",
+        "bits": 0.6510416666666666,
+        "target_bit_rate": 4950000.0,
+        "options": {
+          "deadline": "realtime",
+          "cpu-used": "4",
+          "maxrate": "4950000",
+          "bufsize": "4950000",
+          "g": "60"
+        }
+      }
+    ],
+    "pyav": "19.0.1",
+    "decisive_rung": "R2",
+    "no_effect_bpm": 1.0,
+    "effect_bpm": 2.0,
+    "effect_recordings": 2,
+    "estimators": [
+      "hr_physnet_v2",
+      "hr_spectral"
+    ],
+    "deciding": "hr_physnet_v2",
+    "reported_statuses": [
+      "ok",
+      "degraded_capture",
+      "unstable"
+    ],
+    "recordings": 12,
+    "raw_subset": "D:\\QualityPhys\\demo_data\\vitalvideos_subset",
+    "ladder_dir": "D:\\QualityPhys\\demo_data\\vitalvideos_reencoded",
+    "limit": null
+  },
+  "readout": {
+    "CLIP_LEN": 160,
+    "WINDOW_STRIDE": 80,
+    "TARGET_FPS": 30.0,
+    "HR_LOW_HZ": 0.66,
+    "HR_HIGH_HZ": 3.0,
+    "CONFIDENCE_FLOOR_HZ": 0.15,
+    "MIN_CONFIDENCE": 0.65,
+    "MAD_OUTLIER_K": 3.0,
+    "MAD_FLOOR_BPM": 1.0,
+    "MIN_USABLE_WINDOWS": 3,
+    "MIN_USABLE_FRACTION": 0.5,
+    "MIN_REPORTABLE_FRACTION": 0.25,
+    "HARMONIC_GUARD_ENABLED": false,
+    "MIN_FPS_ACCEPT": 27.0,
+    "MIN_FPS_WARN": 20.0,
+    "MAX_FPS_ACCEPT": 33.0
+  },
+  "ladder": {
+    "manifest_sha256": "e93003403efb6bc751d7102a6210c4928059f65bdb1e8fc1a8bcb8265dcedc5e",
+    "written_utc": "2026-11-01T12:15:07+00:00",
+    "repository": {
+      "commit": "41736314e7dafd7799b31ec97c9dd0452825f2cc",
+      "dirty": false,
+      "changed": []
+    }
+  },
+  "self_test": {
+    "recordings": 12,
+    "equal": 12,
+    "frames_each": [
+      1800
+    ],
+    "max_abs_diff": 0
+  },
+  "files": {
+    "R0": {
+      "codec": "h264",
+      "pix_fmt": "yuv444p",
+      "target_bits_per_pixel_frame": null,
+      "median_bits_per_pixel_frame": 8.651558352623457,
+      "bytes": 5991491613
+    },
+    "R1": {
+      "codec": "h264",
+      "pix_fmt": "yuv420p",
+      "target_bits_per_pixel_frame": null,
+      "median_bits_per_pixel_frame": 3.615723686517957,
+      "bytes": 2488896095
+    },
+    "R2": {
+      "codec": "h264",
+      "pix_fmt": "yuv420p",
+      "target_bits_per_pixel_frame": 0.6510416666666666,
+      "median_bits_per_pixel_frame": 0.6558516414141414,
+      "bytes": 448776484
+    },
+    "R3": {
+      "codec": "h264",
+      "pix_fmt": "yuv420p",
+      "target_bits_per_pixel_frame": 0.3255208333333333,
+      "median_bits_per_pixel_frame": 0.3281368371212121,
+      "bytes": 224516498
+    },
+    "R4": {
+      "codec": "h264",
+      "pix_fmt": "yuv420p",
+      "target_bits_per_pixel_frame": 0.16276041666666666,
+      "median_bits_per_pixel_frame": 0.16418145868406286,
+      "bytes": 112258679
+    },
+    "R5": {
+      "codec": "vp8",
+      "pix_fmt": "yuv420p",
+      "target_bits_per_pixel_frame": 0.6510416666666666,
+      "median_bits_per_pixel_frame": 0.6623106235970819,
+      "bytes": 452173374
+    }
+  },
+  "rungs": {
+    "R1": {
+      "hr_physnet_v2": {
+        "base_reported": 10,
+        "lost": 0,
+        "gained": 0,
+        "moved_over_no_effect": 0,
+        "moved_over_effect": 0,
+        "max_move": 0.4328567424119427,
+        "median_move": 0.14096667281322794,
+        "outcome": "no effect"
+      },
+      "hr_spectral": {
+        "base_reported": 10,
+        "lost": 0,
+        "gained": 0,
+        "moved_over_no_effect": 0,
+        "moved_over_effect": 0,
+        "max_move": 0.49362423372235753,
+        "median_move": 0.10396420558914343,
+        "outcome": "no effect"
+      }
+    },
+    "R2": {
+      "hr_physnet_v2": {
+        "base_reported": 10,
+        "lost": 1,
+        "gained": 0,
+        "moved_over_no_effect": 0,
+        "moved_over_effect": 0,
+        "max_move": 0.7211481092798238,
+        "median_move": 0.22528621531462534,
+        "outcome": "inconclusive"
+      },
+      "hr_spectral": {
+        "base_reported": 10,
+        "lost": 6,
+        "gained": 0,
+        "moved_over_no_effect": 1,
+        "moved_over_effect": 0,
+        "max_move": 1.093524699467551,
+        "median_move": 0.8089001667803011,
+        "outcome": "effect"
+      }
+    },
+    "R3": {
+      "hr_physnet_v2": {
+        "base_reported": 10,
+        "lost": 1,
+        "gained": 0,
+        "moved_over_no_effect": 1,
+        "moved_over_effect": 0,
+        "max_move": 1.004540357489148,
+        "median_move": 0.2239199479749061,
+        "outcome": "inconclusive"
+      },
+      "hr_spectral": {
+        "base_reported": 10,
+        "lost": 5,
+        "gained": 0,
+        "moved_over_no_effect": 1,
+        "moved_over_effect": 0,
+        "max_move": 1.163227633600286,
+        "median_move": 0.4800401767744944,
+        "outcome": "effect"
+      }
+    },
+    "R4": {
+      "hr_physnet_v2": {
+        "base_reported": 10,
+        "lost": 2,
+        "gained": 0,
+        "moved_over_no_effect": 2,
+        "moved_over_effect": 1,
+        "max_move": 2.1137982350974767,
+        "median_move": 0.2216053507351674,
+        "outcome": "effect"
+      },
+      "hr_spectral": {
+        "base_reported": 10,
+        "lost": 5,
+        "gained": 0,
+        "moved_over_no_effect": 2,
+        "moved_over_effect": 1,
+        "max_move": 2.2599692929636745,
+        "median_move": 0.7953711730391007,
+        "outcome": "effect"
+      }
+    },
+    "R5": {
+      "hr_physnet_v2": {
+        "base_reported": 10,
+        "lost": 2,
+        "gained": 0,
+        "moved_over_no_effect": 1,
+        "moved_over_effect": 0,
+        "max_move": 1.379287003194122,
+        "median_move": 0.17844857911477874,
+        "outcome": "effect"
+      },
+      "hr_spectral": {
+        "base_reported": 10,
+        "lost": 4,
+        "gained": 0,
+        "moved_over_no_effect": 1,
+        "moved_over_effect": 1,
+        "max_move": 2.3345841491419748,
+        "median_move": 0.3819821068586222,
+        "outcome": "effect"
+      }
+    }
+  },
+  "reference": {
+    "source": "hr_ecg of the VitalVideos-WW store, description only",
+    "median_abs_error": {
+      "hr_physnet_v2": {
+        "R0": 0.30467031573670056,
+        "R1": 0.3230472682758325,
+        "R2": 0.4592314893862124,
+        "R3": 0.1472544385767094,
+        "R4": 0.2947995018976357,
+        "R5": 0.288061023179214
+      },
+      "hr_spectral": {
+        "R0": 0.23406164898148774,
+        "R1": 0.24087660024379076,
+        "R2": 0.769927743930225,
+        "R3": 0.5964616666757792,
+        "R4": 0.6547742873458731,
+        "R5": 0.3011269255536284
+      }
+    }
+  },
+  "verdict": {
+    "rung": "R2",
+    "estimator": "hr_physnet_v2",
+    "outcome": "inconclusive"
+  },
+  "provenance": {
+    "command": [
+      "check_hr_robustness.py",
+      "reencode",
+      "--device",
+      "cuda"
+    ],
+    "git": {
+      "commit": "46a6cda300e171a831e9f7af4a0b3250dec04e55",
+      "dirty": false,
+      "changed": []
+    },
+    "weights": {
+      "file": "phase_3_physnet_v2_baseline_best.zip",
+      "sha256": "f30fae250fb948e2aaece9aae5ec2d77fcc438d7ef1abbe54ae878a7eecee6b8",
+      "bytes": 3106459
+    },
+    "written_utc": "2026-11-01T13:49:30+00:00"
+  }
+}
