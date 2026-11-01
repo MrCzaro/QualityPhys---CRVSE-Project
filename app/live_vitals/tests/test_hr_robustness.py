@@ -3,10 +3,9 @@
 Check 1 on rows built here (classes, flags, interval, outcomes, outputs): the benchmark
 scripts' evaluation functions are replaced, so no store is read. Check 2 on a synthetic face
 recorded losslessly at a quarter of the raw recordings' size (the ladder, its self-test, the
-outcome rule, the app's own reading path, outcome rule, the app's own reading path, the run). 
-Check 3 on a small store of the VitalVideos schema and a synthetic face at 60 fps (the thinning, 
-its self-test, the readout told the rate, the outcome rule, the verdict, the run). 
-None of it says anything about a dataset.
+outcome rule, the app's own reading path, the run). Check 3 on a small store of the VitalVideos
+schema and a synthetic face at 60 fps (the thinning, its self-test, the readout told the rate,
+the outcome rule, the verdict, the run). None of it says anything about a dataset.
 """
 import argparse
 import json

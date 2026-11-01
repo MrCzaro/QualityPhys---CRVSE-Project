@@ -778,9 +778,6 @@ def run_reencode(args):
     return summary
 
 
-# ===================================================================== main ==
-
-
 # ================================================================== check 3 ==
 
 # -------------------------------------------------------------------- rates --
@@ -1008,6 +1005,10 @@ def run_frame_rate(args):
     print_frame_rate(summary)
     print(f"\noutputs: {args.out_dir}" + (f" (subset run: names end in {suffix})" if suffix else ""))
     return summary
+
+# ===================================================================== main ==
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
