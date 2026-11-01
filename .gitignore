@@ -57,6 +57,9 @@ Data/mrnirp_hrv_eval/*
 !Data/mrnirp_hrv_eval/summary_*.json
 Data/vv_hrv_eval/*
 !Data/vv_hrv_eval/summary_*.json
+Data/hr_robustness/*
+!Data/hr_robustness/summary_*.json
+Data/hr_robustness/summary_*_limit*.json
 Data/ecg_fitness_eval/*
 !Data/ecg_fitness_eval/summary_*.json
 Data/motion_gate/*
