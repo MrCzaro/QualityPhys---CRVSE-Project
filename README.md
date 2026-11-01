@@ -42,8 +42,9 @@ deployment is structural rather than defended by review.
 
 The interface reports a heart rate with its confidence and status, an independent
 classical cross-check, a per-window trend, and a diagnostics panel holding every number
-behind the reading. HRV and respiratory rate are shown as unavailable rather than
-hidden, so the intended scope is visible.
+behind the reading. Heart rate is the only vital sign it reports: pulse-rate variability
+was tested and not confirmed (see *What It Cannot Do*), and respiratory rate has no model
+with evidence behind it yet.
 
 **No capture is stored.** The uploaded clip goes to a temporary file deleted under every
 outcome; no frame, crop or clip is persisted. The interface says so while the camera is
@@ -63,6 +64,9 @@ measurement, not taste:
 | Usable fraction | Below 0.25 surviving, no value is reported |
 | Acquisition rate | Below 20 fps refused outright; below 27 fps flagged |
 | Framing | A face box clamped by more than 2% of its side is refused |
+| Face found | The face is looked for in 12 frames spread over the capture: found in 9 or fewer, the capture is refused; in 10 or 11, flagged |
+| Face in the box | Less than half the face inside the frozen face box in any of those frames is refused; more than 5% of it outside is flagged |
+| Second face | A second face at least half as wide as the subject's is flagged |
 | Head motion | A capture whose face crop moves 1.7 px or more per window, or 0.9 px or more with a regular rhythm in at least half the windows, is refused |
 
 Acquisition rate is a hard gate because spectral confidence cannot detect a wrong time

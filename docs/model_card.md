@@ -397,7 +397,7 @@ Not intended for:
 - heart-rate or pulse-rate **variability**: the app reports none, and the one positive
   finding (SDNN, still subjects, one laboratory camera) was not confirmed on an
   independent set under a rule fixed in advance; see Limitations
-- respiratory rate or blood pressure, which the app shows as unavailable
+- respiratory rate or blood pressure, which the app does not report
 
 ### Input Contract
 
@@ -622,6 +622,11 @@ minimum usable windows   fewer than 3 surviving windows is not a reading
 minimum usable fraction  below 0.25 surviving, no value is reported at all
 acquisition rate         below 20 fps refused outright, below 27 fps flagged
 framing                  a box clamped by more than 2% of its side is refused
+face found               the face is looked for in 12 frames spread over the capture:
+                         found in 9 or fewer refused, in 10 or 11 flagged
+face in the box          less than half the face inside the frozen box in any of
+                         those frames refused; more than 5% outside it flagged
+second face              a second face at least half the subject's width is flagged
 frame aspect             outside 1.20-1.90 the capture is flagged off-distribution
 head motion              median crop displacement >= 1.7 px per window, or >= 0.9 px
                          with a regular rhythm in half the windows, is refused
