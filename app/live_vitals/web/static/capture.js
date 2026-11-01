@@ -573,7 +573,8 @@ function renderSpectralDiagnostics(d) {
     ? 'POS and CHROM did not both produce a reading, so the classical path is '
       + 'unverified on this capture.'
     : spread <= AGREEMENT_BPM
-      ? `POS and CHROM agree to ${spread.toFixed(1)} bpm, so the colour trace is sound.`
+      ? `POS and CHROM agree to ${spread.toFixed(1)} bpm. Two colour methods agreeing `
+        + 'does not show that a pulse is present.'
       : `POS and CHROM differ by ${spread.toFixed(1)} bpm — the classical path is `
         + 'unreliable here and its agreement with the model would be coincidence.';
 

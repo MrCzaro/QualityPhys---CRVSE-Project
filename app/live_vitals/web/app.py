@@ -549,15 +549,12 @@ def index():
         for name in registry.available()]
     spectral_installed = SPECTRAL_NAME in registry.available()
 
-    # A vitals row gives the readings at a glance; the two unavailable vitals are
-    # shown rather than hidden so the intended scope of the app is visible.
-    vitals = Grid(
-        vital_tile("Heart rate", "model-hr", "bpm", "awaiting capture",
-                   "heart-pulse", chip("model-status", "idle")),
-        vital_tile("HRV", "model-hrv", "ms", "under evaluation", "activity"),
-        vital_tile("Respiratory rate", "model-rr", "br/min", "requires model",
-                   "wind"),
-        cols_md=3, cols_sm=1, cls="gap-5")
+        # Only what the app measures is shown. Variability could not be recovered from
+    # these captures, and respiratory rate has no model with evidence behind it yet;
+    # its tile is kept commented out, to be restored when one has.
+    vitals = vital_tile("Heart rate", "model-hr", "bpm", "awaiting capture",
+                        "heart-pulse", chip("model-status", "idle"))
+    # vital_tile("Respiratory rate", "model-rr", "br/min", "requires model", "wind")
 
     capture = Card(
         # The canvas carries the same mirroring as the video, so the overlay can be
@@ -674,11 +671,12 @@ def index():
         Div(waiting(), id="diag-windows", cls="overflow-x-auto pt-1"),
         DividerLine(),
         H4("Spectral cross-check"),
-        P("POS and CHROM read the same colour trace through different projections, "
-          "so their agreeing says the trace itself is sound and their diverging "
-          "says the cross-check should not be trusted on this capture, however "
-          "close either one lands to the model. GREEN carries no specular "
-          "rejection and is shown for reference only.", cls=TextPresets.muted_sm),
+        P("POS and CHROM read the same colour trace through different projections. "
+          "Their diverging says the cross-check should not be trusted on this "
+          "capture, however close either one lands to the model; their agreeing "
+          "does not show that a pulse is present, since both can lock onto the "
+          "same wrong component. GREEN carries no specular rejection and is shown "
+          "for reference only.", cls=TextPresets.muted_sm),
         Div(waiting(), id="diag-spectral", cls="overflow-x-auto pt-1"),
         DividerLine(),
         H4("Reconstructed BVP waveform"),
@@ -712,7 +710,7 @@ def index():
                       multiple=False),
             cls="space-y-6 pt-2"),
         P(DISCLAIMER, cls=(TextPresets.muted_sm, "pt-8 pb-4")),
-        Script(src="/static/capture.js?v=20261016-1"),
+        Script(src="/static/capture.js?v=20261031-1"),
         cls=("space-y-4", ContainerT.xl))
 
 
