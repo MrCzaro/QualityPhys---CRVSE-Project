@@ -67,6 +67,7 @@ measurement, not taste:
 | Face found | The face is looked for in 12 frames spread over the capture: found in 9 or fewer, the capture is refused; in 10 or 11, flagged |
 | Face in the box | Less than half the face inside the frozen face box in any of those frames is refused; more than 5% of it outside is flagged |
 | Second face | A second face at least half as wide as the subject's is flagged |
+| Frame aspect | A frame outside 1.20-1.90 width to height is flagged as off-distribution |
 | Head motion | A capture whose face crop moves 1.7 px or more per window, or 0.9 px or more with a regular rhythm in at least half the windows, is refused |
 
 Acquisition rate is a hard gate because spectral confidence cannot detect a wrong time
@@ -232,6 +233,7 @@ A command line exists for recorded video and direct webcam capture:
 ## Verification
 
 ```powershell
+.\venv\Scripts\python.exe -m pytest
 .\venv\Scripts\python.exe -m app.live_vitals.scripts.check_ubfc_regression
 .\venv\Scripts\python.exe -m app.live_vitals.scripts.check_contract_parity
 .\venv\Scripts\python.exe -m app.live_vitals.scripts.check_hrv_sampling_ceiling
@@ -245,6 +247,12 @@ or when the config, face model or weights differ from the baseline's, and 2 when
 no comparable baseline. The HRV scripts carry a reference-against-itself control row; any
 result there other than `0.00 / 100% / 0.0 ms` means the harness is broken rather than
 the model.
+
+`pytest` runs 159 tests on synthetic data only: the heart-rate readout and its gating,
+the capture gates, video decoding (AVI, MP4 and browser-style WebM), the web endpoints,
+the HRV harness, and the capture page itself in headless Chromium. Those five page tests
+carry the `browser` mark and need Playwright's Chromium (`python -m playwright install
+chromium`); `-m "not browser"` leaves them out.
 
 
 ## Repository Map

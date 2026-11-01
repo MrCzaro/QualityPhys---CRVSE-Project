@@ -549,7 +549,7 @@ def index():
         for name in registry.available()]
     spectral_installed = SPECTRAL_NAME in registry.available()
 
-        # Only what the app measures is shown. Variability could not be recovered from
+    # Only what the app measures is shown. Variability could not be recovered from
     # these captures, and respiratory rate has no model with evidence behind it yet;
     # its tile is kept commented out, to be restored when one has.
     vitals = vital_tile("Heart rate", "model-hr", "bpm", "awaiting capture",
