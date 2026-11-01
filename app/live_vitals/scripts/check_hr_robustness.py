@@ -29,12 +29,24 @@ as the web app reads an upload and judges each against R0:
 no effect when every recording R0 reports stays reported within 1.0 bpm; an effect when at
 least two lose their reading or move by more than 2.0 bpm; inconclusive between.
 
+frame-rate: down to which frame rate does v2's reading hold? Every VitalVideos-WW recording is
+thinned from its 60 fps crops to 30, 27, 25, 24, 22 and 20 fps - the frame nearest each tick
+of a uniform grid, index round(k x 60 / r) - with the reference read at the same indices, and
+the readout is told the rate. The 30 fps thinning has to return the store's own frames in
+every recording before anything is scored. Per rate, over the recordings reported at both
+rates: the mean change in absolute error against 30 fps, with a 95% interval from recordings
+resampled whole, and how many fewer recordings are reported. A rate holds within +0.5 bpm and
+3 fewer, and fails beyond +0.5 bpm or 15 fewer; the verdict is the lowest rate that holds with
+every rate above it holding too.
+
 Usage:
     python -m app.live_vitals.scripts.check_hr_robustness low-hr [--device cpu|cuda]
         [--limit N] [--vv-store PATH] [--ubfc-phys-store PATH] [--rice-store PATH]
         [--out-dir DIR]
     python -m app.live_vitals.scripts.check_hr_robustness reencode [--device cpu|cuda]
         [--limit N] [--source DIR] [--ladder-dir DIR] [--out-dir DIR]
+    python -m app.live_vitals.scripts.check_hr_robustness frame-rate [--device cpu|cuda]
+        [--limit N] [--store PATH] [--out-dir DIR]
 
 No frame is rendered; every store and source video is read-only.
 """
@@ -64,6 +76,7 @@ from app.live_vitals.preprocess.face_box import make_landmarker
 from app.live_vitals.scripts import check_rice_ippg, check_ubfc_phys, check_vitalvideos
 from app.live_vitals.scripts.bench_outputs import file_sha256, git_state, provenance, subset_suffix
 from app.live_vitals.scripts.check_ubfc_phys import REPORTED, _write_csv, make_estimators
+from app.live_vitals.scripts.check_ubfc_regression import window_starts
 
 DEFAULT_OUT_DIR = _REPO_ROOT / "Data" / "hr_robustness"
 PART0 = "NB_P3_38 Part 0, pre-registered 2026-11-01"
@@ -110,6 +123,12 @@ NO_EFFECT_BPM = 1.0        # every recording R0 reports stays reported within th
 EFFECT_BPM = 2.0           # lost, or moved by more than this, ...
 EFFECT_RECORDINGS = 2      # ... in at least this many recordings: an effect
 
+# Check 3 (frame-rate), Part 0's numbers.
+RATES = (30, 27, 25, 24, 22, 20)  # fps; 30 is the baseline the lower rates are judged against
+NATIVE_FPS = 60                   # the store's frames_60 and bvp_60
+HOLD_BPM = 0.5                    # holds: the interval's upper bound at or below this ...
+HOLD_FEWER = 3                    # ... and at most this many fewer recordings reported
+FAIL_FEWER = 15                   # fails: the lower bound above HOLD_BPM, or more fewer than this
 
 # ================================================================== check 1 ==
 
@@ -761,6 +780,234 @@ def run_reencode(args):
 
 # ===================================================================== main ==
 
+
+# ================================================================== check 3 ==
+
+# -------------------------------------------------------------------- rates --
+
+def thinned_indices(n_frames, rate):
+    """Part 0's thinning: the 60 fps frame nearest each tick of a uniform grid at `rate`.
+
+    Index round(k x 60 / rate) for k = 0, 1, 2 ... while it stays inside the recording, in
+    exact fractions: a tick halfway between two frames - every second one at 24 fps - goes
+    to the even index, as Python's round does.
+    """
+    indices, k = [], 0
+    while (index := round(Fraction(k * NATIVE_FPS, rate))) < n_frames:
+        indices.append(index)
+        k += 1
+    return np.array(indices, dtype=int)
+
+
+def thinning_self_test(store, names):
+    """Whether each recording's 30 fps thinning returns the store's own 30 fps streams.
+
+    Part 0 asks it of the frames, byte for byte; the reference is compared as well and
+    reported beside it.
+    """
+    results = {}
+    for name in names:
+        group = store[name]
+        index = thinned_indices(len(group["frames_60"]), RATES[0])
+        results[name] = dict(
+            frames_equal=bool(np.array_equal(group["frames_60"][()][index], group["frames"][()])),
+            bvp_equal=bool(np.array_equal(group["bvp_60"][()][index], group["bvp"][()])))
+    return results
+
+
+def read_at_rate(frames, bvp, rate, estimators):
+    """One recording at one rate: the reference read through the windows, then each estimator.
+
+    The readout is told `rate`, as the app tells it a capture's measured rate, and its
+    windows stay CLIP_LEN frames, so they last longer at lower rates. The frame-rate gate is
+    not applied: it is what this check measures. An absolute error exists only where both
+    the estimator and the reference report a value.
+    """
+    starts = list(window_starts(len(frames)))
+    reference, _ = check_ubfc_phys.reference_windows(bvp, rate, starts)
+    ref_reported = reference.status in REPORTED
+    rows = {}
+    for estimator in estimators:
+        result = estimator.estimate(frames, rate)
+        reported = result.status in REPORTED
+        detail = result.detail or {}
+        rows[estimator.name] = dict(
+            frames=len(frames), windows=len(starts), value=float(result.value),
+            status=result.status, reported=reported, confidence=float(result.confidence),
+            usable_fraction=float(detail.get("usable_fraction", 0.0)),
+            ref_value=float(reference.value), ref_status=reference.status,
+            abs_error=(abs(float(result.value) - float(reference.value))
+                       if reported and ref_reported else float("nan")))
+    return rows
+
+
+def evaluate_rates(store_path, estimators, limit):
+    """The self-test over every recording first, then one row per recording, rate and estimator."""
+    rows = []
+    with h5py.File(store_path, "r") as store:
+        names = sorted(store.keys())
+        if limit:
+            names = names[:limit]
+        for name in names:
+            if abs(float(store[name].attrs["fps_native"]) - NATIVE_FPS) > 0.01:
+                raise SystemExit(f"ERROR: {name} has no {NATIVE_FPS} fps stream to thin")
+        self_test = thinning_self_test(store, names)
+        if not all(result["frames_equal"] for result in self_test.values()):
+            raise SystemExit("ERROR: the 30 fps thinning does not return the stored frames; "
+                             "nothing scored")
+        for i, name in enumerate(names, 1):
+            group = store[name]
+            frames_60, bvp_60 = group["frames_60"][()], group["bvp_60"][()]
+            hr_ecg = float(group.attrs["hr_ecg"])
+            for rate in RATES:
+                index = thinned_indices(len(frames_60), rate)
+                for estimator_name, row in read_at_rate(frames_60[index], bvp_60[index], rate,
+                                                        estimators).items():
+                    rows.append(dict(recording=name, rate=rate, estimator=estimator_name, **row,
+                                     error_vs_hr_ecg=row["value"] - hr_ecg))
+            if i % 10 == 0 or i == len(names):
+                print(f"  {i}/{len(names)} recordings read at every rate", flush=True)
+    return self_test, rows
+
+
+# ------------------------------------------------------------------ outcome --
+
+def rate_outcome(base, at_rate, draws=BOOT_DRAWS, seed=BOOT_SEED):
+    """Part 0's outcome of one rate against 30 fps, for one estimator.
+
+    `base` and `at_rate` map each recording to its row. Over the recordings reported at both
+    rates with an error at both: the mean of (absolute error at the rate) minus (absolute
+    error at 30 fps), with a 95% interval from recordings resampled with replacement. Fewer
+    is the recordings reported at 30 fps minus those reported at the rate, over all of them.
+    Holds: upper bound at most HOLD_BPM and at most HOLD_FEWER fewer. Fails: lower bound
+    above HOLD_BPM, or more than FAIL_FEWER fewer. Inconclusive between.
+    """
+    both = [name for name in sorted(base) if base[name]["reported"] and at_rate[name]["reported"]]
+    names = [name for name in both
+             if math.isfinite(base[name]["abs_error"]) and math.isfinite(at_rate[name]["abs_error"])]
+    reported_at_30 = sum(row["reported"] for row in base.values())
+    reported = sum(row["reported"] for row in at_rate.values())
+    fewer = reported_at_30 - reported
+    point = lower = upper = None
+    if names:
+        changes = np.array([at_rate[name]["abs_error"] - base[name]["abs_error"] for name in names])
+        point = float(changes.mean())
+        pick = np.random.default_rng(seed).integers(0, len(changes), size=(draws, len(changes)))
+        lower, upper = (float(v) for v in np.percentile(changes[pick].mean(axis=1), [2.5, 97.5]))
+    if upper is not None and upper <= HOLD_BPM and fewer <= HOLD_FEWER:
+        verdict = "holds"
+    elif (lower is not None and lower > HOLD_BPM) or fewer > FAIL_FEWER:
+        verdict = "fails"
+    elif lower is None:
+        verdict = "not estimable"
+    else:
+        verdict = "inconclusive"
+    return dict(reported_at_30=reported_at_30, reported=reported, fewer=fewer, pairs=len(names),
+                pairs_without_reference=len(both) - len(names), point=point, lower=lower,
+                upper=upper, draws=draws, outcome=verdict)
+
+
+def lowest_holding_rate(outcomes):
+    """Part 0's verdict: the lowest rate that holds with every rate above it holding too.
+
+    `outcomes` maps each rate below 30 fps to its outcome; 30 means no lower rate holds.
+    """
+    lowest = RATES[0]
+    for rate in RATES[1:]:
+        if outcomes[rate]["outcome"] != "holds":
+            break
+        lowest = rate
+    return lowest
+
+
+# ------------------------------------------------------------------ summary --
+
+def frame_rate_settings(args, recordings):
+    """Check 3's rule as this run applies it, for the notebook to hold against Part 0."""
+    return dict(rates=list(RATES), native_fps=NATIVE_FPS,
+                thinning="index round(k x 60 / r) while inside the recording; exact fractions, "
+                         "half to even",
+                window_frames=config.CLIP_LEN, frame_rate_gate="not applied",
+                hold_bpm=HOLD_BPM, hold_fewer=HOLD_FEWER, fail_fewer=FAIL_FEWER,
+                interval=dict(unit="recording", draws=BOOT_DRAWS, seed=BOOT_SEED,
+                              percentiles=[2.5, 97.5]),
+                estimators=list(ESTIMATORS), deciding=DECIDING, reported_statuses=list(REPORTED),
+                store=str(args.store), recordings=len(recordings), limit=args.limit)
+
+
+def print_frame_rate(summary):
+    """Prints the self-test, then each estimator's rates against 30 fps and its lowest holding rate."""
+    test = summary["self_test"]
+    print(f"\nself-test: the 30 fps thinning returns the stored frames in {test['frames_equal']} of "
+          f"{test['recordings']} recordings (the stored reference in {test['bvp_equal']})")
+    for name, block in summary["estimators"].items():
+        print(f"\n=== {name}")
+        print(f"  {'fps':>4} {'frames':>6} {'reported':>8} {'fewer':>5} {'pairs':>5}   "
+              f"{'change in |error|, bpm (95%)':<44} {'|error|':>7}")
+        for row in block["rates"]:
+            error = "-" if row["median_abs_error"] is None else f"{row['median_abs_error']:.2f}"
+            judged = row["against_30"]
+            if judged is None:
+                fewer, pairs, change = "-", "-", "baseline"
+            else:
+                fewer, pairs = judged["fewer"], judged["pairs"]
+                change = ("not estimable" if judged["point"] is None else
+                          f"{judged['point']:+.2f} ({judged['lower']:+.2f} to {judged['upper']:+.2f})")
+                change += f" -> {judged['outcome']}"
+            print(f"  {row['rate']:>4} {row['frames_each'][0]:>6} {row['reported']:>8} {fewer:>5} "
+                  f"{pairs:>5}   {change:<44} {error:>7}")
+        lowest = block["lowest_holding_rate"]
+        print(f"  lowest rate that holds, every rate above it holding too: {lowest} fps"
+              + (" (no rate below 30 holds)" if lowest == RATES[0] else ""))
+    verdict = summary["verdict"]
+    print(f"\nVERDICT, check 3 ({verdict['estimator']}): holds down to {verdict['lowest_holding_rate']} fps")
+
+
+# ---------------------------------------------------------------------- run --
+
+def run_frame_rate(args):
+    """Check 3: the self-test first, then every recording read at every rate; writes the outputs."""
+    estimators = make_estimators(list(ESTIMATORS), args.device)
+    deciding = next(e for e in estimators if e.name == DECIDING)
+    # Read before anything is written, so the run's own outputs never list as changed files.
+    produced_by = provenance(deciding)
+    suffix = subset_suffix(("limit", args.limit or None, None))
+    self_test, rows = evaluate_rates(args.store, estimators, args.limit)
+    recordings = sorted(self_test)
+
+    blocks = {}
+    for name in ESTIMATORS:
+        by_rate = {rate: {row["recording"]: row for row in rows
+                          if row["estimator"] == name and row["rate"] == rate} for rate in RATES}
+        outcomes = {rate: rate_outcome(by_rate[RATES[0]], by_rate[rate]) for rate in RATES[1:]}
+        blocks[name] = dict(
+            rates=[dict(rate=rate,
+                        frames_each=sorted({row["frames"] for row in by_rate[rate].values()}),
+                        windows_each=sorted({row["windows"] for row in by_rate[rate].values()}),
+                        reported=sum(row["reported"] for row in by_rate[rate].values()),
+                        median_abs_error=_median([row["abs_error"] for row in by_rate[rate].values()]),
+                        median_abs_error_vs_hr_ecg=_median([abs(row["error_vs_hr_ecg"])
+                                                            for row in by_rate[rate].values()
+                                                            if row["reported"]]),
+                        against_30=outcomes.get(rate))
+                   for rate in RATES],
+            lowest_holding_rate=lowest_holding_rate(outcomes))
+    summary = dict(
+        check="frame-rate", part0=PART0, settings=frame_rate_settings(args, recordings),
+        readout=readout_settings(),
+        self_test=dict(recordings=len(self_test),
+                       frames_equal=sum(result["frames_equal"] for result in self_test.values()),
+                       bvp_equal=sum(result["bvp_equal"] for result in self_test.values())),
+        estimators=blocks,
+        verdict=dict(estimator=DECIDING, lowest_holding_rate=blocks[DECIDING]["lowest_holding_rate"]))
+    summary["provenance"] = produced_by
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+    _write_csv(args.out_dir / f"recordings_frame_rate{suffix}.csv", rows)
+    (args.out_dir / f"summary_frame_rate{suffix}.json").write_text(json.dumps(summary, indent=2),
+                                                                   encoding="utf-8")
+    print_frame_rate(summary)
+    print(f"\noutputs: {args.out_dir}" + (f" (subset run: names end in {suffix})" if suffix else ""))
+    return summary
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -780,11 +1027,19 @@ def main():
     encode.add_argument("--source", type=Path, default=RAW_SUBSET)
     encode.add_argument("--ladder-dir", type=Path, default=DEFAULT_LADDER_DIR)
     encode.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
+    frame_rate = checks.add_parser("frame-rate", help="check 3: lower frame rates")
+    frame_rate.add_argument("--device", default="cpu", help="torch device for learned estimators")
+    frame_rate.add_argument("--limit", type=int, default=None,
+                            help="the first N recordings only (smoke test)")
+    frame_rate.add_argument("--store", type=Path, default=check_vitalvideos.DEFAULT_STORE)
+    frame_rate.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     args = parser.parse_args()
     if args.check == "low-hr":
         run_low_hr(args)
     elif args.check == "reencode":
         run_reencode(args)
+    elif args.check == "frame-rate":
+        run_frame_rate(args)
     return 0
 
 

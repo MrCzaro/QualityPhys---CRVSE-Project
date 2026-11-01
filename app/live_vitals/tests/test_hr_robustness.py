@@ -3,7 +3,10 @@
 Check 1 on rows built here (classes, flags, interval, outcomes, outputs): the benchmark
 scripts' evaluation functions are replaced, so no store is read. Check 2 on a synthetic face
 recorded losslessly at a quarter of the raw recordings' size (the ladder, its self-test, the
-outcome rule, the app's own reading path, the run). None of it says anything about a dataset.
+outcome rule, the app's own reading path, outcome rule, the app's own reading path, the run). 
+Check 3 on a small store of the VitalVideos schema and a synthetic face at 60 fps (the thinning, 
+its self-test, the readout told the rate, the outcome rule, the verdict, the run). 
+None of it says anything about a dataset.
 """
 import argparse
 import json
@@ -11,10 +14,12 @@ from fractions import Fraction
 
 import av
 import cv2
+import h5py
 import numpy as np
 import pytest
 
 from app.live_vitals.estimators import registry
+from app.live_vitals.estimators.base import EstimatorResult
 from app.live_vitals.scripts import check_hr_robustness as robust
 from app.live_vitals.tests import synth
 
@@ -363,3 +368,170 @@ def test_the_reencode_run(tmp_path, monkeypatch):
     robust.rung_file(tmp_path / "ladder", "rec_a", robust.RUNGS[3]).unlink()
     with pytest.raises(SystemExit, match="1 rung files missing"):
         run_again("out5")
+
+
+# ------------------------------------------------------------------ check 3 --
+
+def test_the_thinning_follows_part0():
+    for rate, count in ((30, 1800), (27, 1620), (25, 1500), (24, 1440), (22, 1320), (20, 1200)):
+        index = robust.thinned_indices(3600, rate)
+        assert len(index) == count and index[0] == 0 and index[-1] < 3600
+        assert np.all(np.diff(index) > 0)
+        # The frame nearest each tick: never more than half a 60 fps frame (8.3 ms) off it.
+        assert np.abs(index - np.arange(count) * 60 / rate).max() <= 0.5
+    assert np.array_equal(robust.thinned_indices(3600, 30), np.arange(0, 3600, 2))
+    assert np.array_equal(robust.thinned_indices(3600, 20), np.arange(0, 3600, 3))
+    # At 24 fps every second tick lies halfway between two frames and goes to the even one.
+    assert robust.thinned_indices(3600, 24)[:8].tolist() == [0, 2, 5, 8, 10, 12, 15, 18]
+
+
+def test_the_readout_is_told_the_thinned_rate():
+    scene = synth.Scene(width=72, height=72, fps=60.0, bpm=72.0)
+    frames_60 = np.stack(list(scene.frames(1200)))
+    bvp_60 = np.sin(2 * np.pi * 1.2 * np.arange(1200) / 60).astype(np.float32)
+    index = robust.thinned_indices(1200, 24)
+    pos = registry.get_estimator("hr_spectral")
+    row = robust.read_at_rate(frames_60[index], bvp_60[index], 24, [pos])["hr_spectral"]
+    assert row["frames"] == 480 and row["windows"] == 5
+    assert row["reported"] and row["value"] == pytest.approx(72.0, abs=2.0)
+    assert row["ref_value"] == pytest.approx(72.0, abs=1.0) and row["abs_error"] < 2.0
+    # A reference that gives no value leaves no error, however the estimator reads.
+    flat = robust.read_at_rate(frames_60[index], np.zeros(len(index), np.float32), 24, [pos])
+    assert flat["hr_spectral"]["reported"] and np.isnan(flat["hr_spectral"]["abs_error"])
+
+
+def errors(values, unreported=0, prefix="r"):
+    """Rows of one rate: a reported recording per error given, then unreported ones."""
+    rows = {f"{prefix}{i:02d}": dict(abs_error=value, reported=True) for i, value in enumerate(values)}
+    rows.update({f"u{i:02d}": dict(abs_error=float("nan"), reported=False) for i in range(unreported)})
+    return rows
+
+
+def lose(rows, n):
+    """The same rows with the first n reported recordings no longer reported."""
+    rows = {name: dict(row) for name, row in rows.items()}
+    for name in sorted(rows)[:n]:
+        rows[name] = dict(abs_error=float("nan"), reported=False)
+    return rows
+
+
+BASE = [0.25] * 40
+
+
+@pytest.mark.parametrize("at_rate, expected", [
+    (errors([0.25] * 40), "holds"),
+    (errors([0.75] * 40), "holds"),                       # +0.5 exactly: at the bound, not above it
+    (errors([0.875] * 40), "fails"),                      # the whole interval above +0.5
+    (errors([0.25, 1.25] * 20), "inconclusive"),          # mean +0.5, the interval across it
+    (lose(errors([0.25] * 40), 3), "holds"),              # 3 fewer is allowed
+    (lose(errors([0.25] * 40), 4), "inconclusive"),
+    (lose(errors([0.25] * 40), 15), "inconclusive"),      # 15 fewer does not fail ...
+    (lose(errors([0.25] * 40), 16), "fails"),             # ... 16 does
+])
+def test_rate_outcomes_follow_part0(at_rate, expected):
+    result = robust.rate_outcome(errors(BASE), at_rate)
+    assert result["outcome"] == expected
+    assert result["reported_at_30"] == 40
+
+
+def test_fewer_counts_every_recording_and_pairs_need_an_error_at_both_rates():
+    base = errors([0.25] * 10, unreported=2)
+    at_rate = errors([0.25] * 10, unreported=2)
+    at_rate["r00"] = dict(abs_error=float("nan"), reported=True)   # reported, but no reference
+    at_rate["u00"] = dict(abs_error=0.3, reported=True)            # reported at the rate only
+    result = robust.rate_outcome(base, at_rate)
+    assert result["fewer"] == -1 and result["reported"] == 11
+    assert result["pairs"] == 9 and result["pairs_without_reference"] == 1
+    assert result["point"] == pytest.approx(0.0)
+
+
+def test_no_pairs_is_not_estimable_unless_too_few_are_reported():
+    assert robust.rate_outcome(errors(BASE), lose(errors(BASE), 40))["outcome"] == "fails"
+    nothing = errors([float("nan")] * 5)
+    assert robust.rate_outcome(nothing, nothing)["outcome"] == "not estimable"
+
+
+def test_the_interval_is_reproducible():
+    rows = errors([0.1 * (i % 7) for i in range(40)])
+    first = robust.rate_outcome(errors(BASE), rows)
+    assert first == robust.rate_outcome(errors(BASE), rows)
+    assert first["lower"] < first["point"] < first["upper"] and first["draws"] == robust.BOOT_DRAWS
+
+
+@pytest.mark.parametrize("outcomes, expected", [
+    (["holds"] * 5, 20),
+    (["holds", "holds", "inconclusive", "holds", "holds"], 25),
+    (["fails", "holds", "holds", "holds", "holds"], 30),
+    (["holds", "holds", "holds", "fails", "holds"], 24),
+    (["not estimable", "holds", "holds", "holds", "holds"], 30),
+])
+def test_the_verdict_is_the_lowest_rate_holding_with_every_rate_above(outcomes, expected):
+    by_rate = {rate: dict(outcome=outcome) for rate, outcome in zip(robust.RATES[1:], outcomes)}
+    assert robust.lowest_holding_rate(by_rate) == expected
+
+
+def write_store(path, n_recordings, frames=1200, broken=None):
+    """A VitalVideos-schema store: 60 fps crops whose pixel (0, 0) names the recording, a
+    72 bpm reference, and the 30 fps streams as every second frame - except in `broken`."""
+    t = np.arange(frames) / 60
+    with h5py.File(path, "w") as store:
+        for i in range(n_recordings):
+            group = store.create_group(f"rec{i}")
+            crops = np.zeros((frames, 8, 8, 3), np.uint8)
+            crops[:, 0, 0, 0] = i
+            crops[:, 0, 0, 1] = np.arange(frames) % 251
+            group["frames_60"] = crops
+            group["frames"] = crops[1::2] if f"rec{i}" == broken else crops[::2]
+            group["bvp_60"] = np.sin(2 * np.pi * 1.2 * t).astype(np.float32)
+            group["bvp"] = group["bvp_60"][()][::2]
+            group.attrs.update(fps=30.0, fps_native=60.0, hr_ecg=72.0)
+    return path
+
+
+class RateFake(FakeEstimator):
+    """Reads 72 bpm down to 24 fps and 75 bpm below; recording 0 stops reporting below 25 fps."""
+
+    def estimate(self, frames, fps):
+        recording = int(frames[0, 0, 0, 0])
+        if recording == 0 and fps < 25:
+            return EstimatorResult("heart_rate", float("nan"), "bpm", 0.0, "insufficient_quality",
+                                   detail=dict(usable_fraction=0.1))
+        value = 72.0 if fps >= 24 or self.name == "hr_spectral" else 75.0
+        return EstimatorResult("heart_rate", value, "bpm", 0.9, "ok", detail=dict(usable_fraction=1.0))
+
+
+@pytest.mark.parametrize("limit, summary_name", [(None, "summary_frame_rate.json"),
+                                                 (3, "summary_frame_rate_limit3.json")])
+def test_the_frame_rate_run(tmp_path, monkeypatch, limit, summary_name):
+    store = write_store(tmp_path / "vv.h5", 6)
+    monkeypatch.setattr(robust, "make_estimators",
+                        lambda names, device: [RateFake(name) for name in names])
+    args = argparse.Namespace(device="cpu", limit=limit, store=store, out_dir=tmp_path / "out")
+    robust.run_frame_rate(args)
+
+    summary = json.loads((tmp_path / "out" / summary_name).read_text(encoding="utf-8"))
+    n = limit or 6
+    assert summary["self_test"] == dict(recordings=n, frames_equal=n, bvp_equal=n)
+    v2 = {row["rate"]: row for row in summary["estimators"]["hr_physnet_v2"]["rates"]}
+    assert [v2[rate]["frames_each"] for rate in robust.RATES] == [[600], [540], [500], [480], [440], [400]]
+    assert v2[30]["against_30"] is None and v2[30]["reported"] == n
+    outcomes = {rate: v2[rate]["against_30"]["outcome"] for rate in robust.RATES[1:]}
+    assert outcomes == {27: "holds", 25: "holds", 24: "holds", 22: "fails", 20: "fails"}
+    assert v2[24]["against_30"]["fewer"] == 1 and v2[24]["against_30"]["pairs"] == n - 1
+    assert summary["verdict"] == dict(estimator="hr_physnet_v2", lowest_holding_rate=24)
+    assert summary["estimators"]["hr_spectral"]["lowest_holding_rate"] == 20
+    assert summary["settings"]["rates"] == [30, 27, 25, 24, 22, 20]
+    assert summary["settings"]["hold_bpm"] == 0.5 and summary["settings"]["limit"] == limit
+    assert summary["readout"]["MIN_CONFIDENCE"] == 0.65 and "provenance" in summary
+    table = (tmp_path / "out" / summary_name.replace("summary", "recordings").replace(".json", ".csv"))
+    assert len(table.read_text(encoding="utf-8").splitlines()) == 1 + n * 6 * 2
+
+
+def test_a_thinning_that_misses_the_stored_frames_scores_nothing(tmp_path, monkeypatch):
+    store = write_store(tmp_path / "vv.h5", 3, broken="rec1")
+    monkeypatch.setattr(robust, "make_estimators",
+                        lambda names, device: [RateFake(name) for name in names])
+    args = argparse.Namespace(device="cpu", limit=None, store=store, out_dir=tmp_path / "out")
+    with pytest.raises(SystemExit, match="does not return the stored frames"):
+        robust.run_frame_rate(args)
+    assert not (tmp_path / "out").exists()
