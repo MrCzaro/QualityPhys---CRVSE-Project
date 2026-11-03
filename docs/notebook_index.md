@@ -13,11 +13,11 @@ The notebooks fall into two phases:
   multichannel experiments, and live-compatible adaptation. They produced the Phase-2
   app, `app/live_hr_demo/`, now frozen; its model's characterised failure (predictions
   shrinking toward the corpus mean) is recorded in Card 1 of the model card.
-- **Phase 3** (`Notebooks/Phase 3 Notebooks/`, NB_P3_01 to NB_P3_37): models that read
+- **Phase 3** (`Notebooks/Phase 3 Notebooks/`, NB_P3_01 to NB_P3_38): models that read
   the face-crop video itself - the unified preprocessing schema, the architecture screen,
   the shipped model (PhysNet v2, NB_P3_18), held-out and benchmark sets, full-corpus
-  retraining, the app-level battery, and beat timing. They are the basis of the current
-  app, `app/live_vitals/`, and of Card 2.
+  retraining, the app-level battery, beat timing, and robustness checks of the heart-rate
+  reading. They are the basis of the current app, `app/live_vitals/`, and of Card 2.
 
 Within a phase, later notebooks should be trusted more than earlier ones when they
 disagree, because they were written after the issues the earlier ones exposed. Where
@@ -140,11 +140,12 @@ sets it is judged on. Each is listed with the question it asked and what it foun
 | `NB_P3_35_MR-NIRP_Indoor_Exploration.ipynb` | Does MR-NIRP Indoor add anything the project lacks? | Mostly a second session on Rice's own camera (7 of 8 subjects). POS is within 1.7 bpm everywhere, and the app's 8-bit crop costs about a quarter of the beat-timing error. Adopted for evaluation, not training. |
 | `NB_P3_36_MR-NIRP_Indoor_Preprocessing.ipynb` | How does MR-NIRP Indoor go into an evaluation store? | 15 recordings with the app's 8-bit crop and a full-depth trace of the same region, verified byte for byte; an alignment tie found under NB_P3_35's timing figure. |
 | `NB_P3_37_VitalVideos_PRV_Confirmation.ipynb` | Does v2's 60 s SDNN hold on VitalVideos-WW, under a rule fixed in advance? | No: within 10% of the contact PPG in 9.3% of 236 recordings, against a bar of 50%. "HRV" is not earned and RMSSD is closed; the Rice result stands for one laboratory camera only. |
+| `NB_P3_38_HR_Robustness_Checks.ipynb` | Does the heart-rate reading hold below 60 bpm, after a browser-grade encode and at lower frame rates? Three checks, each under a rule fixed in advance. | Below 60 bpm: inconclusive (good windows 63.6% against 85.8% at 65-90 bpm; the loss is v2's, not the confidence formula's). The app's recorder setting: inconclusive (9 of 10 readings within 0.72 bpm, one marginal recording lost; POS lost 6). Frame rate: v2 holds down to 24 fps, with 22 and 20 fps unresolved. No gate moved. |
 
 Main interpretation: the training loss mattered more than the architecture (NB_P3_18,
 20, 21, 23), and PhysNet v2 was chosen for size and speed as well as accuracy. The later
 evaluations run through the app's own code, and where a decision rests on one, its rule
-was fixed before the run (NB_P3_29, 32 and 37).
+was fixed before the run (NB_P3_29, 32, 37 and 38).
 
 ## Current Scientific Boundary
 
@@ -161,6 +162,11 @@ README and in Card 2 of the model card.
   VitalVideos-WW the skin-tone and outdoor-site disparity shows as coverage, not as wrong
   numbers; during exercise the readings follow head motion (NB_P3_28 and 29), which the
   motion gate now refuses.
+- **Robustness, under rules fixed in advance (NB_P3_38).** Below 60 bpm v2 keeps fewer
+  usable windows (inconclusive against the bar); an encode at the app's recorder setting
+  kept 9 of 10 readings within 0.72 bpm (inconclusive); on lossless crops thinned to lower
+  rates the reading holds down to 24 fps, below the 27 fps flag, with 22 and 20 fps
+  unresolved. No gate was moved.
 - **Measured negatives:** classical respiratory rate from the face (NB_P3_01);
   pulse-rate variability, recoverable as 60 s SDNN on one laboratory camera (NB_P3_33)
   but not confirmed on an independent set under a rule fixed in advance (NB_P3_37), with

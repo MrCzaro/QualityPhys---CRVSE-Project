@@ -46,6 +46,19 @@ behind the reading. Heart rate is the only vital sign it reports: pulse-rate var
 was tested and not confirmed (see *What It Cannot Do*), and respiratory rate has no model
 with evidence behind it yet.
 
+![The app after a 60-second capture: heart rate 51.0 bpm with status ok; measurement quality with confidence 0.77, 11 of 21 windows used and a 29.9 fps capture rate; POS at 50.8 bpm as the classical cross-check; and the per-window trend](docs/images/app_result.png)
+
+*One resting capture. Hollow points in the trend are windows the quality gates discarded,
+and the dashed line is the reported median. One capture is an illustration, not
+validation.*
+
+<details>
+<summary>While a capture is analysed</summary>
+
+![The app after recording: the capture accepted at 640x480 and 30 fps, the analysis running, and no value shown yet](docs/images/app_analysing.png)
+
+</details>
+
 **No capture is stored.** The uploaded clip goes to a temporary file deleted under every
 outcome; no frame, crop or clip is persisted. The interface says so while the camera is
 live.
@@ -195,6 +208,18 @@ refuses 14 and the quality gates the other 4. What evidence exists is unfavourab
 UBFC-rPPG, the fastest resting corpus at 90-123 bpm, carries the only negative
 validation bias, and the regression set's largest error is on its fastest subject.
 
+**Slow pulses, browser compression and lower frame rates.** Each was tested once, under a
+rule fixed before it ran (NB_P3_38; VitalVideos-WW, through the app's own code). Below
+60 bpm PhysNet v2 kept a reading within 10% of the reference in 64% of windows, against 86%
+at 65-90 bpm: inconclusive against the 10-point bar, and its visible failure is a window
+reading near twice the rate. Re-encoded at the app's recorder setting (H.264, the same bits
+per pixel per frame), 9 of 10 recordings kept their reading within 0.72 bpm and one marginal
+recording lost it: inconclusive. VP8 at that rate lost two, and POS lost 6 of 10. Thinned
+from 60 fps crops and told the true rate, v2 holds down to 24 fps, below the 27 fps warning;
+at 22 and 20 fps a few recordings were read confidently low, and the result is unresolved.
+The encoder imitates a browser's and is not one, the crops are lossless lab video, and no
+gate was moved.
+
 **MCD-rPPG remains an unexplained ceiling** - roughly 7 bpm against 3 on the other
 corpora, for every architecture screened. Frame rate and crop aspect were each tested as
 explanations and eliminated.
@@ -248,9 +273,10 @@ no comparable baseline. The HRV scripts carry a reference-against-itself control
 result there other than `0.00 / 100% / 0.0 ms` means the harness is broken rather than
 the model.
 
-`pytest` runs 159 tests on synthetic data only: the heart-rate readout and its gating,
+`pytest` runs 220 tests on synthetic data only: the heart-rate readout and its gating,
 the capture gates, video decoding (AVI, MP4 and browser-style WebM), the web endpoints,
-the HRV harness, and the capture page itself in headless Chromium. Those five page tests
+the HRV harness, the three robustness checks' rules, and the capture page itself in headless Chromium.
+Those five page tests
 carry the `browser` mark and need Playwright's Chromium (`python -m playwright install
 chromium`); `-m "not browser"` leaves them out.
 
@@ -293,7 +319,9 @@ checkpoint. The shrinkage bias is gone: validation bias is +0.40 bpm on DLCN and
 MCD-rPPG.
 
 The app was rebuilt around the frame contract, with the quality gates and the classical
-cross-check added on evidence gathered while validating it.
+cross-check added on evidence gathered while validating it. Its heart-rate reading was then
+tested under rules fixed in advance against slow pulses, browser-grade compression and lower
+frame rates (NB_P3_38); none of the three moved a gate.
 
 `docs/notebook_index.md` has the chronology.
 

@@ -640,6 +640,11 @@ Acquisition rate is a **hard** gate because spectral confidence cannot detect a
 wrong time base: a 10 fps webcam capture once produced a confident reading about
 7 bpm below a known resting heart rate.
 
+On VitalVideos-WW crops thinned from 60 fps and told the true rate, the error held down
+to 24 fps, and at 22 and 20 fps a few recordings were read confidently low (NB_P3_38).
+Neither threshold has been moved: that needs its own rule, re-recorded regression
+baselines and phone captures.
+
 ### Limitations
 
 - **Variability was not confirmed beyond one laboratory rig, and the app reports none.**
@@ -688,6 +693,31 @@ wrong time base: a 10 fps webcam capture once produced a confident reading about
   quality gates). What evidence exists points one way: UBFC-rPPG is the fastest resting
   corpus at 90-123 bpm and carries the only negative validation bias, and the largest
   error in its regression set is on its fastest subject.
+- **Slow pulses, browser-grade compression and lower frame rates were each tested once**,
+  under a rule fixed before the run (NB_P3_38; VitalVideos-WW; PhysNet v2 weights SHA-256
+  f30fae25…e6b8; through the app's own code; run 2026-11-01).
+
+  *Below 60 bpm*, v2 kept a reading within 10% of the reference in 63.6% of windows (478 in
+  42 recordings), against 85.8% at 65-90 bpm: -22.2 points, 95% -35.8 to -9.5, inconclusive
+  against the 10-point bar. The loss is v2's rather than the confidence formula's - POS,
+  read through the same formula, kept 7.9 points more good windows at low rates than at
+  typical ones - and it shows as fewer usable windows: v2 reads 8.6% of low windows near
+  twice the rate (0.3% at 65-90 bpm) but reports almost none of them.
+
+  *Re-encoded* from the 12 raw recordings at half size, at the app's recorder setting (H.264
+  at 0.651 bits per pixel per frame), 9 of the 10 recordings v2 reported uncompressed kept
+  their reading within 0.72 bpm, and one that was marginal uncompressed (52% of its windows
+  usable) lost it: inconclusive. Chroma subsampling alone moved no v2 reading by more than
+  0.43 bpm (POS 0.49); a quarter of the rate, or VP8 at the same rate, cost two readings
+  each; POS lost 4-6 of 10 at every lossy rate. The encoder imitates a browser's and is not
+  one, so the figures above remain figures on lossless lab video.
+
+  *Thinned* from the 60 fps crops and told the true rate, v2's error held down to 24 fps
+  (mean change +0.02 bpm, 95% -0.05 to +0.11; 276 recordings reported, as at 30 fps), below
+  the 27 fps flag. At 22 and 20 fps the result is unresolved: the typical recording read as
+  well as at 30 fps, but 6 and 10 of about 255 were read lower, their error growing by 2 to
+  44 bpm, and were still reported. POS kept its accuracy but lost coverage from 25 fps down
+  (19 fewer at 24 fps).
 - **Skin tone is characterised only within a site confound** (VitalVideos-WW, 300
   recordings, zero-shot). On the darkest skin the model withholds readings rather than
   reporting wrong ones: recordings reported at Fitzpatrick 1-6 were 100/100/100/100/96/61%
