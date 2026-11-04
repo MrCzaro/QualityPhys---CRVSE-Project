@@ -103,7 +103,7 @@ sets it is judged on. Each is listed with the question it asked and what it foun
 
 | Notebook | Question | Result |
 | --- | --- | --- |
-| `NB_P3_01_RR_Exploration.ipynb` | Can respiratory rate be estimated from the facial rPPG signal with classical spectral methods, against a checkable reference? | No. RIIV, RIAV and RSA correlated near zero with MCD-rPPG's clinical label (RIIV r = -0.01 at n = 504), and facial RIIV agreed with neither that label nor concurrent beat-timing RSA. Closed as a documented negative for this data. |
+| `NB_P3_01_RR_Exploration.ipynb` | Can respiratory rate be estimated from the facial rPPG signal with classical spectral methods, against a checkable reference? | Inconclusive (revised 2026-11-04). RIIV, RIAV and RSA correlated near zero with MCD-rPPG's clinical label (RIIV r = -0.01 at n = 504), but neither reference could tell a working method from a constant: the label is a whole-number spot value that a constant 18 breaths/min matches within 2 in 90.5% of those recordings, and the beat-timing RSA that facial RIIV was compared with came from an ECG taken at MCD's measurement stand, not recorded with the video. |
 | `NB_P3_02_DLCN_Exploration.ipynb` | What does DLCN contain, and how much of it is usable? | 780 recordings of 98 people in four night-lighting scenarios, at rest and after exercise, with a frame-synced BVP. Low light does not degrade the signal, and about 99% is usable as a waveform target. |
 | `NB_P3_03_DLCN_Preprocessing.ipynb` | How does DLCN go into the unified Phase-3 store? | One consolidated HDF5 with a group per recording: 72x72 face crops, the BVP label, and quality fields that weight training. |
 | `NB_P3_04_MCD-rPPG_raw_dataset_exploration.ipynb` | How is the MCD-rPPG download laid out? | Three camera views and two states per subject, with ECG, PPG and a biomarker table: the file patterns the loader parses. |
@@ -167,10 +167,13 @@ README and in Card 2 of the model card.
   kept 9 of 10 readings within 0.72 bpm (inconclusive); on lossless crops thinned to lower
   rates the reading holds down to 24 fps, below the 27 fps flag, with 22 and 20 fps
   unresolved. No gate was moved.
-- **Measured negatives:** classical respiratory rate from the face (NB_P3_01);
-  pulse-rate variability, recoverable as 60 s SDNN on one laboratory camera (NB_P3_33)
-  but not confirmed on an independent set under a rule fixed in advance (NB_P3_37), with
-  RMSSD not recoverable; in-vehicle video (NB_P3_18); hyperparameter tuning (NB_P3_19).
+- **Measured negatives:** pulse-rate variability, recoverable as 60 s SDNN on one
+  laboratory camera (NB_P3_33) but not confirmed on an independent set under a rule fixed
+  in advance (NB_P3_37), with RMSSD not recoverable; in-vehicle video (NB_P3_18);
+  hyperparameter tuning (NB_P3_19).
+- **Open, not a negative:** respiratory rate from video. NB_P3_01's classical test was
+  inconclusive (revised 2026-11-04): neither of its references was recorded with the
+  video, and neither could separate a working method from a constant.
 - **A candidate, not a claim:** `hr_physnet_v3` (NB_P3_31) is registered beside v2; the
   app-level battery (NB_P3_32) kept v2 as the default.
 - **Not characterised:** elevated heart rate and iOS devices.
