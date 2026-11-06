@@ -1,8 +1,12 @@
 """Respiratory rate from the torso's motion, on synthetic signals and frames with known answers:
 the readout (`signal.respiration`), then the development check's guards and scoring
-(`scripts.check_rr`). Nothing here reads a store."""
+(`scripts.check_rr`), its held-out stage included. Nothing here reads a store or a recording."""
+import hashlib
+import json
+import sys
 import uuid
 
+import cv2
 import h5py
 import numpy as np
 import pandas as pd
@@ -216,3 +220,222 @@ def test_readings_digest_ignores_row_order_and_sees_the_sixth_decimal():
     assert check_rr.readings_digest(nudged) == digest
     nudged.loc[0, "a_rate"] += 1e-6
     assert check_rr.readings_digest(nudged) != digest
+
+
+# ----------------------------------------------------------- the held-out stage --
+
+def _held_out_store(rate):
+    """An in-memory store holding one VV-60 recording: a synthetic breathing torso and the
+    attributes scoring reads."""
+    store = _store({})
+    group = store.create_group("v1")
+    group.create_dataset("frames_full", data=torso_frames(rate))
+    group.attrs.update(split="val", full_fps=10.0, box_ry1=BOX_RY1, resp_ok=True, note_resp_bad=False,
+                       site_group="MOL/RING", fitzpatrick=2, age=40, rr_belt=rate, rr_surrogate=np.nan)
+    return store
+
+
+def _portrait_video(path, bpm, fps=30.0, seconds=40, width=270, height=480):
+    """A portrait video in the iPhone's framing: the suite's face near the top and, below it, a
+    textured torso that rises and falls 3 px at bpm. Written with OpenCV (MJPG)."""
+    from app.live_vitals.tests import synth
+    face = synth.portrait()
+    face_h = 170
+    face_w = int(face_h * face.shape[1] / face.shape[0])
+    face = cv2.resize(face, (face_w, face_h), interpolation=cv2.INTER_AREA)
+    y = np.arange(height, dtype=np.float64)[:, None]
+    x = np.arange(width, dtype=np.float64)[None, :]
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"MJPG"), fps, (width, height))
+    for i in range(int(fps * seconds)):
+        moved = y - 3.0 * np.sin(2 * np.pi * bpm / 60.0 * i / fps)
+        torso = (90 + 60 / (1 + np.exp(-(moved - 300) / 4))
+                 + 15 * np.sin(2 * np.pi * moved / 19) * np.cos(2 * np.pi * x / 31))
+        image = np.repeat(np.clip(torso, 0, 255)[..., None], 3, axis=-1)
+        image[:250] = 96.0
+        image[30:30 + face_h, (width - face_w) // 2:(width - face_w) // 2 + face_w] = face
+        writer.write(cv2.cvtColor(image.astype(np.uint8), cv2.COLOR_RGB2BGR))
+    writer.release()
+    return path
+
+
+def test_held_out_settings_are_part_0s():
+    assert check_rr.SETTINGS == {
+        "bar: Wilson 95% lower bound at least": 0.70,
+        "bar: coverage at least": 0.80,
+        "bar: McNemar p below": 0.05,
+        "Wilson z": 1.959964,
+        "ladder: deciding rung": "R2",
+        "ladder: no effect, every move within (breaths/min)": 1.0,
+        "ladder: effect, a move beyond (breaths/min)": 2.0,
+        "ladder: effect, least recordings lost or moved": 2,
+        "ladder: downscale from half size, frames averaged": (4, 3),
+        "self-test: mean absolute difference, pixel means removed (grey levels)": 1.0,
+        "iPhone: downscale, frames averaged": (8, 6),
+    }
+
+
+def test_held_out_reader_refuses_training_recordings():
+    with _store({"a1": "train", "b2": "val"}) as store:
+        assert check_rr.read_held_out(store["b2"], "frames_full").shape == (2, 4, 4, 3)
+        with pytest.raises(RuntimeError, match="VV-60 only"):
+            check_rr.read_held_out(store["a1"], "frames_full")
+
+
+def test_held_out_guids_require_the_frozen_split(tmp_path):
+    frozen = tmp_path / "split.csv"
+    pd.DataFrame(dict(guid=["b2", "a1", "c3"], split=["val", "train", "val"])).to_csv(frozen, index=False)
+    with _store({"a1": "train", "b2": "val", "c3": "val"}) as store:
+        assert check_rr.held_out_guids(store, frozen) == ["b2", "c3"]
+    with _store({"a1": "val", "b2": "val", "c3": "val"}) as store:
+        with pytest.raises(SystemExit):
+            check_rr.held_out_guids(store, frozen)
+
+
+def test_held_out_recording_is_read_by_both_readouts():
+    with _held_out_store(18.7) as store:
+        row = check_rr.read_recording(store, "v1", reader=check_rr.read_held_out)
+        assert row["a_rate"] == pytest.approx(18.7, abs=0.1)
+        assert row["b_rate"] == pytest.approx(18.7, abs=0.5)
+        assert (row["torso_rows"], row["resp_ok"], row["belt"]) == (85, True, 18.7)
+        with pytest.raises(RuntimeError):
+            check_rr.read_recording(store, "v1")  # the development stage's reader refuses it
+
+
+@pytest.mark.parametrize("right, read, belt, expected", [
+    (46, 56, 10.0, "confirmed"),  # 82.1%, lower bound 70.2%
+    (45, 56, 10.0, "inconclusive"),  # 80.4%, lower bound 68.2%
+    (40, 56, 10.0, "inconclusive"),  # 71.4%
+    (39, 56, 10.0, "not confirmed"),  # 69.6%
+    (42, 44, 10.0, "inconclusive"),  # 95.5% of those read, but coverage 78.6%
+    (46, 56, 20.0, "not confirmed"),  # the baseline (20) is right everywhere: A is not ahead
+])
+def test_held_out_outcome_follows_part_0s_bar(right, read, belt, expected):
+    rate = [belt] * right + [belt + 5.0] * (read - right) + [np.nan] * (56 - read)
+    g = check_rr.gate(pd.DataFrame(dict(belt=[belt] * 56, a_rate=rate)), "a_rate", baseline=20.0)
+    assert check_rr.held_out_outcome(g) == expected
+
+
+@pytest.mark.parametrize("rung, expected", [
+    ({"a": 10.2, "b": 12.0, "c": 15.9}, "no effect"),
+    ({"a": 10.2, "b": 12.0, "c": 16.6}, "inconclusive"),  # one move over 1, none over 2
+    ({"a": 10.2, "b": np.nan, "c": 15.0}, "inconclusive"),  # one lost
+    ({"a": np.nan, "b": np.nan, "c": 15.0}, "effect"),  # two lost
+    ({"a": 13.0, "b": np.nan, "c": 15.0}, "effect"),  # one moved by 3 and one lost
+])
+def test_rung_outcome_follows_the_ladder_rule(rung, expected):
+    assert check_rr.rung_outcome({"a": 10.0, "b": 12.0, "c": 15.0}, rung)["outcome"] == expected
+
+
+def test_rung_outcome_with_nothing_read_at_r0_is_inconclusive():
+    outcome = check_rr.rung_outcome({"a": np.nan}, {"a": 10.0})
+    assert (outcome["read_at_r0"], outcome["outcome"]) == (0, "inconclusive")
+
+
+def test_reduced_video_matches_reducing_its_source(tmp_path):
+    import av
+    yy, xx = np.mgrid[0:48, 0:64]
+    source = [np.clip(np.stack([100 + 60 * np.sin(xx / 7 + i / 5), 120 + 50 * np.cos(yy / 5 - i / 7),
+                                90 + 0 * xx + i], axis=-1), 0, 255).astype(np.uint8) for i in range(30)]
+    path = tmp_path / "lossless.mp4"
+    with av.open(str(path), "w") as container:
+        stream = container.add_stream("libx264", rate=30)
+        stream.width, stream.height, stream.pix_fmt = 64, 48, "yuv444p"
+        stream.options = {"qp": "0", "preset": "veryfast"}
+        for rgb in source:
+            for packet in stream.encode(av.VideoFrame.from_ndarray(rgb, format="rgb24")):
+                container.mux(packet)
+        for packet in stream.encode():
+            container.mux(packet)
+    frames, samples, n, fps = check_rr.reduced_video(path, 4, 3, keep=[0, 7])
+    expected = np.stack([np.rint(np.mean([cv2.resize(f, (16, 12), interpolation=cv2.INTER_AREA)
+                                          .astype(np.float32) for f in source[k:k + 3]], axis=0))
+                         for k in range(0, 30, 3)])
+    assert frames.shape == (10, 12, 16, 3) and frames.dtype == np.uint8
+    assert (n, fps, sorted(samples)) == (30, 30.0, [0, 7])
+    assert np.abs(frames.astype(int) - expected.astype(int)).max() <= 2  # the 4:4:4 colour round trip
+    assert np.abs(samples[7].astype(int) - source[7].astype(int)).max() <= 3
+
+
+def test_torso_difference_ignores_offsets_and_sees_change():
+    stored = torso_frames(18.7)[:30]
+    assert check_rr.torso_difference(stored, stored, BOX_RY1) == 0.0
+    assert check_rr.torso_difference(stored + np.uint8(3), stored, BOX_RY1) < 1e-9  # gone with the means
+    changed = stored.copy()
+    changed[5] += np.uint8(6)  # one frame of 30 brighter by 6 levels
+    assert check_rr.torso_difference(changed, stored, BOX_RY1) == pytest.approx(2 * 6 * 29 / 30 ** 2)
+    assert np.isnan(check_rr.torso_difference(stored[:29], stored, BOX_RY1))  # another shape
+    assert np.isnan(check_rr.torso_difference(stored, stored, 0.97))  # no torso region
+
+
+def test_verify_ladder_holds_every_file_to_its_manifest(tmp_path):
+    from app.live_vitals.scripts.bench_outputs import file_sha256
+    names = ("g1/R0.mp4", "g1/R2.mp4")
+    (tmp_path / "g1").mkdir()
+    (tmp_path / names[0]).write_bytes(b"lossless")
+    (tmp_path / names[1]).write_bytes(b"lossy!")
+    manifest = dict(repository=dict(commit="abc", dirty=False, changed=[]), recordings=["g1"],
+                    files={n: dict(bytes=(tmp_path / n).stat().st_size, sha256=file_sha256(tmp_path / n))
+                           for n in names})
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    assert check_rr.verify_ladder(tmp_path, commit="abc")[1] == []
+    assert check_rr.verify_ladder(tmp_path, commit="abd")[1]  # written from another commit
+    (tmp_path / names[1]).write_bytes(b"lossy?")  # the same size, other bytes
+    assert any("SHA-256" in p for p in check_rr.verify_ladder(tmp_path, commit="abc")[1])
+    (tmp_path / names[0]).write_bytes(b"lossles")
+    assert any("bytes" in p for p in check_rr.verify_ladder(tmp_path, commit="abc")[1])
+
+
+def test_files_fingerprint_is_the_freeze_records(tmp_path):
+    (tmp_path / "g1").mkdir()
+    (tmp_path / "g1" / "R0.mp4").write_bytes(b"12345")
+    movie = tmp_path / "raw" / "g1" / "IMG_0001.MOV"
+    movie.parent.mkdir(parents=True)
+    movie.write_bytes(b"123")
+    expected = hashlib.sha256(b"g1/R0.mp4 5\ng1/IMG_0001.MOV 3\n").hexdigest()
+    assert check_rr.files_fingerprint(dict(files={"g1/R0.mp4": {}}), tmp_path, [movie]) == expected
+
+
+def test_concentration_bands_cut_at_the_development_quintiles():
+    scored = pd.DataFrame(dict(belt=[10.0] * 6, a_rate=[10.0, 10.0, 10.0, 15.0, 10.0, np.nan],
+                               a_share=[0.1, 0.2, 0.45, 0.65, 0.9, np.nan]))
+    bands = check_rr.concentration_bands(scored, [0.2, 0.4, 0.6, 0.8])
+    assert [b["read"] for b in bands] == [1, 1, 1, 1, 1]  # a share on a cut joins the band above
+    assert [b["right"] for b in bands] == [1, 1, 1, 0, 1]
+
+
+def test_strata_count_right_over_read():
+    scored = pd.DataFrame(dict(belt=[8.0, 15.0, 22.4, 30.0], a_rate=[8.5, 18.0, 22.0, np.nan],
+                               site_group=["CH*", "CH*", "MOL/RING", "MOL/RING"],
+                               fitzpatrick=[6, 5, 2, 1], age=[30, 45, 61, 70]))
+    found = check_rr.strata(scored, "a_rate")
+    assert found["Fitzpatrick"]["5-6"] == dict(n=2, read=2, right=1)
+    assert found["age"]["41-60"] == dict(n=1, read=1, right=0)
+    assert found["age"][">60"] == dict(n=2, read=1, right=1)
+    assert found["belt rate"]["<=8"] == dict(n=1, read=1, right=1)
+    assert found["belt rate"][">=25"] == dict(n=1, read=0, right=0)
+
+
+def test_iphone_reading_finds_the_face_and_reads_the_torso_below(tmp_path, landmarker):
+    row = check_rr.iphone_reading(_portrait_video(tmp_path / "portrait.avi", 15.0), landmarker)
+    assert row["box_found"] and row["detections"] == 12
+    # The padded box ends below the chin (the face spans 0.06-0.42 of the height), and the torso
+    # region is every row of the 60-row reduced frame below that edge.
+    assert 0.30 < row["box_ry1"] < 0.45
+    assert row["rows"] == 60 - int(np.ceil(row["box_ry1"] * 60))
+    assert row["rate"] == pytest.approx(15.0, abs=0.3)
+
+
+def test_confirm_runs_whole_and_once(tmp_path, monkeypatch):
+    # Should a guard ever fail, the stage must not start for real: it would read held-out frames.
+    def started(args):
+        pytest.fail("the guard let the held-out stage start")
+    monkeypatch.setattr(check_rr, "run_confirm", started)
+    monkeypatch.setattr(check_rr, "run_dev", started)
+    monkeypatch.setattr(sys, "argv", ["check_rr", "--stage", "confirm", "--limit", "3",
+                                      "--out-dir", str(tmp_path)])
+    with pytest.raises(SystemExit, match="runs whole"):
+        check_rr.main()
+    (tmp_path / "summary_confirm.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["check_rr", "--stage", "confirm", "--out-dir", str(tmp_path)])
+    with pytest.raises(SystemExit, match="runs once"):
+        check_rr.main()
