@@ -1,0 +1,95 @@
+{
+  "stage": "dev",
+  "dataset": "VitalVideos-WW",
+  "split": "train",
+  "store": "D:\\QualityPhys\\phase 3 datasets\\vitalvideos_phase3_rc_none.h5",
+  "recordings": 240,
+  "limit": null,
+  "baseline_bpm": 19.939172865687596,
+  "baseline_within_2": 71,
+  "readouts": {
+    "A pixel components": {
+      "scored": 208,
+      "read": 208,
+      "coverage": 1.0,
+      "within_2": 197,
+      "share": 0.9471153846153846,
+      "wilson_95": [
+        0.9077983821220671,
+        0.9702167192761154
+      ],
+      "within_1": 185,
+      "mean_abs_error": 0.6064643606124757,
+      "bias": -0.3229351753283773,
+      "limits_of_agreement": [
+        -4.389165519904255,
+        3.7432951692475007
+      ],
+      "readout_only": 128,
+      "baseline_only": 2,
+      "mcnemar_p": 1.251313736450325e-35,
+      "outcome": "goes forward"
+    },
+    "B vertical shift, described": {
+      "scored": 208,
+      "read": 208,
+      "coverage": 1.0,
+      "within_2": 197,
+      "share": 0.9471153846153846,
+      "wilson_95": [
+        0.9077983821220671,
+        0.9702167192761154
+      ],
+      "within_1": 188,
+      "mean_abs_error": 0.7326901396252125,
+      "bias": -0.4547370435710558,
+      "limits_of_agreement": [
+        -6.193988011526875,
+        5.284513924384763
+      ],
+      "readout_only": 128,
+      "baseline_only": 2,
+      "mcnemar_p": 1.251313736450325e-35,
+      "outcome": "goes forward"
+    }
+  },
+  "reproduction": {
+    "checked": true,
+    "digest": "f75095c4a475f6d8",
+    "digest_nb_p3_39": "f75095c4a475f6d8",
+    "a_counts": {
+      "scored": 208,
+      "read": 208,
+      "within_2": 197,
+      "within_1": 185,
+      "readout_only": 128,
+      "baseline_only": 2
+    },
+    "a_counts_nb_p3_39": {
+      "scored": 208,
+      "read": 208,
+      "within_2": 197,
+      "within_1": 185,
+      "readout_only": 128,
+      "baseline_only": 2
+    },
+    "reproduces": true
+  },
+  "module": {
+    "file": "app/live_vitals/signal/respiration.py",
+    "sha256_lf": "f9f31fa03882bba2b338646c305027ccd65ac5529dd2eff3d6fb396a2734efc2"
+  },
+  "provenance": {
+    "command": [
+      "check_rr.py"
+    ],
+    "git": {
+      "commit": "500ecc8128fe416336a8294774c68bfc5f465f7a",
+      "dirty": true,
+      "changed": [
+        ".gitignore"
+      ]
+    },
+    "written_utc": "2026-11-06T09:08:44+00:00"
+  }
+}
