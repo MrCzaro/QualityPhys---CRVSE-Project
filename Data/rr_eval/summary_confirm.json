@@ -1,0 +1,452 @@
+{
+  "stage": "confirm",
+  "dataset": "VitalVideos-WW",
+  "split": "val",
+  "store": "D:\\QualityPhys\\phase 3 datasets\\vitalvideos_phase3_rc_none.h5",
+  "settings": {
+    "bar: Wilson 95% lower bound at least": 0.7,
+    "bar: coverage at least": 0.8,
+    "bar: McNemar p below": 0.05,
+    "Wilson z": 1.959964,
+    "ladder: deciding rung": "R2",
+    "ladder: no effect, every move within (breaths/min)": 1.0,
+    "ladder: effect, a move beyond (breaths/min)": 2.0,
+    "ladder: effect, least recordings lost or moved": 2,
+    "ladder: downscale from half size, frames averaged": [
+      4,
+      3
+    ],
+    "self-test: mean absolute difference, pixel means removed (grey levels)": 1.0,
+    "iPhone: downscale, frames averaged": [
+      8,
+      6
+    ]
+  },
+  "limit": null,
+  "development": {
+    "reproduces": true,
+    "digest": "f75095c4a475f6d8",
+    "a_counts": {
+      "scored": 208,
+      "read": 208,
+      "within_2": 197,
+      "within_1": 185,
+      "readout_only": 128,
+      "baseline_only": 2
+    }
+  },
+  "module": {
+    "file": "app/live_vitals/signal/respiration.py",
+    "sha256_lf": "f9f31fa03882bba2b338646c305027ccd65ac5529dd2eff3d6fb396a2734efc2"
+  },
+  "files": {
+    "ladder_commit": "41736314e7dafd7799b31ec97c9dd0452825f2cc",
+    "ladder_files": 72,
+    "iphone_files": 12,
+    "fingerprint": "37295672f706a15b1460a0988d5b84d1d835e6f9ff11631b475095eace539166"
+  },
+  "held_out": {
+    "recordings": 60,
+    "scored": 56,
+    "baseline_bpm": 19.939172865687596,
+    "baseline_within_2": 22,
+    "readouts": {
+      "A pixel components": {
+        "scored": 56,
+        "read": 56,
+        "coverage": 1.0,
+        "within_2": 54,
+        "share": 0.9642857142857143,
+        "wilson_95": [
+          0.8788121972263885,
+          0.9901505749404693
+        ],
+        "within_1": 51,
+        "mean_abs_error": 0.5313112347779844,
+        "bias": -0.3316905068788859,
+        "limits_of_agreement": [
+          -4.979728504552004,
+          4.316347490794233
+        ],
+        "readout_only": 32,
+        "baseline_only": 0,
+        "mcnemar_p": 4.656612873077393e-10,
+        "outcome": "goes forward"
+      },
+      "B vertical shift, described": {
+        "scored": 56,
+        "read": 55,
+        "coverage": 0.9821428571428571,
+        "within_2": 54,
+        "share": 0.9818181818181818,
+        "wilson_95": [
+          0.9039422384151328,
+          0.9967832195807291
+        ],
+        "within_1": 53,
+        "mean_abs_error": 0.26624806662824996,
+        "bias": -0.087573427861318,
+        "limits_of_agreement": [
+          -1.8643094506440299,
+          1.6891625949213938
+        ],
+        "readout_only": 32,
+        "baseline_only": 0,
+        "mcnemar_p": 4.656612873077393e-10,
+        "outcome": "goes forward"
+      }
+    },
+    "outcome": "confirmed",
+    "a_against_b": {
+      "both_read": 55,
+      "within_2_of_each_other": 53,
+      "both_right": 53,
+      "a_only": 1,
+      "b_only": 1,
+      "neither": 0
+    },
+    "strata": {
+      "a": {
+        "site group": {
+          "CH*": {
+            "n": 19,
+            "read": 19,
+            "right": 18
+          },
+          "CRC/SCH/BET": {
+            "n": 20,
+            "read": 20,
+            "right": 20
+          },
+          "MOL/RING": {
+            "n": 17,
+            "read": 17,
+            "right": 16
+          }
+        },
+        "Fitzpatrick": {
+          "1-2": {
+            "n": 16,
+            "read": 16,
+            "right": 15
+          },
+          "3-4": {
+            "n": 18,
+            "read": 18,
+            "right": 18
+          },
+          "5-6": {
+            "n": 22,
+            "read": 22,
+            "right": 21
+          }
+        },
+        "age": {
+          "<=40": {
+            "n": 17,
+            "read": 17,
+            "right": 15
+          },
+          "41-60": {
+            "n": 30,
+            "read": 30,
+            "right": 30
+          },
+          ">60": {
+            "n": 9,
+            "read": 9,
+            "right": 9
+          }
+        },
+        "belt rate": {
+          "<=8": {
+            "n": 3,
+            "read": 3,
+            "right": 2
+          },
+          "9-11": {
+            "n": 1,
+            "read": 1,
+            "right": 1
+          },
+          "12-20": {
+            "n": 35,
+            "read": 35,
+            "right": 35
+          },
+          "21-24": {
+            "n": 13,
+            "read": 13,
+            "right": 12
+          },
+          ">=25": {
+            "n": 4,
+            "read": 4,
+            "right": 4
+          }
+        }
+      },
+      "b": {
+        "site group": {
+          "CH*": {
+            "n": 19,
+            "read": 18,
+            "right": 17
+          },
+          "CRC/SCH/BET": {
+            "n": 20,
+            "read": 20,
+            "right": 20
+          },
+          "MOL/RING": {
+            "n": 17,
+            "read": 17,
+            "right": 17
+          }
+        },
+        "Fitzpatrick": {
+          "1-2": {
+            "n": 16,
+            "read": 16,
+            "right": 16
+          },
+          "3-4": {
+            "n": 18,
+            "read": 18,
+            "right": 18
+          },
+          "5-6": {
+            "n": 22,
+            "read": 21,
+            "right": 20
+          }
+        },
+        "age": {
+          "<=40": {
+            "n": 17,
+            "read": 16,
+            "right": 16
+          },
+          "41-60": {
+            "n": 30,
+            "read": 30,
+            "right": 29
+          },
+          ">60": {
+            "n": 9,
+            "read": 9,
+            "right": 9
+          }
+        },
+        "belt rate": {
+          "<=8": {
+            "n": 3,
+            "read": 3,
+            "right": 3
+          },
+          "9-11": {
+            "n": 1,
+            "read": 1,
+            "right": 1
+          },
+          "12-20": {
+            "n": 35,
+            "read": 35,
+            "right": 34
+          },
+          "21-24": {
+            "n": 13,
+            "read": 12,
+            "right": 12
+          },
+          ">=25": {
+            "n": 4,
+            "read": 4,
+            "right": 4
+          }
+        }
+      }
+    },
+    "concentration": {
+      "cuts": [
+        0.5611949695893644,
+        0.7071942898715138,
+        0.8023581527872912,
+        0.8639077090931403
+      ],
+      "bands": [
+        {
+          "read": 10,
+          "right": 8
+        },
+        {
+          "read": 10,
+          "right": 10
+        },
+        {
+          "read": 17,
+          "right": 17
+        },
+        {
+          "read": 11,
+          "right": 11
+        },
+        {
+          "read": 8,
+          "right": 8
+        }
+      ]
+    },
+    "without_confirmed_belt": {
+      "recordings": 4,
+      "with_surrogate": 2,
+      "a_read": 2,
+      "a_within_2_of_surrogate": 2
+    }
+  },
+  "ladder": {
+    "recordings": 12,
+    "resp_ok": 11,
+    "self_test": {
+      "passed": true,
+      "within": 12,
+      "median": 0.2639277570473251,
+      "max": 0.3236291646966116
+    },
+    "r0_against_stored": {
+      "read_at_both": 12,
+      "median": 0.0002200483437686529,
+      "max": 0.009699698854355177
+    },
+    "rungs": {
+      "R1": {
+        "recordings": 11,
+        "read_at_r0": 11,
+        "lost": 0,
+        "moved_over_no_effect": 0,
+        "moved_over_effect": 0,
+        "max_move": 0.01670110614030129,
+        "median_move": 0.00039897885870843197,
+        "outcome": "no effect",
+        "described_without_belt": {
+          "recordings": 1,
+          "read_at_r0": 1,
+          "lost": 0,
+          "moved_over_no_effect": 0,
+          "moved_over_effect": 0,
+          "max_move": 8.762563816233637e-05,
+          "median_move": 8.762563816233637e-05,
+          "outcome": "no effect"
+        }
+      },
+      "R2": {
+        "recordings": 11,
+        "read_at_r0": 11,
+        "lost": 0,
+        "moved_over_no_effect": 0,
+        "moved_over_effect": 0,
+        "max_move": 0.02168334817538664,
+        "median_move": 0.0014105857849138204,
+        "outcome": "no effect",
+        "described_without_belt": {
+          "recordings": 1,
+          "read_at_r0": 1,
+          "lost": 0,
+          "moved_over_no_effect": 0,
+          "moved_over_effect": 0,
+          "max_move": 0.0009958982997488874,
+          "median_move": 0.0009958982997488874,
+          "outcome": "no effect"
+        }
+      },
+      "R3": {
+        "recordings": 11,
+        "read_at_r0": 11,
+        "lost": 0,
+        "moved_over_no_effect": 0,
+        "moved_over_effect": 0,
+        "max_move": 0.07762993500855053,
+        "median_move": 0.0018234030626338438,
+        "outcome": "no effect",
+        "described_without_belt": {
+          "recordings": 1,
+          "read_at_r0": 1,
+          "lost": 0,
+          "moved_over_no_effect": 0,
+          "moved_over_effect": 0,
+          "max_move": 0.00028541784751112687,
+          "median_move": 0.00028541784751112687,
+          "outcome": "no effect"
+        }
+      },
+      "R4": {
+        "recordings": 11,
+        "read_at_r0": 11,
+        "lost": 0,
+        "moved_over_no_effect": 0,
+        "moved_over_effect": 0,
+        "max_move": 0.039133137197717716,
+        "median_move": 0.0025904878923519448,
+        "outcome": "no effect",
+        "described_without_belt": {
+          "recordings": 1,
+          "read_at_r0": 1,
+          "lost": 0,
+          "moved_over_no_effect": 0,
+          "moved_over_effect": 0,
+          "max_move": 0.000260075659383574,
+          "median_move": 0.000260075659383574,
+          "outcome": "no effect"
+        }
+      },
+      "R5": {
+        "recordings": 11,
+        "read_at_r0": 11,
+        "lost": 0,
+        "moved_over_no_effect": 0,
+        "moved_over_effect": 0,
+        "max_move": 0.01826864458728572,
+        "median_move": 0.0009136368231352776,
+        "outcome": "no effect",
+        "described_without_belt": {
+          "recordings": 1,
+          "read_at_r0": 1,
+          "lost": 0,
+          "moved_over_no_effect": 0,
+          "moved_over_effect": 0,
+          "max_move": 0.00044652936111688746,
+          "median_move": 0.00044652936111688746,
+          "outcome": "no effect"
+        }
+      }
+    },
+    "outcome": "no effect"
+  },
+  "iphone": {
+    "recordings": 12,
+    "box_found": 12,
+    "read": 6,
+    "rows": {
+      "median": 4.5,
+      "min": 0,
+      "max": 49
+    },
+    "resp_ok": 11,
+    "resp_ok_read": 5,
+    "resp_ok_within_2_of_belt": 5,
+    "within_2_of_stored": 6
+  },
+  "provenance": {
+    "command": [
+      "check_rr.py",
+      "--stage",
+      "confirm"
+    ],
+    "git": {
+      "commit": "495e2d6131807424123cf5009a9a8f9e55586f10",
+      "dirty": false,
+      "changed": []
+    },
+    "written_utc": "2026-11-06T17:15:12+00:00"
+  }
+}
