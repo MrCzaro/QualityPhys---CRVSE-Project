@@ -277,18 +277,21 @@ It documents a condition the app does not support.
 
 VitalVideos-Worldwide entered in Phase 3 as a training corpus, with a subject-wise
 split frozen before any video was processed: 240 subjects for training and 60 held out
-(`Data/vitalvideos_split.csv`). It has not yet been used to train a model; all 300
-recordings have been evaluated zero-shot (`check_vitalvideos`). It is the project's
-first data with Fitzpatrick skin type, which is confounded with recording site, and it
-carries respiration-belt and ECG references recorded with the video.
-
+(`Data/vitalvideos_split.csv`). Its 240 training subjects trained the v3 candidate
+(NB_P3_31), not the shipped v2, and all 300 recordings have been evaluated zero-shot with
+v2 (`check_vitalvideos`). It is the project's first data with Fitzpatrick skin type,
+which is confounded with recording site, and it carries respiration-belt and ECG
+references recorded with the video; the belt is the respiratory-rate reference of
+NB_P3_39 (the 240) and NB_P3_40 (the 60).
 Project artifacts include:
 
 - `Data/processing_log_vitalvideos_phase3.csv`
 - `Data/vitalvideos_split.csv`
 - `Data/vitalvideos_eval/summary_*.json`; the per-recording evaluation tables carry
   participant age, sex and skin type and are not committed
-
+- `Data/rr_eval/summary_*.json` (respiratory rate, NB_P3_39 and NB_P3_40); the
+  per-recording tables stay local for the same reason
+  
 ### Rice iPPG (HRVCam)
 
 Rice iPPG entered in Phase 3 as an evaluation-only set (NB_P3_33 exploration, NB_P3_34

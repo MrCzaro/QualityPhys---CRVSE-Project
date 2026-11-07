@@ -13,11 +13,12 @@ The notebooks fall into two phases:
   multichannel experiments, and live-compatible adaptation. They produced the Phase-2
   app, `app/live_hr_demo/`, now frozen; its model's characterised failure (predictions
   shrinking toward the corpus mean) is recorded in Card 1 of the model card.
-- **Phase 3** (`Notebooks/Phase 3 Notebooks/`, NB_P3_01 to NB_P3_38): models that read
+- **Phase 3** (`Notebooks/Phase 3 Notebooks/`, NB_P3_01 to NB_P3_40): models that read
   the face-crop video itself - the unified preprocessing schema, the architecture screen,
   the shipped model (PhysNet v2, NB_P3_18), held-out and benchmark sets, full-corpus
-  retraining, the app-level battery, beat timing, and robustness checks of the heart-rate
-  reading. They are the basis of the current app, `app/live_vitals/`, and of Card 2.
+  retraining, the app-level battery, beat timing, robustness checks of the heart-rate
+  reading, and respiratory rate from the torso's motion in the whole frame. They are the
+  basis of the current app, `app/live_vitals/`, and of Card 2.
 
 Within a phase, later notebooks should be trusted more than earlier ones when they
 disagree, because they were written after the issues the earlier ones exposed. Where
@@ -141,11 +142,13 @@ sets it is judged on. Each is listed with the question it asked and what it foun
 | `NB_P3_36_MR-NIRP_Indoor_Preprocessing.ipynb` | How does MR-NIRP Indoor go into an evaluation store? | 15 recordings with the app's 8-bit crop and a full-depth trace of the same region, verified byte for byte; an alignment tie found under NB_P3_35's timing figure. |
 | `NB_P3_37_VitalVideos_PRV_Confirmation.ipynb` | Does v2's 60 s SDNN hold on VitalVideos-WW, under a rule fixed in advance? | No: within 10% of the contact PPG in 9.3% of 236 recordings, against a bar of 50%. "HRV" is not earned and RMSSD is closed; the Rice result stands for one laboratory camera only. |
 | `NB_P3_38_HR_Robustness_Checks.ipynb` | Does the heart-rate reading hold below 60 bpm, after a browser-grade encode and at lower frame rates? Three checks, each under a rule fixed in advance. | Below 60 bpm: inconclusive (good windows 63.6% against 85.8% at 65-90 bpm; the loss is v2's, not the confidence formula's). The app's recorder setting: inconclusive (9 of 10 readings within 0.72 bpm, one marginal recording lost; POS lost 6). Frame rate: v2 holds down to 24 fps, with 22 and 20 fps unresolved. No gate moved. |
+| `NB_P3_39_RR_Exploration.ipynb` | Which camera readout carries the breathing rate, against a waist belt recorded with the video? Development on VitalVideos-WW's training split, each check's method fixed before it ran. | Only the torso's motion in the whole frame: two readouts put 197 of 208 within 2 breaths/min (94.7%), against 71 for a constant at the training median. Head motion in the face crop, and the face's colour intensity, pulse amplitude and pulse-rate swing, did not beat the constant; on Rice's paced deep breathing the pulse-rate swing followed the pace while intensity and amplitude did not. Readout A (pixel components) chosen at the gate. |
+| `NB_P3_40_RR_Confirmation.ipynb` | Does readout A hold on the held-out split, under a rule fixed before any of its frames was read? | Confirmed: 54 of 56 within 2 breaths/min of the belt (96.4%, 95% 87.9-99.0%), against 22 for the constant; an encode at the app's recorder setting moved no reading on 11 raw recordings. A close-up phone framing leaves too little torso below the face to read half of its recordings. The app keeps only the face crop and reports no respiratory rate. |
 
 Main interpretation: the training loss mattered more than the architecture (NB_P3_18,
 20, 21, 23), and PhysNet v2 was chosen for size and speed as well as accuracy. The later
 evaluations run through the app's own code, and where a decision rests on one, its rule
-was fixed before the run (NB_P3_29, 32, 37 and 38).
+was fixed before the run (NB_P3_29, 32, 37, 38 and 40).
 
 ## Current Scientific Boundary
 
@@ -171,9 +174,13 @@ README and in Card 2 of the model card.
   laboratory camera (NB_P3_33) but not confirmed on an independent set under a rule fixed
   in advance (NB_P3_37), with RMSSD not recoverable; in-vehicle video (NB_P3_18);
   hyperparameter tuning (NB_P3_19).
-- **Open, not a negative:** respiratory rate from video. NB_P3_01's classical test was
-  inconclusive (revised 2026-11-04): neither of its references was recorded with the
-  video, and neither could separate a working method from a constant.
+- **Respiratory rate, on lab video and from the torso (NB_P3_40).** Under a rule fixed
+  before any held-out frame was read, the motion of the torso below the face, in the whole
+  frame, read the breathing rate within 2 breaths/min of a waist belt in 54 of 56 held-out
+  VitalVideos-WW recordings, and an encode at the app's recorder setting moved no reading.
+  The face crop's own signals did not beat a constant (NB_P3_39), and the app keeps only
+  the crop, so it reports no respiratory rate. NB_P3_01's classical test, with no
+  reference recorded with the video, stays inconclusive.
 - **A candidate, not a claim:** `hr_physnet_v3` (NB_P3_31) is registered beside v2; the
   app-level battery (NB_P3_32) kept v2 as the default.
 - **Not characterised:** elevated heart rate and iOS devices.

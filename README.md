@@ -26,11 +26,14 @@ rather than held-out accuracy (see the model card).
 | Pulse oximeter, one resting capture | oximeter 60 → model 61.2, classical 60.6–61.2 |
 | Beat timing and pulse-rate variability, Rice iPPG: 12 still subjects, one lab camera, the app's gates bypassed (exploratory; Rice's rig only) | beats timed to **8 ms**; SDNN within 10% of a finger oximeter in **8 of 12**, RMSSD in 5 of 12 |
 | Pulse-rate variability, VitalVideos-WW: 236 recordings the app's gates accept, a rule fixed before the run (NB_P3_37) | beats timed to **15 ms**; 60 s SDNN within 10% of a contact PPG in **9%** (95% 6–14%) - **not confirmed**; RMSSD 3% |
+| Respiratory rate from the motion of the torso, seated adults at rest, VitalVideos-WW: 56 held-out recordings with a confirmed waist belt, lossless lab video, a rule fixed before the run (NB_P3_40) | **54 of 56** within 2 breaths/min of the belt (95% 88–99%), against 39% for a constant - **confirmed**; an encode at the app's recorder setting moved no reading |
 
-The last two rows are the honest boundary. Heart rate works. Beat timing good enough for
-variability does not carry over: on one laboratory camera SDNN held in most still
+The two variability rows are the honest boundary. Heart rate works. Beat timing good enough
+for variability does not carry over: on one laboratory camera SDNN held in most still
 recordings, but a test fixed in advance on an independent set did not confirm it, and the
-app reports no variability - see *What It Cannot Do*.
+app reports no variability - see *What It Cannot Do*. Respiratory rate is the opposite
+case: it holds on lab video, read from the torso, but the app keeps only the face and
+reports none.
 
 ## What the App Does
 
@@ -43,8 +46,8 @@ deployment is structural rather than defended by review.
 The interface reports a heart rate with its confidence and status, an independent
 classical cross-check, a per-window trend, and a diagnostics panel holding every number
 behind the reading. Heart rate is the only vital sign it reports: pulse-rate variability
-was tested and not confirmed (see *What It Cannot Do*), and respiratory rate has no model
-with evidence behind it yet.
+was tested and not confirmed, and respiratory rate, confirmed on lab video from the motion
+of the torso, needs a whole-frame stream the app does not capture (see *What It Cannot Do*).
 
 ![The app after a 60-second capture: heart rate 51.0 bpm with status ok; measurement quality with confidence 0.77, 11 of 21 windows used and a 29.9 fps capture rate; POS at 50.8 bpm as the classical cross-check; and the per-window trend](docs/images/app_result.png)
 
@@ -186,6 +189,19 @@ frame rate is not the limit either: resampling a contact PPG to 30 Hz costs 3% o
 beat positions are refined sub-sample. Averaging overlapping model windows recovers 4%,
 because their errors correlate at r ≈ 0.83. A timing-aware training objective is untried.
 
+**Respiratory rate.** The app reports none, although a readout passed a test fixed in
+advance. Read from the motion of the torso below the face - the principal components of
+the whole frame's pixels there, in `app/live_vitals/signal/respiration.py` - it put 54 of 56
+held-out VitalVideos-WW recordings within 2 breaths/min of a waist belt (95% interval
+88–99%; a constant at the training median: 39%), and an encode at the app's recorder
+setting moved no reading (NB_P3_40; the full statement is in the
+[model card](docs/model_card.md#limitations-1)). The app keeps only the face crop, and
+nothing in it - head motion, colour, pulse amplitude or the pulse-rate swing - beat the
+constant (NB_P3_39). The recordings are lossless lab video of seated, still adults with
+the chest in frame, and a close-up phone framing of the same people left too little torso
+below the face to read half of them. Whether the app should keep a whole-frame stream is
+the next question.
+
 **In-vehicle conditions.** Zero-shot on PhysDrive: 27.79 bpm MAE, +24.82 bias,
 r = 0.11 - not tracking at all. Training on PhysDrive repaired that corpus and destroyed
 the other three.
@@ -263,6 +279,7 @@ A command line exists for recorded video and direct webcam capture:
 .\venv\Scripts\python.exe -m app.live_vitals.scripts.check_contract_parity
 .\venv\Scripts\python.exe -m app.live_vitals.scripts.check_hrv_sampling_ceiling
 .\venv\Scripts\python.exe -m app.live_vitals.scripts.check_hrv_from_video
+.\venv\Scripts\python.exe -m app.live_vitals.scripts.check_rr
 ```
 
 `check_ubfc_regression` runs each subject through the app's own capture path and compares
@@ -271,11 +288,14 @@ measured rate and verdict, against a committed per-estimator baseline. It exits 
 or when the config, face model or weights differ from the baseline's, and 2 when there is
 no comparable baseline. The HRV scripts carry a reference-against-itself control row; any
 result there other than `0.00 / 100% / 0.0 ms` means the harness is broken rather than
-the model.
+the model. `check_rr` reruns the respiratory-rate readout on VitalVideos-WW's training split
+and exits 1 unless it reproduces NB_P3_39's 240 readings exactly; its held-out stage
+(`--stage confirm`) was NB_P3_40's one run and refuses to run again.
 
-`pytest` runs 220 tests on synthetic data only: the heart-rate readout and its gating,
+`pytest` runs 269 tests on synthetic data only: the heart-rate readout and its gating,
 the capture gates, video decoding (AVI, MP4 and browser-style WebM), the web endpoints,
-the HRV harness, the three robustness checks' rules, and the capture page itself in headless Chromium.
+the HRV harness, the three robustness checks' rules, the respiratory-rate readout and its
+checks, and the capture page itself in headless Chromium.
 Those five page tests
 carry the `browser` mark and need Playwright's Chromium (`python -m playwright install
 chromium`); `-m "not browser"` leaves them out.
@@ -322,6 +342,13 @@ The app was rebuilt around the frame contract, with the quality gates and the cl
 cross-check added on evidence gathered while validating it. Its heart-rate reading was then
 tested under rules fixed in advance against slow pulses, browser-grade compression and lower
 frame rates (NB_P3_38); none of the three moved a gate.
+
+Respiratory rate followed. A feasibility review found that the earlier classical test
+(NB_P3_01) had no reference recorded with the video. On VitalVideos-WW, whose waist belt
+was recorded with it, six camera readouts were screened on the training split and only the
+torso's motion beat a constant (NB_P3_39); one run fixed in advance confirmed it on the
+held-out split (NB_P3_40). The app does not report it: that needs a capture that keeps the
+whole frame.
 
 `docs/notebook_index.md` has the chronology.
 

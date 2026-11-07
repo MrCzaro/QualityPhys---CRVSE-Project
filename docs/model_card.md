@@ -397,7 +397,8 @@ Not intended for:
 - heart-rate or pulse-rate **variability**: the app reports none, and the one positive
   finding (SDNN, still subjects, one laboratory camera) was not confirmed on an
   independent set under a rule fixed in advance; see Limitations
-- respiratory rate or blood pressure, which the app does not report
+- respiratory rate or blood pressure, which the app does not report; the respiratory-rate
+  finding (see Limitations) reads the torso in a whole frame the app does not capture
 
 ### Input Contract
 
@@ -674,6 +675,32 @@ baselines and phone captures.
   found, 46.5 ms of jitter against an RMSSD of 20-27 ms) was a property of that capture,
   not of the model, and 30 fps sampling costs only 3% of RMSSD when beat positions are
   refined sub-sample.
+
+  - **Respiratory rate was confirmed on lab video, from the torso, and the app reports none.**
+  Tested under a rule fixed before any held-out frame was read (NB_P3_40; readout A,
+  `app/live_vitals/signal/respiration.py`, SHA-256 of its text f9f31fa0…efc2; run
+  2026-11-06):
+
+  > Respiratory rate from the motion of the torso, seated adults at rest. On the 56 of 60
+  > held-out VitalVideos-WW recordings whose waist belt an independent surrogate confirms
+  > (lossless lab video with the chest in frame, not a browser capture), readout A reads the
+  > breathing rate within 2 breaths/min of the belt often enough to clear a bar fixed in
+  > advance: 54 of the 56 recordings it reads (96.4%, 95% interval 87.9-99.0%; within 1
+  > breath/min 91.1%), coverage 100.0%, against 39.3% for a constant at the training median
+  > (exact McNemar p = 4.7e-10). A browser-grade encode (H.264 at 0.65 bits per pixel per
+  > frame, 11 recordings) did not move the reading. Developed on 208 training recordings
+  > (94.7% within 2 breaths/min), where no face-only readout beat the constant. Research use
+  > only: not a medical device, and no clinical reading of the rate.
+
+  The readout is not this card's model: it takes the principal components of the pixels
+  below the padded face box in a whole-frame stream (120x132 at 10 fps), which the app
+  does not capture, and nothing in the face crop - head motion, colour intensity, pulse
+  amplitude or the pulse-rate swing - beat the constant (NB_P3_39). The belt-confirmed
+  recordings lean young (on the held-out split, 17 of 18 participants aged 40 or under
+  against 9 of 12 over 60), only 7 of the 56 breathe at 8 or fewer or 25 or more breaths
+  per minute, and site and skin type are confounded. The same participants' close-up
+  phone recordings left too little torso below the face box to read 6 of 12.
+  
 - **MCD-rPPG is the standing accuracy ceiling** — around 10 bpm at training time
   against 2-3 on DLCN and UBFC-rPPG, for every architecture screened. Two candidate
   explanations, source frame rate and crop aspect, were each tested and eliminated.
